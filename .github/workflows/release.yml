@@ -1,0 +1,204 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            target: "universal-apple-darwin"
+            artifact: "dmg"
+          - platform: "ubuntu-22.04"
+            target: "x86_64-unknown-linux-gnu"
+            artifact: "AppImage"
+          - platform: "windows-latest"
+            target: "x86_64-pc-windows-msvc"
+            artifact: "msi"
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./apps/desktop/src-tauri -> target"
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build Tauri app
+        run: |
+          cd apps/desktop
+          pnpm tauri build
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-build
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+
+  create-release:
+    needs: build-desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure
+        run: ls -R artifacts
+
+      - name: Create checksums
+        run: |
+          cd artifacts
+          find . -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.deb" \) -exec sha256sum {} \; > ../checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.msi
+            artifacts/**/*.deb
+            checksums.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-manifest:
+    needs: create-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get release info
+        id: release_info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const release = await github.rest.repos.getReleaseByTag({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag: tag
+            });
+            
+            const assets = release.data.assets;
+            
+            const manifest = {
+              version: tag,
+              releaseDate: release.data.published_at,
+              assets: {
+                mac: {},
+                win: {},
+                linux: {}
+              }
+            };
+            
+            for (const asset of assets) {
+              const url = asset.browser_download_url;
+              
+              if (asset.name.endsWith('.dmg')) {
+                manifest.assets.mac.dmg = url;
+              } else if (asset.name.endsWith('.msi')) {
+                manifest.assets.win.msi = url;
+              } else if (asset.name.endsWith('.AppImage')) {
+                manifest.assets.linux.appImage = url;
+              } else if (asset.name.endsWith('.deb')) {
+                manifest.assets.linux.deb = url;
+              }
+            }
+            
+            // Find checksums
+            const checksumAsset = assets.find(a => a.name === 'checksums.txt');
+            if (checksumAsset) {
+              const response = await fetch(checksumAsset.browser_download_url);
+              const checksums = await response.text();
+              
+              // Parse checksums (simplified)
+              const lines = checksums.split('\n');
+              for (const line of lines) {
+                const [hash, file] = line.split(/\s+/);
+                if (file.includes('.dmg')) manifest.assets.mac.sha256 = hash;
+                if (file.includes('.msi')) manifest.assets.win.sha256 = hash;
+                if (file.includes('.AppImage')) manifest.assets.linux.sha256 = hash;
+              }
+            }
+            
+            return manifest;
+
+      - name: Update assets.json
+        run: |
+          mkdir -p apps/web/public
+          echo '${{ steps.release_info.outputs.result }}' > apps/web/public/assets.json
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/web/public/assets.json
+          git commit -m "Update assets.json for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin HEAD:main || echo "Failed to push"
