@@ -16,13 +16,14 @@ lazy_static::lazy_static! {
         m.insert("less", "Less");
         m.insert("vue", "Vue");
         m.insert("svelte", "Svelte");
-        
+
         // Backend
         m.insert("py", "Python");
         m.insert("rb", "Ruby");
         m.insert("php", "PHP");
         m.insert("java", "Java");
         m.insert("kt", "Kotlin");
+        m.insert("kts", "Kotlin");
         m.insert("scala", "Scala");
         m.insert("go", "Go");
         m.insert("rs", "Rust");
@@ -32,11 +33,13 @@ lazy_static::lazy_static! {
         m.insert("cc", "C++");
         m.insert("cxx", "C++");
         m.insert("hpp", "C++");
+        m.insert("hh", "C++");
+        m.insert("hxx", "C++");
         m.insert("cs", "C#");
         m.insert("swift", "Swift");
         m.insert("m", "Objective-C");
         m.insert("mm", "Objective-C++");
-        
+
         // Functional
         m.insert("hs", "Haskell");
         m.insert("elm", "Elm");
@@ -46,14 +49,14 @@ lazy_static::lazy_static! {
         m.insert("ml", "OCaml");
         m.insert("fs", "F#");
         m.insert("clj", "Clojure");
-        
+
         // Shell
         m.insert("sh", "Shell");
         m.insert("bash", "Bash");
         m.insert("zsh", "Zsh");
         m.insert("fish", "Fish");
         m.insert("ps1", "PowerShell");
-        
+
         // Data & Config
         m.insert("json", "JSON");
         m.insert("yaml", "YAML");
@@ -63,23 +66,23 @@ lazy_static::lazy_static! {
         m.insert("sql", "SQL");
         m.insert("graphql", "GraphQL");
         m.insert("gql", "GraphQL");
-        
+
         // Markup
         m.insert("md", "Markdown");
         m.insert("mdx", "MDX");
         m.insert("tex", "LaTeX");
         m.insert("rst", "reStructuredText");
-        
+
         // Other
         m.insert("lua", "Lua");
         m.insert("r", "R");
         m.insert("jl", "Julia");
         m.insert("dart", "Dart");
         m.insert("vim", "Vimscript");
-        
+
         m
     };
-    
+
     static ref SPECIAL_FILES: HashMap<&'static str, &'static str> = {
         let mut m = HashMap::new();
         m.insert("Dockerfile", "Docker");
@@ -93,18 +96,16 @@ lazy_static::lazy_static! {
 }
 
 pub fn detect_language(filename: &str) -> String {
-    // Check special filenames first
+    // Fichiers spéciaux
     if let Some(&lang) = SPECIAL_FILES.get(filename) {
         return lang.to_string();
     }
-
-    // Check extension
+    // Extension
     if let Some(ext_pos) = filename.rfind('.') {
         let ext = &filename[ext_pos + 1..].to_lowercase();
         if let Some(&lang) = LANGUAGE_MAP.get(ext.as_str()) {
             return lang.to_string();
         }
     }
-
     "Unknown".to_string()
 }

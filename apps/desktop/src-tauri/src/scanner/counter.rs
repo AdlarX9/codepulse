@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 
 lazy_static::lazy_static! {
+    // Marqueurs de commentaire "ligne" par langage.
+    // IMPORTANT: on ne met plus "#" pour JS/TS (ce n'est pas un commentaire ligne valide).
     static ref LINE_COMMENT_MARKERS: HashMap<&'static str, Vec<&'static str>> = {
         let mut m = HashMap::new();
-        m.insert("JavaScript", vec!["//", "#"]);
-        m.insert("TypeScript", vec!["//", "#"]);
+        m.insert("JavaScript", vec!["//"]);
+        m.insert("TypeScript", vec!["//"]);
         m.insert("Python", vec!["#"]);
         m.insert("Ruby", vec!["#"]);
         m.insert("Shell", vec!["#"]);
@@ -23,7 +25,7 @@ lazy_static::lazy_static! {
         m.insert("SQL", vec!["--"]);
         m
     };
-    
+
     static ref BLOCK_COMMENT_MARKERS: HashMap<&'static str, (&'static str, &'static str)> = {
         let mut m = HashMap::new();
         m.insert("JavaScript", ("/*", "*/"));
@@ -61,13 +63,13 @@ pub fn count_lines(content: &str, language: &str) -> (u32, u32, u32, u32) {
         total += 1;
         let trimmed = line.trim();
 
-        // Check blank
+        // Blank
         if trimmed.is_empty() {
             blank += 1;
             continue;
         }
 
-        // Check if we're in a block comment
+        // Dans un bloc de commentaire
         if in_block_comment {
             comment += 1;
             if trimmed.contains(block_end_marker) {
@@ -76,14 +78,14 @@ pub fn count_lines(content: &str, language: &str) -> (u32, u32, u32, u32) {
             continue;
         }
 
-        // Check for block comment start
+        // Début bloc commentaire
         if let Some(&(start, end)) = block_markers {
             if trimmed.starts_with(start) {
                 comment += 1;
                 in_block_comment = true;
                 block_end_marker = end;
-                
-                // Check if it ends on the same line
+
+                // Bloc commence et se termine sur la même ligne
                 if trimmed.contains(end) && trimmed.rfind(end).unwrap() > trimmed.find(start).unwrap() {
                     in_block_comment = false;
                 }
@@ -91,7 +93,7 @@ pub fn count_lines(content: &str, language: &str) -> (u32, u32, u32, u32) {
             }
         }
 
-        // Check for line comment
+        // Commentaire ligne
         let mut is_comment = false;
         for &marker in line_markers {
             if trimmed.starts_with(marker) {
@@ -126,5 +128,6 @@ function test() {
         let (total, blank, comment, code) = count_lines(content, "JavaScript");
         assert!(comment >= 2);
         assert!(code >= 3);
+        assert!(total >= comment + code + blank);
     }
 }

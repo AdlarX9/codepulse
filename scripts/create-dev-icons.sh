@@ -21,14 +21,6 @@ fi
 
 echo "Creating placeholder icons..."
 
-# Create base 1024x1024 icon
-convert -size 1024x1024 xc:"#3B82F6" \
-    -gravity center \
-    -pointsize 400 \
-    -fill white \
-    -annotate +0+0 "CP" \
-    "$ICON_DIR/icon-1024.png"
-
 # Generate required sizes
 convert "$ICON_DIR/icon-1024.png" -resize 32x32 "$ICON_DIR/32x32.png"
 convert "$ICON_DIR/icon-1024.png" -resize 128x128 "$ICON_DIR/128x128.png"

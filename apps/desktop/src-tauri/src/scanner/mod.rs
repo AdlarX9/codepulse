@@ -1,23 +1,19 @@
 mod language;
 mod counter;
+mod filter;
 
-use serde::{Deserialize, Serialize};
+use rayon::prelude::*;
+use serde::{Serialize};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
-use walkdir::{DirEntry, WalkDir};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use walkdir::{WalkDir};
 
 pub use language::detect_language;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScanOptions {
-    #[serde(default)]
-    pub exclude_dirs: Vec<String>,
-    #[serde(default)]
-    pub exclude_extensions: Vec<String>,
-    #[serde(default)]
-    pub follow_symlinks: bool,
-}
+pub use crate::settings::UserSettings;
+pub use filter::count_files;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileStats {
@@ -62,41 +58,11 @@ struct ProgressEvent {
     current_file: String,
 }
 
-const EXCLUDED_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    ".svn",
-    ".hg",
-    "dist",
-    "build",
-    "out",
-    "target",
-    ".next",
-    ".nuxt",
-    ".turbo",
-    "coverage",
-    "__pycache__",
-    ".pytest_cache",
-    ".venv",
-    "venv",
-    "vendor",
-    "bin",
-    "obj",
-];
-
-fn is_excluded_dir(entry: &DirEntry, exclude_dirs: &[String]) -> bool {
-    if let Some(name) = entry.file_name().to_str() {
-        if EXCLUDED_DIRS.contains(&name) || exclude_dirs.contains(&name.to_string()) {
-            return true;
-        }
-    }
-    false
-}
-
 pub async fn scan_path(
     path: &str,
-    options: ScanOptions,
+    settings: UserSettings,
     window: tauri::Window,
+    cancel_flag: Arc<AtomicBool>,
 ) -> Result<ScanResult, String> {
     let start = Instant::now();
     let root = Path::new(path);
@@ -105,39 +71,32 @@ pub async fn scan_path(
         return Err("Path does not exist".to_string());
     }
 
-    let mut files: Vec<FileStats> = Vec::new();
-    let mut files_scanned = 0u32;
-
-    // Walk directory
+    // Collecte des fichiers — on ne traverse que les dossiers non exclus
+    let mut file_paths: Vec<PathBuf> = Vec::new();
     let walker = WalkDir::new(root)
-        .follow_links(options.follow_symlinks)
+        .follow_links(settings.follow_symlinks)
         .into_iter()
         .filter_entry(|e| {
-            if e.path().is_dir() {
-                !is_excluded_dir(e, &options.exclude_dirs)
-            } else {
-                true
+            // Vérifier l'annulation pendant la traversée
+            if cancel_flag.load(Ordering::Relaxed) {
+                return false;
             }
+            
+            return count_files(e, settings.clone())
         });
 
     for entry in walker {
+        if cancel_flag.load(Ordering::Relaxed) {
+            return Err("Scan cancelled".to_string());
+        }
+
         match entry {
             Ok(entry) => {
                 if entry.path().is_file() {
-                    if let Some(stats) = process_file(entry.path(), &options) {
-                        files.push(stats);
-                        files_scanned += 1;
-
-                        // Emit progress every 10 files
-                        if files_scanned % 10 == 0 {
-                            let _ = window.emit(
-                                "scan:progress",
-                                ProgressEvent {
-                                    files_scanned,
-                                    current_file: entry.path().display().to_string(),
-                                },
-                            );
-                        }
+                    // filter_entry() cannot exclude files, only controls directory descent.
+                    // Re-apply file-level filter here to ensure only allowed files are queued.
+                    if count_files(&entry, settings.clone()) {
+                        file_paths.push(entry.path().to_path_buf());
                     }
                 }
             }
@@ -147,7 +106,46 @@ pub async fn scan_path(
         }
     }
 
-    // Aggregate by language
+    // Traitement en parallèle avec rayon
+    // Le filtrage a déjà été fait pendant la traversée, donc ici on ne fait que lire et compter
+    let files_scanned = Arc::new(Mutex::new(0u32));
+    let files: Vec<FileStats> = file_paths
+        .par_iter()
+        .filter_map(|path| {
+            // Vérifier l'annulation
+            if cancel_flag.load(Ordering::Relaxed) {
+                return None;
+            }
+
+            // Traiter le fichier (lecture + comptage des lignes)
+            let stats = process_file(path)?;
+
+            // Mise à jour de la progression
+            let mut count = files_scanned.lock().unwrap();
+            *count += 1;
+            let current_count = *count;
+            drop(count);
+
+            // Émettre un événement de progression toutes les 10 fichiers
+            if current_count % 10 == 0 {
+                let _ = window.emit(
+                    "scan:progress",
+                    ProgressEvent {
+                        files_scanned: current_count,
+                        current_file: path.display().to_string(),
+                    },
+                );
+            }
+
+            Some(stats)
+        })
+        .collect();
+
+    if cancel_flag.load(Ordering::Relaxed) {
+        return Err("Scan cancelled".to_string());
+    }
+
+    // Agrégation
     let mut languages: HashMap<String, LanguageStats> = HashMap::new();
     let mut total_lines = 0u32;
     let mut total_code = 0u32;
@@ -176,7 +174,6 @@ pub async fn scan_path(
         lang_stats.code += file.code;
     }
 
-    // Calculate percentages
     for lang_stats in languages.values_mut() {
         lang_stats.percentage = if total_lines > 0 {
             (lang_stats.total as f64 / total_lines as f64) * 100.0
@@ -197,9 +194,7 @@ pub async fn scan_path(
         0.0
     };
 
-    // Calculate stats
     let (mean, median, std_dev) = calculate_statistics(&files);
-
     let duration_ms = start.elapsed().as_millis() as u64;
 
     Ok(ScanResult {
@@ -219,15 +214,14 @@ pub async fn scan_path(
     })
 }
 
-fn process_file(path: &Path, _options: &ScanOptions) -> Option<FileStats> {
+fn process_file(path: &Path) -> Option<FileStats> {
     let filename = path.file_name()?.to_str()?;
     let language = detect_language(filename);
 
-    // Read file with encoding fallback
+    // Lecture avec fallback d'encodage
     let content = match std::fs::read_to_string(path) {
         Ok(content) => content,
         Err(_) => {
-            // Fallback to latin-1 encoding
             match std::fs::read(path) {
                 Ok(bytes) => {
                     let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);

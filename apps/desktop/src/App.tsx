@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
-import { FolderOpen, Play, Moon, Sun, Monitor, Download } from 'lucide-react'
+import { FolderOpen, Play, Moon, Sun, Monitor, Download, X, Settings as SettingsIcon } from 'lucide-react'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import Dashboard from './components/Dashboard'
-import type { ScanResult, ScanProgress } from './types'
+import Settings from './components/Settings'
+import type { ScanResult, ScanProgress, UserSettings } from './types'
 import { open } from '@tauri-apps/api/dialog';
 
 function App() {
@@ -14,8 +15,20 @@ function App() {
 	const [progress, setProgress] = useState<ScanProgress | null>(null)
 	const [result, setResult] = useState<ScanResult | null>(null)
 	const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system')
+	const [showSettings, setShowSettings] = useState(false)
+	const [settings, setSettings] = useState<UserSettings>({
+		excluded_dirs: [],
+		excluded_extensions: [],
+		excluded_patterns: [],
+		follow_symlinks: false,
+		excluded_languages: [],
+		allowed_languages: [],
+	})
 
 	useEffect(() => {
+		// Load settings
+		loadSettings()
+
 		// Listen for scan progress
 		const unlisten = listen<ScanProgress>('scan:progress', event => {
 			setProgress(event.payload)
@@ -25,6 +38,15 @@ function App() {
 			unlisten.then(fn => fn())
 		}
 	}, [])
+
+	async function loadSettings() {
+		try {
+			const loadedSettings = await invoke<UserSettings>('get_settings')
+			setSettings(loadedSettings)
+		} catch (error) {
+			console.error('Failed to load settings:', error)
+		}
+	}
 
 	useEffect(() => {
 		// Apply theme
@@ -58,22 +80,31 @@ function App() {
 		setResult(null)
 
 		try {
+			// Utiliser directement les settings utilisateur
 			const scanResult = await invoke<ScanResult>('scan_directory', {
 				path: selectedPath,
-				options: {
-					exclude_dirs: [],
-					exclude_extensions: [],
-					follow_symlinks: false
-				}
+				settings: settings
 			})
 
 			setResult(scanResult)
 		} catch (error) {
 			console.error('Scan failed:', error)
-			alert(`Scan failed: ${error}`)
+			if (error !== 'Scan cancelled') {
+				alert(`Scan failed: ${error}`)
+			}
 		} finally {
 			setScanning(false)
 			setProgress(null)
+		}
+	}
+
+	async function cancelScan() {
+		try {
+			await invoke('cancel_scan')
+			setScanning(false)
+			setProgress(null)
+		} catch (error) {
+			console.error('Failed to cancel scan:', error)
 		}
 	}
 
@@ -116,6 +147,17 @@ function App() {
 		a.click()
 	}
 
+	if (showSettings) {
+		return (
+			<Settings
+				onClose={() => {
+					setShowSettings(false)
+					loadSettings()
+				}}
+			/>
+		)
+	}
+
 	return (
 		<div className='min-h-screen bg-background'>
 			{/* Header */}
@@ -141,6 +183,9 @@ function App() {
 								</Button>
 							</>
 						)}
+						<Button variant='ghost' size='sm' onClick={() => setShowSettings(true)}>
+							<SettingsIcon className='h-4 w-4' />
+						</Button>
 						<Button variant='ghost' size='sm' onClick={cycleTheme}>
 							{theme === 'light' && <Sun className='h-4 w-4' />}
 							{theme === 'dark' && <Moon className='h-4 w-4' />}
@@ -181,14 +226,25 @@ function App() {
 									</div>
 								)}
 
-								<Button
-									className='w-full'
-									onClick={startScan}
-									disabled={!selectedPath || scanning}
-								>
-									<Play className='h-4 w-4 mr-2' />
-									{scanning ? 'Scanning...' : 'Start Analysis'}
-								</Button>
+								{scanning ? (
+									<Button
+										className='w-full'
+										variant='destructive'
+										onClick={cancelScan}
+									>
+										<X className='h-4 w-4 mr-2' />
+										Cancel Scan
+									</Button>
+								) : (
+									<Button
+										className='w-full'
+										onClick={startScan}
+										disabled={!selectedPath}
+									>
+										<Play className='h-4 w-4 mr-2' />
+										Start Analysis
+									</Button>
+								)}
 
 								{progress && (
 									<div className='p-4 bg-primary/10 rounded-md'>
