@@ -4,7 +4,7 @@ import { ArrowLeft, Clock, FileCode, Code2, MessageSquare, FileText } from "luci
 import { Button } from "./ui/Button";
 import { Card } from "./ui/Card";
 import { formatNumber, formatDuration } from "@/lib/utils";
-import type { ScanResult, FileStats } from "@/types";
+import type { ScanResult } from "@/types";
 
 interface DashboardProps {
   result: ScanResult;
@@ -117,7 +117,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
                 fill="#8884d8"
                 dataKey="value"
               >
-                {languageData.slice(0, 7).map((entry, index) => (
+                {languageData.slice(0, 7).map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
