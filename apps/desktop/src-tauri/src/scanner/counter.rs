@@ -1,4 +1,3 @@
-use regex::Regex;
 use std::collections::HashMap;
 
 lazy_static::lazy_static! {

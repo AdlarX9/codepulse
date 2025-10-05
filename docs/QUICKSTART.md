@@ -14,11 +14,13 @@ Install these before starting:
 ### Platform-Specific Prerequisites
 
 **macOS:**
+
 ```bash
 xcode-select --install
 ```
 
 **Ubuntu/Debian:**
+
 ```bash
 sudo apt update
 sudo apt install libwebkit2gtk-4.0-dev \
@@ -33,6 +35,7 @@ sudo apt install libwebkit2gtk-4.0-dev \
 ```
 
 **Windows:**
+
 - Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 - Install [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)
 
@@ -80,6 +83,7 @@ cp .env.example .env.local
 ```
 
 Edit `.env.local`:
+
 ```env
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 SUPABASE_URL=https://xxxxx.supabase.co
@@ -110,6 +114,7 @@ pnpm dev
 ```
 
 This runs:
+
 - Desktop app on Tauri window
 - Web app on http://localhost:3000
 
@@ -123,6 +128,7 @@ pnpm tauri build
 ```
 
 Outputs:
+
 - **macOS**: `src-tauri/target/release/bundle/dmg/`
 - **Windows**: `src-tauri/target/release/bundle/msi/`
 - **Linux**: `src-tauri/target/release/bundle/appimage/` and `deb/`
@@ -159,21 +165,25 @@ pnpm build
 ## 🐛 Troubleshooting
 
 ### Desktop app won't start
+
 - Verify Rust is installed: `rustc --version`
 - Check Tauri prerequisites: `pnpm tauri info`
 - Try cleaning: `cd apps/desktop/src-tauri && cargo clean`
 
 ### Web app errors
+
 - Verify Node version: `node --version` (should be 20+)
 - Check environment variables in `.env.local`
 - Verify Supabase connection
 
 ### Build fails
+
 - Clean all artifacts: `pnpm clean`
 - Reinstall dependencies: `rm -rf node_modules && pnpm install`
 - Check disk space
 
 ### pnpm not found
+
 ```bash
 npm install -g pnpm
 ```

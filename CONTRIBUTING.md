@@ -21,6 +21,7 @@ Thank you for your interest in contributing! 🎉
 ### Commit Messages
 
 Follow conventional commits:
+
 - `feat: add new feature`
 - `fix: resolve bug`
 - `docs: update documentation`
@@ -46,12 +47,14 @@ Follow conventional commits:
 ## Testing
 
 ### Rust
+
 ```bash
 cd apps/desktop/src-tauri
 cargo test
 ```
 
 ### TypeScript
+
 ```bash
 pnpm lint
 pnpm tsc --noEmit

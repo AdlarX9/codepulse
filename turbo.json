@@ -1,25 +1,20 @@
 {
-  "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": ["**/.env.*local"],
-  "tasks": {
-    "dev": {
-      "cache": false,
-      "persistent": true
-    },
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**",
-        "src-tauri/target/**"
-      ]
-    },
-    "lint": {
-      "dependsOn": ["^lint"]
-    },
-    "clean": {
-      "cache": false
-    }
-  }
+	"$schema": "https://turbo.build/schema.json",
+	"globalDependencies": ["**/.env.*local"],
+	"tasks": {
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**", ".next/**", "!.next/cache/**", "src-tauri/target/**"]
+		},
+		"lint": {
+			"dependsOn": ["^lint"]
+		},
+		"clean": {
+			"cache": false
+		}
+	}
 }

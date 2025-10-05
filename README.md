@@ -16,6 +16,26 @@ CodePulse is a cross-platform desktop application that analyzes your codebase an
 - 💾 **Export**: Save results as CSV or JSON
 - 🌍 **Cross-Platform**: Works on macOS, Windows, and Linux
 
+## 🚀 Quick Start
+
+**New to CodePulse?** Check out the [Getting Started Guide](docs/GETTING_STARTED.md) for a step-by-step walkthrough.
+
+```bash
+# Clone and install
+git clone https://github.com/AdlarX9/code-pulse.git
+cd code-pulse
+pnpm install
+
+# Generate icons
+python3 scripts/create-dev-icons.py
+
+# Launch desktop app
+bash scripts/launch-desktop.sh
+
+# Or launch web app
+bash scripts/launch-web.sh
+```
+
 ## 📥 Download
 
 Download the latest version for your platform:
@@ -43,6 +63,7 @@ codepulse/
 ### Tech Stack
 
 **Desktop App:**
+
 - [Tauri](https://tauri.app/) - Desktop framework
 - [Rust](https://www.rust-lang.org/) - Fast, safe backend
 - [React](https://react.dev/) - UI framework
@@ -51,6 +72,7 @@ codepulse/
 - [Recharts](https://recharts.org/) - Data visualization
 
 **Web:**
+
 - [Next.js 14](https://nextjs.org/) - React framework
 - [Framer Motion](https://www.framer.com/motion/) - Animations
 - [Supabase](https://supabase.com/) - Download analytics
@@ -82,11 +104,13 @@ pnpm -w build
 ### Running Locally
 
 **Desktop App:**
+
 ```bash
 pnpm dev:desktop
 ```
 
 **Web App:**
+
 ```bash
 # Configure environment variables
 cp apps/web/.env.example apps/web/.env.local
@@ -96,6 +120,7 @@ pnpm dev:web
 ```
 
 **Both Simultaneously:**
+
 ```bash
 pnpm dev
 ```
@@ -121,6 +146,7 @@ pnpm release:tag v1.0.0
 ```
 
 This triggers:
+
 1. Multi-platform Tauri builds (macOS, Windows, Linux)
 2. GitHub Release creation with artifacts
 3. assets.json manifest update
@@ -196,6 +222,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## 🙏 Acknowledgments
 
 Built with amazing open source tools:
+
 - [Tauri](https://tauri.app/)
 - [Rust](https://www.rust-lang.org/)
 - [Next.js](https://nextjs.org/)

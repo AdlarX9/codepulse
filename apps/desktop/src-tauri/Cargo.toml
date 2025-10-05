@@ -4,7 +4,7 @@ version = "1.0.0"
 description = "Beautiful, privacy-first code analysis tool"
 authors = ["CodePulse Team"]
 license = "MIT"
-repository = "https://github.com/username/codepulse"
+repository = "https://github.com/AdlarX9/code-pulse"
 edition = "2021"
 
 [build-dependencies]

@@ -4,35 +4,35 @@
  */
 
 export interface TelemetryEvent {
-  type: string;
-  timestamp: number;
-  data: Record<string, any>;
+	type: string
+	timestamp: number
+	data: Record<string, any>
 }
 
 export class Logger {
-  private prefix: string;
+	private prefix: string
 
-  constructor(prefix: string = "CodePulse") {
-    this.prefix = prefix;
-  }
+	constructor(prefix: string = 'CodePulse') {
+		this.prefix = prefix
+	}
 
-  info(message: string, data?: any) {
-    console.log(`[${this.prefix}] INFO:`, message, data || "");
-  }
+	info(message: string, data?: any) {
+		console.log(`[${this.prefix}] INFO:`, message, data || '')
+	}
 
-  warn(message: string, data?: any) {
-    console.warn(`[${this.prefix}] WARN:`, message, data || "");
-  }
+	warn(message: string, data?: any) {
+		console.warn(`[${this.prefix}] WARN:`, message, data || '')
+	}
 
-  error(message: string, error?: any) {
-    console.error(`[${this.prefix}] ERROR:`, message, error || "");
-  }
+	error(message: string, error?: any) {
+		console.error(`[${this.prefix}] ERROR:`, message, error || '')
+	}
 
-  debug(message: string, data?: any) {
-    if (process.env.NODE_ENV === "development") {
-      console.debug(`[${this.prefix}] DEBUG:`, message, data || "");
-    }
-  }
+	debug(message: string, data?: any) {
+		if (process.env.NODE_ENV === 'development') {
+			console.debug(`[${this.prefix}] DEBUG:`, message, data || '')
+		}
+	}
 }
 
-export const logger = new Logger();
+export const logger = new Logger()

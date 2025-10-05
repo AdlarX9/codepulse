@@ -28,6 +28,7 @@ Complete guide for deploying CodePulse to production.
 3. Paste and execute
 
 This creates:
+
 - `downloads` table
 - Indexes for performance
 - Row Level Security policies
@@ -46,10 +47,10 @@ This creates:
 1. Go to [vercel.com](https://vercel.com)
 2. Import your GitHub repository
 3. Configure build settings:
-   - **Framework**: Next.js
-   - **Root Directory**: `apps/web`
-   - **Build Command**: `pnpm build`
-   - **Output Directory**: `.next`
+    - **Framework**: Next.js
+    - **Root Directory**: `apps/web`
+    - **Build Command**: `pnpm build`
+    - **Output Directory**: `.next`
 
 4. Add environment variables:
 
@@ -89,6 +90,7 @@ Releases are automated via GitHub Actions when you push a tag.
 Go to repository Settings → Secrets → Actions and add:
 
 **Optional (for signing):**
+
 - `TAURI_PRIVATE_KEY` - For app signing/updates
 - `TAURI_KEY_PASSWORD` - Password for private key
 - `APPLE_CERTIFICATE` - macOS code signing (Base64)
@@ -98,6 +100,7 @@ Go to repository Settings → Secrets → Actions and add:
 - `APPLE_TEAM_ID`
 
 **For web deploy (if not using Vercel Git):**
+
 - `VERCEL_TOKEN`
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID`
@@ -114,6 +117,7 @@ pnpm release:tag v1.0.0
 ```
 
 This triggers the `release.yml` workflow which:
+
 1. Builds for macOS, Windows, Linux (parallel)
 2. Creates GitHub Release
 3. Uploads installers (.dmg, .msi, .AppImage, .deb)
@@ -124,11 +128,11 @@ This triggers the `release.yml` workflow which:
 
 1. Go to GitHub Releases
 2. Verify all artifacts are uploaded:
-   - `CodePulse_x.x.x_x64.dmg`
-   - `CodePulse_x.x.x_x64_en-US.msi`
-   - `codepulse_x.x.x_amd64.AppImage`
-   - `codepulse_x.x.x_amd64.deb`
-   - `checksums.txt`
+    - `CodePulse_x.x.x_x64.dmg`
+    - `CodePulse_x.x.x_x64_en-US.msi`
+    - `codepulse_x.x.x_amd64.AppImage`
+    - `codepulse_x.x.x_amd64.deb`
+    - `checksums.txt`
 3. Download and test on target platforms
 
 ## 🔑 Code Signing (Production)
@@ -138,21 +142,22 @@ This triggers the `release.yml` workflow which:
 1. Get Apple Developer account
 2. Create certificates in Xcode
 3. Export as Base64:
-   ```bash
-   base64 -i certificate.p12 | pbcopy
-   ```
+    ```bash
+    base64 -i certificate.p12 | pbcopy
+    ```
 4. Add to GitHub secrets
 
 Update `tauri.conf.json`:
+
 ```json
 {
-  "tauri": {
-    "bundle": {
-      "macOS": {
-        "signingIdentity": "Developer ID Application: Your Name (TEAM_ID)"
-      }
-    }
-  }
+	"tauri": {
+		"bundle": {
+			"macOS": {
+				"signingIdentity": "Developer ID Application: Your Name (TEAM_ID)"
+			}
+		}
+	}
 }
 ```
 
@@ -160,16 +165,17 @@ Update `tauri.conf.json`:
 
 1. Get code signing certificate
 2. Add thumbprint to `tauri.conf.json`:
+
 ```json
 {
-  "tauri": {
-    "bundle": {
-      "windows": {
-        "certificateThumbprint": "YOUR_THUMBPRINT",
-        "digestAlgorithm": "sha256"
-      }
-    }
-  }
+	"tauri": {
+		"bundle": {
+			"windows": {
+				"certificateThumbprint": "YOUR_THUMBPRINT",
+				"digestAlgorithm": "sha256"
+			}
+		}
+	}
 }
 ```
 
@@ -178,6 +184,7 @@ Update `tauri.conf.json`:
 ### Download Analytics
 
 Access admin dashboard at:
+
 ```
 https://your-domain.com/admin
 ```
@@ -187,6 +194,7 @@ Credentials: `NEXT_ADMIN_USER` / `NEXT_ADMIN_PASS`
 ### Supabase Dashboard
 
 Monitor database at:
+
 ```
 https://app.supabase.com/project/YOUR_PROJECT/editor
 ```
@@ -226,12 +234,14 @@ Same as patch, but increment major version.
 ### Release workflow fails
 
 Check GitHub Actions logs:
+
 1. Go to Actions tab
 2. Click failed workflow
 3. Expand failed job
 4. Check error messages
 
 Common issues:
+
 - Missing secrets
 - Rust compilation errors
 - Network timeouts
@@ -277,10 +287,10 @@ If a release has critical issues:
 
 1. Delete GitHub release
 2. Delete tag:
-   ```bash
-   git tag -d v1.0.0
-   git push --delete origin v1.0.0
-   ```
+    ```bash
+    git tag -d v1.0.0
+    git push --delete origin v1.0.0
+    ```
 3. Fix issues
 4. Release new version
 

@@ -31,30 +31,35 @@ pnpm tauri build
 ## Architecture
 
 ### Frontend (`src/`)
+
 - `App.tsx` - Main application component
 - `components/` - UI components
 - `lib/` - Utilities
 
 ### Backend (`src-tauri/src/`)
+
 - `main.rs` - Tauri app entry point
 - `scanner/` - Code scanning logic
-  - `mod.rs` - Main scanner
-  - `language.rs` - Language detection
-  - `counter.rs` - Line counting logic
+    - `mod.rs` - Main scanner
+    - `language.rs` - Language detection
+    - `counter.rs` - Line counting logic
 
 ## Building
 
 ### Debug Build
+
 ```bash
 pnpm tauri build --debug
 ```
 
 ### Release Build
+
 ```bash
 pnpm tauri build
 ```
 
 Outputs:
+
 - **macOS**: `src-tauri/target/release/bundle/dmg/`
 - **Windows**: `src-tauri/target/release/bundle/msi/`
 - **Linux**: `src-tauri/target/release/bundle/appimage/`
@@ -73,7 +78,9 @@ pnpm tsc --noEmit
 ## Code Signing (Production)
 
 ### macOS
+
 Set environment variables:
+
 ```bash
 export APPLE_CERTIFICATE=<base64>
 export APPLE_CERTIFICATE_PASSWORD=<password>
@@ -83,23 +90,26 @@ export APPLE_TEAM_ID=<team-id>
 ```
 
 ### Windows
+
 Set in tauri.conf.json:
+
 ```json
 {
-  "tauri": {
-    "bundle": {
-      "windows": {
-        "certificateThumbprint": "...",
-        "digestAlgorithm": "sha256"
-      }
-    }
-  }
+	"tauri": {
+		"bundle": {
+			"windows": {
+				"certificateThumbprint": "...",
+				"digestAlgorithm": "sha256"
+			}
+		}
+	}
 }
 ```
 
 ## Privacy
 
 The desktop app:
+
 - ✅ Runs completely offline
 - ✅ Makes zero network requests
 - ✅ Stores nothing outside the scanned directory
@@ -108,6 +118,7 @@ The desktop app:
 ## Performance
 
 The Rust backend can scan:
+
 - 10,000 files in ~2-3 seconds
 - 100,000 files in ~20-30 seconds
 

@@ -82,6 +82,7 @@ pnpm start
 3. Deploy
 
 Or use Vercel CLI:
+
 ```bash
 vercel --prod
 ```
@@ -89,6 +90,7 @@ vercel --prod
 ### Other Platforms
 
 Build the Next.js app:
+
 ```bash
 pnpm build
 ```
@@ -100,6 +102,7 @@ Then deploy the `.next` directory with a Node.js runtime.
 Access at `/admin` with credentials from `NEXT_ADMIN_USER` and `NEXT_ADMIN_PASS`.
 
 Features:
+
 - Download statistics over time
 - Platform breakdown (pie chart)
 - Top countries (bar chart)
@@ -109,6 +112,7 @@ Features:
 ## Privacy
 
 Download tracking collects:
+
 - Hashed IP (SHA-256 + salt)
 - Geographic region (from CDN)
 - Platform, version, user agent, referrer
