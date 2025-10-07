@@ -36,6 +36,29 @@ pub struct LanguageStats {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SnapshotLang {
+    pub language: String,
+    pub files: u32,
+    pub total: u32,
+    pub code: u32,
+    pub comment: u32,
+    pub blank: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ScanSnapshot {
+    pub total: u32,
+    pub code: u32,
+    pub comment: u32,
+    pub blank: u32,
+    pub comment_ratio: f64,
+    pub core_code_lines: u32,
+    pub info_lines: u32,
+    pub per_language: Vec<SnapshotLang>,
+    pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct ScanResult {
     pub total_files: u32,
     pub total_lines: u32,
@@ -50,6 +73,47 @@ pub struct ScanResult {
     pub mean: f64,
     pub median: f64,
     pub std_dev: f64,
+}
+
+pub fn to_snapshot(result: &ScanResult) -> ScanSnapshot {
+    let mut per_language: Vec<SnapshotLang> = Vec::with_capacity(result.languages.len());
+    let mut lang_totals: Vec<(String, u32)> = Vec::with_capacity(result.languages.len());
+    
+    for (lang, stats) in &result.languages {
+        per_language.push(SnapshotLang {
+            language: lang.clone(),
+            files: stats.files,
+            total: stats.total,
+            code: stats.code,
+            comment: stats.comment,
+            blank: stats.blank,
+        });
+        lang_totals.push((lang.clone(), stats.total));
+    }
+
+    // Sort languages by total lines desc for a stable order
+    per_language.sort_by(|a, b| b.total.cmp(&a.total));
+
+    let comment_ratio = if result.total_lines > 0 {
+        result.total_comments as f64 / result.total_lines as f64
+    } else {
+        0.0
+    };
+
+    // Calculate core vs info lines using categories
+    let (core_code_lines, info_lines) = crate::categories::aggregate_by_category(&lang_totals);
+
+    ScanSnapshot {
+        total: result.total_lines,
+        code: result.total_code,
+        comment: result.total_comments,
+        blank: result.total_blank,
+        comment_ratio,
+        core_code_lines,
+        info_lines,
+        per_language,
+        duration_ms: result.duration_ms,
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -44,4 +44,18 @@ export interface UserSettings {
 	excluded_dirs: string[]
 	excluded_extensions: string[]
 	follow_symlinks: boolean
+	sync_enabled: boolean
+	device_id: string
+	local_salt: string
+	auto_update: boolean
+	update_channel: string
+	last_update_check: string
+}
+
+export interface UpdateCheck {
+	available: boolean
+	version?: string
+	current_version: string
+	notes?: string
+	url?: string
 }

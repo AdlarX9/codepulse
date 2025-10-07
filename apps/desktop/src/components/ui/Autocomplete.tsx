@@ -50,9 +50,7 @@ export function Autocomplete({
 			}
 		} else if (e.key === 'ArrowDown') {
 			e.preventDefault()
-			setSelectedIndex(prev =>
-				prev < filteredSuggestions.length - 1 ? prev + 1 : prev
-			)
+			setSelectedIndex(prev => (prev < filteredSuggestions.length - 1 ? prev + 1 : prev))
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault()
 			setSelectedIndex(prev => (prev > 0 ? prev - 1 : -1))

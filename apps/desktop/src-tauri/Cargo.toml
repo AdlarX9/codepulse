@@ -21,6 +21,10 @@ lazy_static = "1.4"
 rayon = "1.8"
 tokio = { version = "1.36", features = ["full"] }
 dirs = "5.0"
+sha2 = "0.10"
+hex = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
+uuid = { version = "1.6", features = ["v4"] }
 
 [features]
 default = ["custom-protocol"]

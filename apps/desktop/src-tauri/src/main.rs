@@ -3,8 +3,11 @@
 
 mod scanner;
 mod settings;
+mod sync;
+mod categories;
+mod updater;
 
-use scanner::{ScanResult};
+use scanner::{ScanResult, to_snapshot};
 use settings::{UserSettings, load_settings, save_settings};
 use tauri::{Window, State};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -13,6 +16,30 @@ use std::sync::{Arc};
 
 struct AppState {
     cancel_flag: Arc<AtomicBool>,
+}
+
+#[tauri::command]
+async fn scan_and_maybe_enqueue(
+    path: &str,
+    settings: UserSettings,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<ScanResult, String> {
+    // Reset cancel flag
+    state.cancel_flag.store(false, Ordering::Relaxed);
+
+    let result = scanner::scan_path(&path, settings.clone(), window, state.cancel_flag.clone())
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if settings.sync_enabled {
+        let snapshot = to_snapshot(&result);
+        if let Err(e) = crate::sync::enqueue_snapshot(path, &settings, &snapshot) {
+            eprintln!("enqueue_snapshot failed: {}", e);
+        }
+    }
+
+    Ok(result)
 }
 
 #[tauri::command]
@@ -46,16 +73,51 @@ async fn update_settings(settings: UserSettings) -> Result<(), String> {
     save_settings(&settings)
 }
 
+#[tauri::command]
+async fn check_for_updates() -> Result<updater::UpdateCheck, String> {
+    let mut settings = load_settings()?;
+    updater::check_for_updates(&mut settings).await
+}
+
 fn main() {
+    // Load settings for background tasks
+    let settings = load_settings().expect("Failed to load settings");
+
+    // Start sync worker in background (will be spawned within Tauri runtime)
+    // TODO: Make API base URL configurable
+    let api_url = "https://codepulse.dev".to_string(); // or http://localhost:3000 for dev
+
+    // Start update checker in background
+    let settings_clone = settings.clone();
+
     tauri::Builder::default()
         .manage(AppState {
             cancel_flag: Arc::new(AtomicBool::new(false)),
         })
+        .setup(move |app| {
+            // Spawn background tasks within Tauri runtime
+            // let app_handle = app.handle(); // Unused for now
+
+            // Sync worker
+            let sync_api_url = api_url.clone();
+            tauri::async_runtime::spawn(async move {
+                crate::sync::start_sync_worker(sync_api_url).await;
+            });
+
+            // Update checker
+            tauri::async_runtime::spawn(async move {
+                crate::updater::start_update_checker(settings_clone).await;
+            });
+
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scan_directory,
+            scan_and_maybe_enqueue,
             cancel_scan,
             get_settings,
             update_settings,
+            check_for_updates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

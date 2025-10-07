@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
-import { FolderOpen, Play, Moon, Sun, Monitor, Download, X, Settings as SettingsIcon } from 'lucide-react'
+import {
+	FolderOpen,
+	Play,
+	Moon,
+	Sun,
+	Monitor,
+	Download,
+	X,
+	Settings as SettingsIcon
+} from 'lucide-react'
 import { Button } from './components/ui/Button'
 import { Card } from './components/ui/Card'
 import Dashboard from './components/Dashboard'
 import Settings from './components/Settings'
 import type { ScanResult, ScanProgress, UserSettings } from './types'
-import { open } from '@tauri-apps/api/dialog';
+import { open } from '@tauri-apps/api/dialog'
 
 function App() {
 	const [selectedPath, setSelectedPath] = useState<string>('')
@@ -23,6 +32,12 @@ function App() {
 		follow_symlinks: false,
 		excluded_languages: [],
 		allowed_languages: [],
+		sync_enabled: false,
+		device_id: '',
+		local_salt: '',
+		auto_update: true,
+		update_channel: 'stable',
+		last_update_check: ''
 	})
 
 	useEffect(() => {
@@ -63,7 +78,7 @@ function App() {
 
 	async function selectDirectory() {
 		try {
-			const path = await open({ directory: true, multiple: false });
+			const path = await open({ directory: true, multiple: false })
 			if (path && !Array.isArray(path)) {
 				setSelectedPath(path)
 			}
@@ -81,7 +96,7 @@ function App() {
 
 		try {
 			// Utiliser directement les settings utilisateur
-			const scanResult = await invoke<ScanResult>('scan_directory', {
+			const scanResult = await invoke<ScanResult>('scan_and_maybe_enqueue', {
 				path: selectedPath,
 				settings: settings
 			})

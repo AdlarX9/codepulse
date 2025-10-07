@@ -52,8 +52,6 @@ export async function GET(request: NextRequest) {
 				referrer,
 				platform,
 				version,
-				release_channel: 'stable',
-				source: 'landing'
 			})
 		} catch (error) {
 			// Log but don't block download

@@ -19,6 +19,43 @@ pub struct UserSettings {
     // Optionnel: allowlist globale de langages. Vide => tous les langages non exclus sont autorisés.
     #[serde(default = "default_allowed_languages")]
     pub allowed_languages: Vec<String>,
+
+    // Sync aggregates (opt-in) and local identifiers
+    #[serde(default = "default_sync_enabled")]
+    pub sync_enabled: bool,
+    #[serde(default = "default_device_id")]
+    pub device_id: String,
+    #[serde(default = "default_local_salt")]
+    pub local_salt: String,
+    
+    // Auto-update settings
+    #[serde(default = "default_auto_update")]
+    pub auto_update: bool,
+    #[serde(default = "default_update_channel")]
+    pub update_channel: String, // "stable" or "beta"
+    #[serde(default = "default_last_update_check")]
+    pub last_update_check: String,
+}
+
+fn ensure_ids(settings: &mut UserSettings) -> Result<bool, String> {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let mut changed = false;
+    let now_ms = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .map_err(|e| format!("Clock error: {}", e))?;
+
+    if settings.device_id.is_empty() {
+        settings.device_id = format!("dev-{:x}", now_ms);
+        changed = true;
+    }
+    if settings.local_salt.is_empty() {
+        // Different seed for salt
+        let salt_seed = now_ms.wrapping_mul(1469598103934665603u128 as u128);
+        settings.local_salt = format!("salt-{:x}", salt_seed);
+        changed = true;
+    }
+    Ok(changed)
 }
 
 // Par défaut: pas d'exclusions de dossiers
@@ -85,6 +122,13 @@ fn default_allowed_languages() -> Vec<String> {
     vec![]
 }
 
+fn default_sync_enabled() -> bool { false }
+fn default_device_id() -> String { String::new() }
+fn default_local_salt() -> String { String::new() }
+fn default_auto_update() -> bool { true }
+fn default_update_channel() -> String { "stable".to_string() }
+fn default_last_update_check() -> String { String::new() }
+
 impl Default for UserSettings {
     fn default() -> Self {
         Self {
@@ -94,6 +138,12 @@ impl Default for UserSettings {
             excluded_patterns: default_excluded_patterns(),
             follow_symlinks: default_follow_symlinks(),
             allowed_languages: default_allowed_languages(),
+            sync_enabled: default_sync_enabled(),
+            device_id: default_device_id(),
+            local_salt: default_local_salt(),
+            auto_update: default_auto_update(),
+            update_channel: default_update_channel(),
+            last_update_check: default_last_update_check(),
         }
     }
 }
@@ -115,14 +165,23 @@ pub fn load_settings() -> Result<UserSettings, String> {
     let settings_path = get_settings_path()?;
 
     if !settings_path.exists() {
-        return Ok(UserSettings::default());
+        let mut s = UserSettings::default();
+        ensure_ids(&mut s)?;
+        // Persist initial file
+        save_settings(&s)?;
+        return Ok(s);
     }
 
     let content = fs::read_to_string(settings_path)
         .map_err(|e| format!("Failed to read settings: {}", e))?;
 
-    let settings: UserSettings = serde_json::from_str(&content)
+    let mut settings: UserSettings = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse settings: {}", e))?;
+
+    // Ensure identifiers are present and persist if mutated
+    if ensure_ids(&mut settings)? {
+        save_settings(&settings)?;
+    }
 
     Ok(settings)
 }

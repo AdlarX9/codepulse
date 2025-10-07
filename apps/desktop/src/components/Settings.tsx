@@ -6,7 +6,6 @@ import { Card } from './ui/Card'
 import { Autocomplete } from './ui/Autocomplete'
 import type { UserSettings } from '../types'
 import { ALL_LANGUAGES, COMMON_EXCLUDED_LANGUAGES } from '../constants/languages'
-
 interface SettingsProps {
 	onClose: () => void
 }
@@ -18,7 +17,13 @@ export default function Settings({ onClose }: SettingsProps) {
 		excluded_patterns: [],
 		follow_symlinks: false,
 		excluded_languages: [],
-		allowed_languages: []
+		allowed_languages: [],
+		sync_enabled: false,
+		device_id: '',
+		local_salt: '',
+		auto_update: true,
+		update_channel: 'stable',
+		last_update_check: ''
 	})
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -116,7 +121,8 @@ export default function Settings({ onClose }: SettingsProps) {
 								</label>
 								<div className='flex flex-wrap gap-2'>
 									{COMMON_EXCLUDED_LANGUAGES.map(lang => {
-										const isSelected = settings.excluded_languages.includes(lang)
+										const isSelected =
+											settings.excluded_languages.includes(lang)
 										return (
 											<button
 												key={lang}
@@ -437,6 +443,110 @@ export default function Settings({ onClose }: SettingsProps) {
 								Follow symlinks during analysis
 							</span>
 						</label>
+					</Card>
+
+					{/* Auto-Update Settings */}
+					<Card className='p-6'>
+						<h2 className='text-xl font-semibold mb-4'>Auto-Update</h2>
+						<p className='text-sm text-muted-foreground mb-4'>
+							Automatically check for and install updates to CodePulse.
+						</p>
+
+						<div className='space-y-4'>
+							<label className='flex items-center gap-3 cursor-pointer'>
+								<input
+									type='checkbox'
+									checked={settings.auto_update}
+									onChange={e =>
+										setSettings({ ...settings, auto_update: e.target.checked })
+									}
+									className='w-5 h-5'
+								/>
+								<span className='text-sm font-medium'>
+									Enable automatic updates
+								</span>
+							</label>
+
+							{settings.auto_update && (
+								<div>
+									<label className='block text-sm font-medium mb-2'>
+										Update Channel
+									</label>
+									<select
+										value={settings.update_channel}
+										onChange={e =>
+											setSettings({
+												...settings,
+												update_channel: e.target.value
+											})
+										}
+										className='w-full px-3 py-2 bg-background border border-input rounded-md'
+									>
+										<option value='stable'>Stable (Recommended)</option>
+										<option value='beta'>Beta (Early Access)</option>
+									</select>
+									<p className='text-xs text-muted-foreground mt-1'>
+										{settings.update_channel === 'beta'
+											? 'Get early access to new features (may be unstable)'
+											: 'Stable releases only (recommended for production use)'}
+									</p>
+								</div>
+							)}
+
+							{settings.last_update_check && (
+								<div className='text-xs text-muted-foreground'>
+									Last checked:{' '}
+									{new Date(
+										parseInt(settings.last_update_check) * 1000
+									).toLocaleDateString()}
+								</div>
+							)}
+						</div>
+					</Card>
+
+					{/* Sync (opt-in) */}
+					<Card className='p-6'>
+						<h2 className='text-xl font-semibold mb-4'>
+							Sync Aggregated Stats (Opt-in)
+						</h2>
+						<p className='text-sm text-muted-foreground mb-4'>
+							When enabled, the app can queue anonymous aggregated statistics (no file
+							paths, no contents) for synchronization. You can review queued files
+							locally.
+						</p>
+
+						<label className='flex items-center gap-3 cursor-pointer mb-3'>
+							<input
+								type='checkbox'
+								checked={settings.sync_enabled}
+								onChange={e =>
+									setSettings({ ...settings, sync_enabled: e.target.checked })
+								}
+								className='w-5 h-5'
+							/>
+							<span className='text-sm font-medium'>
+								Enable sync of aggregated stats
+							</span>
+						</label>
+
+						<div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Device ID</label>
+								<input
+									readOnly
+									value={settings.device_id}
+									className='w-full px-3 py-2 bg-muted border border-input rounded-md'
+								/>
+							</div>
+							<div>
+								<label className='text-sm font-medium mb-1 block'>Local Salt</label>
+								<input
+									readOnly
+									value={settings.local_salt}
+									className='w-full px-3 py-2 bg-muted border border-input rounded-md'
+								/>
+							</div>
+						</div>
 					</Card>
 
 					{/* Actions */}

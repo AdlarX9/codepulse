@@ -10,7 +10,16 @@ import {
 	Tooltip,
 	ResponsiveContainer
 } from 'recharts'
-import { ArrowLeft, Clock, FileCode, Code2, MessageSquare, FileText } from 'lucide-react'
+import {
+	ArrowLeft,
+	Clock,
+	FileCode,
+	Code2,
+	MessageSquare,
+	FileText,
+	ChevronDown,
+	ChevronRight
+} from 'lucide-react'
 import { Button } from './ui/Button'
 import { Card } from './ui/Card'
 import { formatNumber, formatDuration } from '@/lib/utils'
@@ -26,6 +35,7 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'
 export default function Dashboard({ result, onReset }: DashboardProps) {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [languageFilter, setLanguageFilter] = useState<string | null>(null)
+	const [showFileDetails, setShowFileDetails] = useState(false) // Collapsed by default
 
 	const languageData = useMemo(() => {
 		return Object.entries(result.languages)
@@ -158,7 +168,17 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 			{/* File Table */}
 			<Card className='p-6'>
 				<div className='flex items-center justify-between mb-4'>
-					<h3 className='text-lg font-semibold'>Files ({filteredFiles.length})</h3>
+					<button
+						onClick={() => setShowFileDetails(!showFileDetails)}
+						className='flex items-center gap-2 text-lg font-semibold hover:text-primary transition-colors'
+					>
+						{showFileDetails ? (
+							<ChevronDown className='h-5 w-5' />
+						) : (
+							<ChevronRight className='h-5 w-5' />
+						)}
+						Files ({filteredFiles.length})
+					</button>
 					<div className='flex gap-2'>
 						<input
 							type='text'
@@ -182,37 +202,47 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 					</div>
 				</div>
 
-				<div className='overflow-x-auto max-h-96 overflow-y-auto'>
-					<table className='w-full text-sm'>
-						<thead className='bg-muted sticky top-0'>
-							<tr>
-								<th className='text-left p-2 font-medium'>File</th>
-								<th className='text-left p-2 font-medium'>Language</th>
-								<th className='text-right p-2 font-medium'>Total</th>
-								<th className='text-right p-2 font-medium'>Code</th>
-								<th className='text-right p-2 font-medium'>Comments</th>
-								<th className='text-right p-2 font-medium'>Blank</th>
-							</tr>
-						</thead>
-						<tbody>
-							{filteredFiles.map((file, idx) => (
-								<tr key={idx} className='border-t hover:bg-muted/50'>
-									<td
-										className='p-2 font-mono text-xs truncate max-w-md'
-										title={file.path}
-									>
-										{file.path}
-									</td>
-									<td className='p-2'>{file.language}</td>
-									<td className='p-2 text-right'>{formatNumber(file.total)}</td>
-									<td className='p-2 text-right'>{formatNumber(file.code)}</td>
-									<td className='p-2 text-right'>{formatNumber(file.comment)}</td>
-									<td className='p-2 text-right'>{formatNumber(file.blank)}</td>
+				{showFileDetails && (
+					<div className='overflow-x-auto max-h-96 overflow-y-auto'>
+						<table className='w-full text-sm'>
+							<thead className='bg-muted sticky top-0'>
+								<tr>
+									<th className='text-left p-2 font-medium'>File</th>
+									<th className='text-left p-2 font-medium'>Language</th>
+									<th className='text-right p-2 font-medium'>Total</th>
+									<th className='text-right p-2 font-medium'>Code</th>
+									<th className='text-right p-2 font-medium'>Comments</th>
+									<th className='text-right p-2 font-medium'>Blank</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody>
+								{filteredFiles.map((file, idx) => (
+									<tr key={idx} className='border-t hover:bg-muted/50'>
+										<td
+											className='p-2 font-mono text-xs truncate max-w-md'
+											title={file.path}
+										>
+											{file.path}
+										</td>
+										<td className='p-2'>{file.language}</td>
+										<td className='p-2 text-right'>
+											{formatNumber(file.total)}
+										</td>
+										<td className='p-2 text-right'>
+											{formatNumber(file.code)}
+										</td>
+										<td className='p-2 text-right'>
+											{formatNumber(file.comment)}
+										</td>
+										<td className='p-2 text-right'>
+											{formatNumber(file.blank)}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 			</Card>
 
 			{/* Stats Summary */}

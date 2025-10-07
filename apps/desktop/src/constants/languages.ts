@@ -11,7 +11,7 @@ export const ALL_LANGUAGES = [
 	'Less',
 	'Vue',
 	'Svelte',
-	
+
 	// Backend
 	'Python',
 	'Ruby',
@@ -27,7 +27,7 @@ export const ALL_LANGUAGES = [
 	'Swift',
 	'Objective-C',
 	'Objective-C++',
-	
+
 	// Functional
 	'Haskell',
 	'Elm',
@@ -36,14 +36,14 @@ export const ALL_LANGUAGES = [
 	'OCaml',
 	'F#',
 	'Clojure',
-	
+
 	// Shell
 	'Shell',
 	'Bash',
 	'Zsh',
 	'Fish',
 	'PowerShell',
-	
+
 	// Data & Config
 	'JSON',
 	'YAML',
@@ -51,13 +51,13 @@ export const ALL_LANGUAGES = [
 	'XML',
 	'SQL',
 	'GraphQL',
-	
+
 	// Markup
 	'Markdown',
 	'MDX',
 	'LaTeX',
 	'reStructuredText',
-	
+
 	// Other
 	'Lua',
 	'R',
@@ -66,15 +66,7 @@ export const ALL_LANGUAGES = [
 	'Vimscript',
 	'Docker',
 	'Make',
-	'CMake',
+	'CMake'
 ].sort()
 
-export const COMMON_EXCLUDED_LANGUAGES = [
-	'Markdown',
-	'JSON',
-	'YAML',
-	'TOML',
-	'XML',
-	'HTML',
-	'CSS',
-]
+export const COMMON_EXCLUDED_LANGUAGES = ['Markdown', 'JSON', 'YAML', 'TOML', 'XML', 'HTML', 'CSS']
