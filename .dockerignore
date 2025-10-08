@@ -1,4 +1,4 @@
-# Git
+# Git and CI/CD
 .git
 .gitignore
 .github
@@ -9,27 +9,51 @@ CHANGELOG.md
 docs/
 *.md
 
-# IDE
+# IDE and editors
 .vscode
 .idea
 *.swp
 *.swo
+*.sublime-*
 
-# Logs
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Node.js
+node_modules/
+.pnpm-store/
+.npm
+.yarn
+
+# Per-app node modules and build outputs
+apps/**/node_modules/
+apps/**/dist/
+apps/**/build/
+apps/**/.next/
+apps/**/.turbo/
+apps/**/.cache/
+apps/**/.parcel-cache/
+apps/**/.eslintcache
+
+# Tauri/Rust heavy build artifacts
+apps/desktop/src-tauri/target/
+apps/desktop/target/
+apps/desktop/**/Cargo.lock
+apps/desktop/**/.cargo/
+apps/desktop/**/*.rs.bk
+
+# Logs and temporary files
 *.log
 logs/
-
-# Dependencies
-*node_modules/
-.pnpm-store/
-
-# Build artifacts
-*dist/
-*build/
-*target/
-*.next/
-*out/
-*.turbo/
+tmp/
+temp/
+*.tmp
+*.cache
+.cache/
+.parcel-cache/
+.eslintcache
 
 # Environment files (keep example)
 .env
@@ -38,19 +62,11 @@ logs/
 .env.development
 !.env.example
 
-# OS
-*.DS_Store
-Thumbs.db
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.cache
-
 # Package files
 *.tar.gz
 *.zip
+*.tgz
+*.rar
 
 # Development
 .air.toml
@@ -65,16 +81,74 @@ test-results/
 backup_*.sql
 *.backup
 
-# Git LFS and binaries
+# Binaries and executables
 *.dmg
 *.AppImage
 *.exe
 *.deb
 *.rpm
 *.pkg
+*.msi
 
-# Cache
-.cache/
-.parcel-cache/
-.eslintcache
-apps/**/.cache/
+# Lock files (except root ones)
+apps/**/pnpm-lock.yaml
+packages/**/pnpm-lock.yaml
+
+# Git LFS
+*.gitattributes
+
+# Build artifacts from other tools
+dist/
+build/
+target/
+.next/
+out/
+.turbo/
+.vercel/
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Test files
+**/__tests__/
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+
+# TypeScript
+tsconfig.tsbuildinfo
+
+# Storybook
+storybook-static/
+
+# Temporary files from editors
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*

@@ -1,93 +1,93 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: codepulse-postgres-dev
-    environment:
-      POSTGRES_DB: codepulse_dev
-      POSTGRES_USER: codepulse
-      POSTGRES_PASSWORD: dev_password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data_dev:/var/lib/postgresql/data
-      - ./apps/api/migrations:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U codepulse -d codepulse_dev"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    # PostgreSQL Database
+    postgres:
+        image: postgres:15-alpine
+        container_name: codepulse-postgres-dev
+        environment:
+            POSTGRES_DB: codepulse_dev
+            POSTGRES_USER: codepulse
+            POSTGRES_PASSWORD: dev_password
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data_dev:/var/lib/postgresql/data
+            - ./apps/api/migrations:/docker-entrypoint-initdb.d
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U codepulse -d codepulse_dev"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
 
-  # Redis for caching (optional but recommended)
-  redis:
-    image: redis:7-alpine
-    container_name: codepulse-redis-dev
-    ports:
-      - "6379:6379"
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data_dev:/data
+    # Redis for caching (optional but recommended)
+    redis:
+        image: redis:7-alpine
+        container_name: codepulse-redis-dev
+        ports:
+            - "6379:6379"
+        command: redis-server --appendonly yes
+        volumes:
+            - redis_data_dev:/data
 
-  # Go API with hot reload
-  api:
-    build:
-      context: ./apps/api
-      dockerfile: Dockerfile.dev
-    container_name: codepulse-api-dev
-    ports:
-      - "8080:8080"
-    volumes:
-      - ./apps/api:/app
-      - /app/tmp # Exclude tmp directory
-    environment:
-      - ENV=development
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=codepulse
-      - DB_PASSWORD=dev_password
-      - DB_NAME=codepulse_dev
-      - REDIS_URL=redis:6379
-      - JWT_SECRET=dev_jwt_secret_key
-      - PORT=8080
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # Go API with hot reload
+    api:
+        build:
+            context: ./apps/api
+            dockerfile: Dockerfile.dev
+        container_name: codepulse-api-dev
+        ports:
+            - "8080:8080"
+        volumes:
+            - ./apps/api:/app
+            - /app/tmp # Exclude tmp directory
+        environment:
+            - ENV=development
+            - DB_HOST=postgres
+            - DB_PORT=5432
+            - DB_USER=codepulse
+            - DB_PASSWORD=dev_password
+            - DB_NAME=codepulse_dev
+            - REDIS_URL=redis:6379
+            - JWT_SECRET=dev_jwt_secret_key
+            - PORT=8080
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
 
-  # Next.js Web App with hot reload
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile.dev
-    container_name: codepulse-web-dev
-    ports:
-      - "3000:3000"
-    working_dir: /app/apps/web
-    command: ["pnpm", "dev", "-p", "3000", "-H", "0.0.0.0"]
-    volumes:
-      - .:/app
-      - /app/node_modules
-      - /app/apps/web/.next
-    environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
-      - WATCHPACK_POLLING=true
-      - CHOKIDAR_USEPOLLING=true
-    depends_on:
-      - api
+    # Next.js Web App with hot reload
+    web:
+        build:
+            context: .
+            dockerfile: apps/web/Dockerfile.dev
+        container_name: codepulse-web-dev
+        ports:
+            - "3000:3000"
+        working_dir: /app/apps/web
+        command: ["pnpm", "dev", "-p", "3000", "-H", "0.0.0.0"]
+        volumes:
+            - .:/app
+            - /app/node_modules
+            - /app/apps/web/.next
+        environment:
+            - NODE_ENV=development
+            - NEXT_PUBLIC_API_URL=http://localhost:8080
+            - WATCHPACK_POLLING=true
+            - CHOKIDAR_USEPOLLING=true
+        depends_on:
+            - api
 
 volumes:
-  postgres_data_dev:
-  redis_data_dev:
+    postgres_data_dev:
+    redis_data_dev:
 
 networks:
-  default:
-    name: codepulse-dev-network
+    default:
+        name: codepulse-dev-network

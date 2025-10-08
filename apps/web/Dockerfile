@@ -7,20 +7,25 @@ RUN npm install -g pnpm
 WORKDIR /app
 
 RUN set -eux; \
-    # bascule éventuellement sur un miroir plus fiable
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories; \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories; \
-    for i in 1 2 3; do \
-      apk update && \
-      apk add --no-cache \
-        python3 \
-        build-base \
-        pkgconf \
-        cairo-dev pango-dev libjpeg-turbo-dev giflib-dev pixman-dev \
-        freetype-dev fontconfig-dev \
-      && break || { echo "apk failed, retrying in 5s…"; sleep 5; }; \
-    done; \
-    ln -sf /usr/bin/python3 /usr/bin/python
+	# bascule éventuellement sur un miroir plus fiable
+	echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories; \
+	echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories; \
+	for i in 1 2 3; do \
+		apk update && \
+		apk add --no-cache \
+			python3 \
+			build-base \
+			pkgconf \
+			cairo-dev \
+			pango-dev \
+			libjpeg-turbo-dev \
+			giflib-dev \
+			pixman-dev \
+			freetype-dev \
+			fontconfig-dev \
+		&& break || { echo "apk failed, retrying in 5s…"; sleep 5; }; \
+	done; \
+	ln -sf /usr/bin/python3 /usr/bin/python
 
 # Copy package files
 COPY package*.json pnpm-lock.yaml ./

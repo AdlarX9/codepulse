@@ -6,29 +6,29 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Downloads table
 CREATE TABLE IF NOT EXISTS downloads (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  
-  -- Privacy-first: IP is hashed, never stored raw
-  ip_hash TEXT NOT NULL,
-  
-  -- Geographic data (from CDN headers)
-  country TEXT,
-  region TEXT,
-  city TEXT,
-  
-  -- Request metadata
-  user_agent TEXT,
-  referrer TEXT,
-  
-  -- Download info
-  platform TEXT NOT NULL CHECK (platform IN ('mac', 'win', 'linux')),
-  version TEXT NOT NULL,
-  release_channel TEXT DEFAULT 'stable',
-  source TEXT DEFAULT 'landing',
-  
-  -- Extra metadata (JSON for flexibility)
-  extra JSONB DEFAULT '{}'::JSONB
+	id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+	-- Privacy-first: IP is hashed, never stored raw
+	ip_hash TEXT NOT NULL,
+
+	-- Geographic data (from CDN headers)
+	country TEXT,
+	region TEXT,
+	city TEXT,
+
+	-- Request metadata
+	user_agent TEXT,
+	referrer TEXT,
+
+	-- Download info
+	platform TEXT NOT NULL CHECK (platform IN ('mac', 'win', 'linux')),
+	version TEXT NOT NULL,
+	release_channel TEXT DEFAULT 'stable',
+	source TEXT DEFAULT 'landing',
+
+	-- Extra metadata (JSON for flexibility)
+	extra JSONB DEFAULT '{}'::JSONB
 );
 
 -- Indexes for common queries
@@ -42,8 +42,8 @@ ALTER TABLE downloads ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Allow service role full access
 CREATE POLICY "Service role can do anything" ON downloads
-  FOR ALL
-  USING (auth.role() = 'service_role');
+	FOR ALL
+	USING (auth.role() = 'service_role');
 
 -- Comments for documentation
 COMMENT ON TABLE downloads IS 'Privacy-first download tracking for CodePulse';

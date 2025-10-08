@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# CodePulse Management Script
-# Usage: ./codepulse.sh [command] [environment]
+# CodePulse - Interface Unifiée de Gestion
+# Usage: ./codepulse.sh [command] [options]
 
 set -e
 
@@ -13,186 +13,216 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 print_help() {
-    echo "CodePulse Management Script"
-    echo "=========================="
-    echo ""
-    echo "Usage: $0 [command] [environment]"
-    echo ""
-    echo "Commands:"
-    echo "  start [dev|prod]     Start the application"
-    echo "  stop [dev|prod]      Stop the application"
-    echo "  restart [dev|prod]   Restart the application"
-    echo "  logs [dev|prod]      Show application logs"
-    echo "  status [dev|prod]    Show service status"
-    echo "  shell [api|web|db]   Open shell in container"
-    echo "  backup               Backup database (prod only)"
-    echo "  restore [file]       Restore database from backup"
-    echo "  update               Update application"
-    echo "  clean                Clean Docker resources"
-    echo "  migrate              Run database migrations"
-    echo "  help                 Show this help"
-    echo ""
-    echo "Examples:"
-    echo "  $0 start dev         # Start development environment"
-    echo "  $0 logs prod         # Show production logs"
-    echo "  $0 shell api         # Open shell in API container"
-    echo "  $0 backup            # Backup production database"
+	echo -e "${BLUE}CodePulse - Interface de Gestion${NC}"
+	echo "================================="
+	echo ""
+	echo "Usage: $0 [command] [options]"
+	echo ""
+	echo -e "${YELLOW}Applications:${NC}"
+	echo "  desktop			  Lancer l'application desktop"
+	echo "  web				  Lancer l'application web"
+	echo "  dev				  Lancer desktop + web simultanément"
+	echo ""
+	echo -e "${YELLOW}Développement:${NC}"
+	echo "  setup				Configuration initiale du projet"
+	echo "  icons				Générer les icônes de développement"
+	echo "  build				Build toutes les applications"
+	echo "  build-desktop		Build l'application desktop seulement"
+	echo "  test				 Lancer tous les tests"
+	echo ""
+	echo -e "${YELLOW}Releases:${NC}"
+	echo "  release <version>	Créer un tag de release (ex: v1.0.0)"
+	echo ""
+	echo -e "${YELLOW}Utilitaires:${NC}"
+	echo "  clean				Nettoyer les fichiers temporaires"
+	echo "  help				 Afficher cette aide"
+	echo ""
+	echo "Exemples:"
+	echo "  $0 desktop		   # Lancer l'app desktop"
+	echo "  $0 web			   # Lancer l'app web"
+	echo "  $0 release v1.2.3	# Créer release v1.2.3"
 }
 
-get_compose_file() {
-    if [ "$1" = "dev" ]; then
-        echo "compose.dev.yaml"
-    else
-        echo "compose.yaml"
-    fi
+check_dependencies() {
+	echo -e "${BLUE}Vérification des dépendances...${NC}"
+		
+	# Node.js
+	if ! command -v node &> /dev/null; then
+		echo -e "${RED}❌ Node.js requis. Installez-le depuis https://nodejs.org/${NC}"
+		exit 1
+	fi
+		
+	# pnpm
+	if ! command -v pnpm &> /dev/null; then
+		echo -e "${YELLOW}⚠️  pnpm non trouvé. Installation...${NC}"
+		npm install -g pnpm
+	fi
+		
+	echo -e "${GREEN}✅ Dépendances OK${NC}"
 }
 
-check_environment() {
-    local env=$1
-    if [ "$env" != "dev" ] && [ "$env" != "prod" ] && [ -n "$env" ]; then
-        echo -e "${RED}Error: Environment must be 'dev' or 'prod'${NC}"
-        exit 1
-    fi
+setup_project() {
+	echo -e "${BLUE}Configuration initiale de CodePulse...${NC}"
+		
+	check_dependencies
+		
+	# Install dependencies
+	echo -e "${BLUE}📦 Installation des dépendances...${NC}"
+	pnpm install
+		
+	# Generate icons
+	echo -e "${BLUE}🎨 Génération des icônes...${NC}"
+	bash scripts/create-dev-icons.sh
+		
+	# Setup web env if needed
+	if [ ! -f "apps/web/.env.local" ]; then
+		echo -e "${BLUE}⚙️  Configuration de l'environnement web...${NC}"
+		cp apps/web/.env.example apps/web/.env.local
+		echo -e "${YELLOW}⚠️  Éditez apps/web/.env.local avec vos credentials${NC}"
+	fi
+		
+	echo -e "${GREEN}✅ Configuration terminée !${NC}"
+	echo ""
+	echo "Commandes disponibles :"
+	echo "  $0 desktop	# Lancer l'app desktop"
+	echo "  $0 web		# Lancer l'app web"
+}
+
+launch_desktop() {
+	echo -e "${BLUE}🚀 Lancement de l'application desktop...${NC}"
+	bash scripts/launch-desktop.sh
+}
+
+launch_web() {
+	echo -e "${BLUE}🌐 Lancement de l'application web...${NC}"
+	bash scripts/launch-web.sh
+}
+
+launch_both() {
+	echo -e "${BLUE}🚀 Lancement desktop + web...${NC}"
+	echo -e "${YELLOW}Appuyez sur Ctrl+C pour arrêter les deux applications${NC}"
+		
+	# Launch web in background
+	bash scripts/launch-web.sh &
+	WEB_PID=$!
+		
+	# Launch desktop in foreground
+	bash scripts/launch-desktop.sh &
+	DESKTOP_PID=$!
+		
+	# Wait for both processes
+	wait $WEB_PID $DESKTOP_PID
+}
+
+build_all() {
+	echo -e "${BLUE}📦 Build de toutes les applications...${NC}"
+	pnpm -w build
+	echo -e "${GREEN}✅ Build terminé !${NC}"
+}
+
+build_desktop() {
+	echo -e "${BLUE}🔨 Build de l'application desktop...${NC}"
+	bash scripts/build-tauri.sh
+}
+
+run_tests() {
+	echo -e "${BLUE}🧪 Lancement des tests...${NC}"
+		
+	# TypeScript tests
+	echo -e "${BLUE}▶️  Tests TypeScript...${NC}"
+	pnpm -w lint
+		
+	# Rust tests
+	echo -e "${BLUE}▶️  Tests Rust...${NC}"
+	cd apps/desktop/src-tauri
+	cargo test
+	cd ../../..
+		
+	echo -e "${GREEN}✅ Tous les tests passent !${NC}"
+}
+
+create_release() {
+	if [ -z "$1" ]; then
+		echo -e "${RED}❌ Version requise. Usage: $0 release v1.0.0${NC}"
+		exit 1
+	fi
+		
+	echo -e "${BLUE}🏷️  Création de la release $1...${NC}"
+	node scripts/release-tag.js $1
+}
+
+clean_project() {
+	echo -e "${BLUE}🧹 Nettoyage des fichiers temporaires...${NC}"
+		
+	# Clean node_modules in subdirs
+	find . -name "node_modules" -type d -prune -exec rm -rf {} +
+		
+	# Clean build artifacts
+	rm -rf apps/desktop/dist
+	rm -rf apps/web/.next
+	rm -rf apps/desktop/src-tauri/target
+		
+	# Clean packages
+	rm -rf packages/*/dist
+		
+	echo -e "${GREEN}✅ Nettoyage terminé !${NC}"
+}
+
+generate_icons() {
+	echo -e "${BLUE}🎨 Génération des icônes de développement...${NC}"
+	bash scripts/create-dev-icons.sh
 }
 
 # Main command handling
 case "$1" in
-    "start")
-        ENV=${2:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        echo -e "${BLUE}Starting CodePulse ($ENV environment)...${NC}"
-        docker-compose -f $COMPOSE_FILE up -d
-        echo -e "${GREEN}CodePulse started successfully!${NC}"
-        ;;
-    
-    "stop")
-        ENV=${2:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        echo -e "${BLUE}Stopping CodePulse ($ENV environment)...${NC}"
-        docker-compose -f $COMPOSE_FILE down
-        echo -e "${GREEN}CodePulse stopped successfully!${NC}"
-        ;;
-    
-    "restart")
-        ENV=${2:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        echo -e "${BLUE}Restarting CodePulse ($ENV environment)...${NC}"
-        docker-compose -f $COMPOSE_FILE restart
-        echo -e "${GREEN}CodePulse restarted successfully!${NC}"
-        ;;
-    
-    "logs")
-        ENV=${2:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        docker-compose -f $COMPOSE_FILE logs -f
-        ;;
-    
-    "status")
-        ENV=${2:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        docker-compose -f $COMPOSE_FILE ps
-        ;;
-    
-    "shell")
-        SERVICE=${2:-api}
-        ENV=${3:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        
-        case "$SERVICE" in
-            "api")
-                docker-compose -f $COMPOSE_FILE exec api sh
-                ;;
-            "web")
-                docker-compose -f $COMPOSE_FILE exec web sh
-                ;;
-            "db"|"postgres")
-                docker-compose -f $COMPOSE_FILE exec postgres psql -U codepulse -d codepulse_dev
-                ;;
-            "redis")
-                docker-compose -f $COMPOSE_FILE exec redis redis-cli
-                ;;
-            *)
-                echo -e "${RED}Error: Unknown service '$SERVICE'. Available: api, web, db, redis${NC}"
-                exit 1
-                ;;
-        esac
-        ;;
-    
-    "backup")
-        echo -e "${BLUE}Creating database backup...${NC}"
-        BACKUP_FILE="backup_$(date +%Y%m%d_%H%M%S).sql"
-        docker-compose exec -T postgres pg_dump -U codepulse codepulse > $BACKUP_FILE
-        echo -e "${GREEN}Backup created: $BACKUP_FILE${NC}"
-        ;;
-    
-    "restore")
-        BACKUP_FILE=$2
-        if [ -z "$BACKUP_FILE" ]; then
-            echo -e "${RED}Error: Please specify backup file${NC}"
-            echo "Usage: $0 restore backup_file.sql"
-            exit 1
-        fi
-        
-        if [ ! -f "$BACKUP_FILE" ]; then
-            echo -e "${RED}Error: Backup file '$BACKUP_FILE' not found${NC}"
-            exit 1
-        fi
-        
-        echo -e "${YELLOW}Warning: This will overwrite the current database!${NC}"
-        read -p "Are you sure? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${BLUE}Restoring database from $BACKUP_FILE...${NC}"
-            docker-compose exec -T postgres psql -U codepulse -d codepulse < $BACKUP_FILE
-            echo -e "${GREEN}Database restored successfully!${NC}"
-        else
-            echo "Restore cancelled"
-        fi
-        ;;
-    
-    "update")
-        echo -e "${BLUE}Updating CodePulse...${NC}"
-        git pull
-        docker-compose build --no-cache
-        docker-compose up -d
-        echo -e "${GREEN}Update completed!${NC}"
-        ;;
-    
-    "clean")
-        echo -e "${BLUE}Cleaning Docker resources...${NC}"
-        docker system prune -f
-        docker volume prune -f
-        echo -e "${GREEN}Cleanup completed!${NC}"
-        ;;
-    
-    "migrate")
-        ENV=${2:-dev}
-        check_environment $ENV
-        COMPOSE_FILE=$(get_compose_file $ENV)
-        echo -e "${BLUE}Running database migrations...${NC}"
-        
-        if [ "$ENV" = "prod" ]; then
-            docker-compose -f $COMPOSE_FILE exec api migrate -path /root/migrations -database "$DATABASE_URL" up
-        else
-            echo "Migrations will run automatically in development mode"
-        fi
-        echo -e "${GREEN}Migrations completed!${NC}"
-        ;;
-    
-    "help"|"--help"|"-h"|"")
-        print_help
-        ;;
-    
-    *)
-        echo -e "${RED}Error: Unknown command '$1'${NC}"
-        echo ""
-        print_help
-        exit 1
-        ;;
+	"desktop")
+		launch_desktop
+		;;
+		
+	"web")
+		launch_web
+		;;
+		
+	"dev")
+		launch_both
+		;;
+		
+	"setup")
+		setup_project
+		;;
+		
+	"icons")
+		generate_icons
+		;;
+		
+	"build")
+		build_all
+		;;
+		
+	"build-desktop")
+		build_desktop
+		;;
+		
+	"test")
+		run_tests
+		;;
+		
+	"release")
+		create_release $2
+		;;
+		
+	"clean")
+		clean_project
+		;;
+		
+	"help"|"--help"|"-h"|"")
+		print_help
+		;;
+		
+	*)
+		echo -e "${RED}❌ Commande inconnue: '$1'${NC}"
+		echo ""
+		print_help
+		exit 1
+		;;
 esac

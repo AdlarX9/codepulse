@@ -18,6 +18,9 @@ out/
 .env
 .env*.local
 
+# Certificates
+nginx/certificates/*.pem
+
 # OS
 .DS_Store
 Thumbs.db
@@ -33,6 +36,7 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
+apps/web/tsconfig.tsbuildinfo
 
 # Testing
 coverage/
@@ -40,3 +44,7 @@ coverage/
 
 # Secret Place hehe
 secret-place/
+
+# Icons
+apps/desktop/src-tauri/icons/*.png
+apps/web/public/favicon.ico

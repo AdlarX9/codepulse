@@ -1,52 +1,262 @@
-# Architecture Guide
+# 🏗️ Architecture - CodePulse
 
-CodePulse system architecture and design decisions.
+Architecture technique détaillée de CodePulse.
 
-## 🏗 High-Level Architecture
+## Vue d'Ensemble
+
+CodePulse est une application d'analyse de code **privacy-first** construite comme un monorepo moderne avec une séparation claire entre l'application desktop (Tauri/Rust) et l'application web (Next.js/React).
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Desktop App   │    │    Web App      │    │   Nginx Proxy   │
-│                 │    │                 │    │                 │
-│  Tauri + React  │    │    Next.js      │    │  SSL + Routing  │
-│     (Rust)      │    │  (TypeScript)   │    │   (Rate Limit)  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │                       │                       │
-         └───────────────────────┼───────────────────────┘
-                                 │
-                    ┌─────────────────┐
-                    │   Go API        │
-                    │                 │
-                    │  Gin Framework  │
-                    │  JWT + CORS     │
-                    └─────────────────┘
-                             │
-                ┌─────────────────────────────┐
-                │                             │
-     ┌─────────────────┐           ┌─────────────────┐
-     │   PostgreSQL    │           │     Redis       │
-     │                 │           │                 │
-     │   Primary DB    │           │ Cache + Session │
-     │   ACID + JSONB  │           │   Pub/Sub       │
-     └─────────────────┘           └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        CodePulse Monorepo                       │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │ Desktop App │  │   Web App   │  │  Packages   │              │
+│  │  Tauri/Rust │  │ Next.js/TS  │  │   Shared    │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │   Scanner   │  │     API     │  │   Scripts   │              │
+│  │    Rust     │  │   Next.js   │  │   Build     │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │ PostgreSQL  │  │    Redis    │  │    Nginx    │              │
+│  │  Analytics  │  │   Cache     │  │   Proxy     │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-## 🔧 Technology Stack
+## Architecture par Couche
 
-### Backend
-- **Language**: Go 1.21+
-- **Framework**: Gin (HTTP router)
-- **Database**: PostgreSQL 15 (primary)
-- **Cache**: Redis 7 (sessions, cache)
-- **Auth**: JWT tokens
-- **ORM**: GORM (with raw SQL for complex queries)
+### 1. Couche Présentation (Frontend)
 
-### Frontend
-- **Web**: Next.js 14 (React, TypeScript)
-- **Desktop**: Tauri + React + TypeScript
-- **Styling**: Tailwind CSS
-- **State**: React Context + Hooks
+#### Application Desktop
+- **Framework** : Tauri 1.x (Rust + WebView)
+- **UI** : React 18 + TypeScript + Vite
+- **Styling** : Tailwind CSS
+- **Charts** : Recharts
+- **OS Support** : macOS, Windows, Linux
+
+**Structure :**
+```
+apps/desktop/
+├── src/                 # Frontend React
+│   ├── components/      # Composants UI
+│   ├── lib/            # Utilitaires
+│   └── App.tsx         # Application principale
+├── src-tauri/          # Backend Tauri
+│   ├── src/            # Code Rust
+│   └── icons/          # Icônes d'application
+└── dist/               # Build de production
+```
+
+#### Application Web
+- **Framework** : Next.js 14 (App Router)
+- **Runtime** : Edge Runtime (API Routes)
+- **UI** : React 18 + TypeScript
+- **Styling** : Tailwind CSS + CSS Modules
+- **Database** : Supabase (PostgreSQL)
+
+**Structure :**
+```
+apps/web/
+├── src/app/            # Pages et API (App Router)
+│   ├── api/           # API Routes Next.js
+│   ├── admin/         # Dashboard admin
+│   └── page.tsx       # Landing page
+├── src/components/     # Composants partagés
+└── public/            # Assets statiques
+```
+
+### 2. Couche Métier (Backend)
+
+#### Scanner Rust (Desktop)
+Moteur d'analyse ultra-performant écrit en Rust avec parallélisation.
+
+**Fonctionnalités :**
+- **Analyse syntaxique** : Détection précise du langage
+- **Comptage avancé** : Lignes de code, commentaires, lignes vides
+- **Parallélisation** : Traitement multi-threads avec Rayon
+- **Filtrage** : Exclusion des fichiers générés et caches
+- **Performance** : 10k fichiers en ~2-3 secondes
+
+**Architecture interne :**
+```
+src-tauri/src/scanner/
+├── mod.rs              # Module principal
+├── language.rs         # Détection de langage
+├── counter.rs          # Comptage des lignes
+└── filter.rs           # Filtres d'exclusion
+```
+
+**Algorithme de scan :**
+1. **Découverte récursive** avec `walkdir`
+2. **Filtrage** des fichiers (taille, extension, patterns)
+3. **Détection de langage** par extension + contenu
+4. **Analyse parallèle** par chunks de fichiers
+5. **Agrégation** des statistiques par langage
+
+#### API Web (Next.js)
+API REST construite avec Next.js API Routes.
+
+**Endpoints principaux :**
+- `GET /api/download` : Tracking téléchargements
+- `GET /api/export` : Export données projets
+- `GET /api/admin/stats` : Analytics dashboard
+- `POST /api/github/webhook` : Intégration GitHub
+
+**Technologies :**
+- **Runtime** : Edge Runtime (optimisé, serverless)
+- **Database** : Supabase avec Row Level Security
+- **Validation** : Zod schemas
+- **Sécurité** : Rate limiting, CORS, HTTPS uniquement
+
+### 3. Couche Données
+
+#### Base de Données (Supabase/PostgreSQL)
+Stockage des analytics de téléchargement uniquement.
+
+**Tables principales :**
+```sql
+downloads {
+  id UUID PRIMARY KEY
+  ip_hash TEXT        -- SHA-256 anonymisé
+  country TEXT        -- Code pays
+  region TEXT         -- Région géographique
+  city TEXT          -- Ville
+  user_agent TEXT     -- Client navigateur
+  referrer TEXT       -- URL référente
+  platform TEXT       -- mac/win/linux
+  version TEXT        -- Version téléchargée
+  created_at TIMESTAMPTZ
+}
+```
+
+**Sécurité :**
+- **RLS activé** : Accès restreint par policies
+- **Anonymisation** : IPs hashées avec salt
+- **Rétention** : Données supprimées après 1 an
+
+#### Cache (Redis)
+Utilisé pour les sessions admin et métriques temporaires.
+
+### 4. Couche Infrastructure
+
+#### Scripts d'Automatisation
+Collection de scripts pour le développement et déploiement.
+
+```
+scripts/
+├── build-tauri.sh      # Build desktop
+├── build_all.sh        # Build complet
+├── create-dev-icons.sh # Génération icônes dev
+├── dev.sh             # Setup développement
+└── launch-*.sh        # Lanceurs rapides
+```
+
+#### CI/CD (GitHub Actions)
+Automatisation complète du développement au déploiement.
+
+**Workflows :**
+- **Release** : Build et release sur tags
+- **Web Deploy** : Déploiement automatique web
+- **Tests** : Vérifications sur chaque PR
+
+## Flux de Données
+
+### Analyse de Code (Desktop)
+```
+Fichier utilisateur → Scanner Rust → Analyse → UI React → Export
+     ↓                     ↓           ↓        ↓         ↓
+Sélection dossier → WalkDir +   → Langage +  → Charts + → CSV/
+                  Rayon       Comptage    Stats     JSON
+```
+
+### Téléchargement (Web)
+```
+Utilisateur → Download API → Tracking → Redirection → Analytics
+    ↓            ↓            ↓           ↓           ↓
+Click lien → Validation +  Headers → Hash IP +  → Asset URL + → Supabase
+           Géolocalisation  Anonyme   Salt         Stockage
+```
+
+### Dashboard Admin (Web)
+```
+Admin → Auth → Stats API → Database → Analytics → Charts
+  ↓      ↓       ↓         ↓         ↓         ↓
+Login → Basic  Supabase  PostgreSQL  JSON    Recharts
+      HTTP     Queries   RLS        Export
+```
+
+## Sécurité
+
+### Privacy by Design
+- **Analyse locale** : Aucun code n'est envoyé sur internet
+- **Pas de télémetry** : Zéro tracking utilisateur
+- **Données minimisées** : Seules métriques géographiques anonymes
+- **Open Source** : Code auditable par la communauté
+
+### Sécurité Technique
+- **HTTPS obligatoire** : Certificats TLS 1.3
+- **Headers sécurisés** : CSP, HSTS, etc.
+- **Input validation** : Zod schemas sur toutes les entrées
+- **SQL injection** : Paramètres préparés uniquement
+- **XSS protection** : Échappement automatique
+
+## Performance
+
+### Optimisations Backend
+- **Rust scanner** : ~50x plus rapide que JavaScript équivalent
+- **Parallélisation** : Traitement multi-coeurs
+- **Streaming** : Pas de chargement complet en mémoire
+- **Caching** : Métriques pré-calculées
+
+### Optimisations Frontend
+- **Code splitting** : Next.js automatique
+- **Image optimization** : WebP et formats modernes
+- **Bundle analysis** : Outils intégrés de mesure
+- **Lazy loading** : Composants chargés à la demande
+
+## Déploiement
+
+### Environnements
+- **Développement** : `localhost` avec hot reload
+- **Production** : Déploiement serverless optimisé
+
+### Stratégie de Déploiement
+- **Desktop** : Releases GitHub avec signatures
+- **Web** : Vercel/Netlify avec edge functions
+- **Database** : Supabase géré
+
+## Tests
+
+### Stratégie de Test
+- **Unitaires** : Rust tests pour le scanner
+- **Intégration** : Tests API avec Supabase
+- **E2E** : Tests utilisateurs sur apps
+- **Performance** : Benchmarks scanner Rust
+
+### Outils de Test
+- **Rust** : Tests intégrés avec `cargo test`
+- **TypeScript** : Vérification de types stricte
+- **Build** : Tests de compilation complète
+
+## Monitoring
+
+### Métriques Collectées
+- **Downloads** : Par plateforme, pays, version
+- **Performance** : Temps de scan, taille des projets
+- **Erreurs** : Logs structurés et alerting
+
+### Outils de Monitoring
+- **Logs** : Console structurée (development)
+- **Analytics** : Dashboard admin intégré
+- **Alerting** : GitHub Issues pour erreurs critiques
+
+---
+
+📖 **Voir aussi** : [Guide de développement](development.md) • [API Reference](api-reference.md)
 
 ### Infrastructure  
 - **Containerization**: Docker + Docker Compose

@@ -1,356 +1,343 @@
-# API Documentation
+# 🔌 API Reference - CodePulse
 
-CodePulse REST API built with Go and Gin framework.
+Documentation complète de l'API CodePulse.
 
-## 🔗 Base URL
+## Vue d'Ensemble
 
-- **Development**: `http://localhost:8080`
-- **Production**: `https://your-domain.com/api`
+L'API CodePulse fournit des endpoints pour :
+- **Tracking de téléchargements** avec analytics anonymes
+- **Export de données** de projets en CSV/JSON/XML
+- **Dashboard admin** avec statistiques d'utilisation
+- **Intégration GitHub** pour releases automatisées
 
-## 🔐 Authentication
+## Base URL
 
-All protected endpoints require JWT token in header:
+```
+https://codepulse.app/api
+```
+
+## Authentification
+
+### Admin Authentication
+
+La plupart des endpoints admin nécessitent une authentification HTTP Basic Auth :
 
 ```bash
-Authorization: Bearer <jwt_token>
+curl -u "admin:votre-mot-de-passe" https://codepulse.app/api/admin/stats
 ```
 
-Get token via login endpoint.
+Les credentials sont configurés via les variables d'environnement :
+- `NEXT_ADMIN_USER` : Nom d'utilisateur admin
+- `NEXT_ADMIN_PASS` : Mot de passe admin
 
-## 📋 Endpoints
+## Endpoints
 
-### Authentication
+---
 
-#### Register
-```http
-POST /v1/auth/register
-Content-Type: application/json
+## 📥 Download API
 
-{
-  "email": "user@example.com",
-  "password": "securepassword",
-  "handle": "username"
+Gestion des téléchargements avec tracking analytique.
+
+### `GET /api/download`
+
+Redirige vers les assets de téléchargement selon la plateforme tout en collectant des analytics anonymes.
+
+**Paramètres de requête :**
+- `platform` (requis) : `mac`, `win`, ou `linux`
+- `version` (optionnel) : Tag de version, défaut : `latest`
+
+**Headers ajoutés automatiquement :**
+- `x-real-ip` : Adresse IP utilisateur
+- `x-forwarded-for` : IP proxy si applicable
+- `x-vercel-ip-country` : Code pays (ISO 3166-1 alpha-2)
+- `x-vercel-ip-city` : Nom de la ville
+- `user-agent` : User agent du client
+- `referer` : URL référente
+
+**Réponse :** `302 Redirect` vers l'URL de l'asset
+
+**Données Analytics Collectées :**
+```sql
+downloads {
+  ip_hash        -- SHA-256 de l'IP + salt
+  country        -- Code pays ISO
+  region         -- Région géographique
+  city          -- Ville
+  user_agent    -- Client navigateur
+  referrer      -- URL référente
+  platform      -- mac/win/linux
+  version       -- Tag de version
+  created_at    -- Timestamp
 }
 ```
 
-**Response:**
-```json
-{
-  "token": "jwt_token_here",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "profile": {
-      "handle": "username",
-      "visibility": "private"
-    }
-  }
-}
-```
-
-#### Login
-```http
-POST /v1/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "securepassword"
-}
-```
-
-#### Get Current User
-```http
-GET /v1/auth/me
-Authorization: Bearer <token>
-```
-
-### Projects
-
-#### List Projects
-```http
-GET /v1/me/projects
-Authorization: Bearer <token>
-```
-
-**Response:**
-```json
-{
-  "projects": [
-    {
-      "id": "uuid",
-      "name": "My Project",
-      "visibility": "private",
-      "created_at": "2023-12-01T10:00:00Z",
-      "scans": [...],
-      "github_links": [...]
-    }
-  ]
-}
-```
-
-#### Get Project
-```http
-GET /v1/me/projects/{id}
-Authorization: Bearer <token>
-```
-
-#### Update Project
-```http
-PATCH /v1/me/projects/{id}
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "name": "Updated Project Name",
-  "visibility": "public"
-}
-```
-
-#### Delete Project
-```http
-DELETE /v1/me/projects/{id}
-Authorization: Bearer <token>
-```
-
-### Scans
-
-#### Sync Scan (Desktop App)
-```http
-POST /v1/sync/scan
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "project_key_hash": "hash_of_project_path",
-  "totals": {
-    "total": 1000,
-    "code": 800,
-    "comment": 150,
-    "blank": 50,
-    "core_code_lines": 750,
-    "info_lines": 50
-  },
-  "per_language": [
-    {
-      "language": "JavaScript",
-      "files": 25,
-      "total": 500,
-      "code": 400,
-      "comment": 75,
-      "blank": 25
-    }
-  ],
-  "device_id": "unique_device_identifier",
-  "app_version": "1.0.0",
-  "scanned_at": "1701430800"
-}
-```
-
-#### Get Project Scans
-```http
-GET /v1/me/projects/{id}/scans?page=1&limit=20
-Authorization: Bearer <token>
-```
-
-### Health Check
-
-#### System Health
-```http
-GET /health
-```
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2023-12-01T10:00:00Z",
-  "services": {
-    "postgres": "healthy",
-    "redis": "healthy"
-  },
-  "version": "1.0.0"
-}
-```
-
-## 🔒 Security
-
-### Rate Limiting
-
-- **API endpoints**: 10 requests/second
-- **Login endpoint**: 1 request/second
-- **Burst**: 20 requests
-
-### Headers
-
-All responses include security headers:
-- `X-Frame-Options: DENY`
-- `X-Content-Type-Options: nosniff`
-- `X-XSS-Protection: 1; mode=block`
-- `Strict-Transport-Security` (HTTPS only)
-
-## 📊 Response Format
-
-### Success Response
-```json
-{
-  "data": {...},
-  "message": "Success message"
-}
-```
-
-### Error Response
-```json
-{
-  "error": "Error message",
-  "details": "Additional details",
-  "code": "ERROR_CODE"
-}
-```
-
-## 🔧 HTTP Status Codes
-
-- `200` - Success
-- `201` - Created
-- `400` - Bad Request
-- `401` - Unauthorized
-- `403` - Forbidden
-- `404` - Not Found
-- `429` - Too Many Requests
-- `500` - Internal Server Error
-
-## 📝 Data Models
-
-### User
-```json
-{
-  "id": "uuid",
-  "email": "string",
-  "created_at": "datetime",
-  "profile": {
-    "handle": "string",
-    "display_name": "string|null",
-    "avatar_url": "string|null",
-    "bio": "string|null",
-    "visibility": "private|public"
-  }
-}
-```
-
-### Project
-```json
-{
-  "id": "uuid",
-  "user_id": "uuid",
-  "project_key_hash": "string",
-  "name": "string|null",
-  "visibility": "private|public",
-  "created_at": "datetime",
-  "updated_at": "datetime"
-}
-```
-
-### Scan
-```json
-{
-  "id": "uuid",
-  "project_id": "uuid",
-  "total": "integer",
-  "code": "integer",
-  "comment": "integer",
-  "blank": "integer",
-  "comment_ratio": "float",
-  "core_code_lines": "integer",
-  "info_lines": "integer",
-  "device_id": "string|null",
-  "version_tag": "string|null",
-  "created_at": "datetime",
-  "scan_langs": [
-    {
-      "language": "string",
-      "files": "integer",
-      "total": "integer",
-      "code": "integer",
-      "comment": "integer",
-      "blank": "integer"
-    }
-  ]
-}
-```
-
-## 🧪 Testing
-
-### cURL Examples
-
+**Exemple :**
 ```bash
-# Register
-curl -X POST http://localhost:8080/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123","handle":"testuser"}'
-
-# Login
-curl -X POST http://localhost:8080/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
-
-# Get projects (with token)
-curl -X GET http://localhost:8080/v1/me/projects \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+curl "https://codepulse.app/api/download?platform=mac&version=v1.0.0"
+# → 302 vers le fichier DMG actuel
 ```
 
-### Postman Collection
+---
 
-Import the Postman collection from `/docs/codepulse.postman_collection.json`
+## 📊 Export API
 
-## 🔍 Debugging
+Export des données de scan de projets.
 
-### Logging
+### `GET /api/export`
 
-All requests are logged with:
-- Request method and path
-- Response status
-- Response time
-- User ID (if authenticated)
+Exporte les données de scan d'un projet avec filtrage optionnel.
 
-### Error Tracking
+**Authentification :** Requise (Admin)
 
-Errors include:
-- Timestamp
-- Request ID
-- Stack trace (development only)
-- User context
+**Paramètres de requête :**
+- `project_id` (requis) : UUID du projet
+- `format` (requis) : Format d'export (`csv`, `json`, `xml`)
+- `from` (optionnel) : Date de début (ISO 8601)
+- `to` (optionnel) : Date de fin (ISO 8601)
+- `include_languages` (optionnel) : Inclure répartition langues (`true`/`false`)
 
-## 📚 SDK
+### Formats de Réponse
 
-### JavaScript/TypeScript
+#### CSV
+```csv
+scan_id,created_at,total_lines,code_lines,comment_lines,blank_lines,core_code_lines,info_lines,comment_ratio,device_id,version
+123e4567-e89b-12d3-a456-426614174000,2024-01-15T10:30:00Z,15420,8934,2341,5145,7850,1084,0.15,device-abc,1.2.3
+```
 
-```javascript
-class CodePulseAPI {
-  constructor(baseURL, token) {
-    this.baseURL = baseURL;
-    this.token = token;
+#### JSON
+```json
+{
+  "codepulse_export": {
+    "project": {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "name": "Mon Projet",
+      "exported_at": "2024-01-15T10:30:00Z"
+    },
+    "scans": [
+      {
+        "id": "scan-uuid",
+        "created_at": "2024-01-15T10:30:00Z",
+        "total": 15420,
+        "code": 8934,
+        "comment": 2341,
+        "blank": 5145,
+        "core_code_lines": 7850,
+        "info_lines": 1084,
+        "comment_ratio": 0.15,
+        "device_id": "device-abc",
+        "version_tag": "1.2.3",
+        "scan_langs": [
+          {
+            "language": "typescript",
+            "lines": 5420,
+            "percentage": 35.1
+          }
+        ]
+      }
+    ]
   }
-
-  async request(method, path, data = null) {
-    const response = await fetch(`${this.baseURL}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.token}`
-      },
-      body: data ? JSON.stringify(data) : null
-    });
-    
-    return response.json();
-  }
-
-  // Methods for each endpoint...
 }
 ```
 
-## 🔄 Versioning
+#### XML
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<codepulse_export>
+  <project>
+    <id>123e4567-e89b-12d3-a456-426614174000</id>
+    <name>Mon Projet</name>
+    <exported_at>2024-01-15T10:30:00Z</exported_at>
+  </project>
+  <scans>
+    <id>scan-uuid</id>
+    <created_at>2024-01-15T10:30:00Z</created_at>
+    <total>15420</total>
+    <code>8934</code>
+    <!-- autres champs -->
+  </scans>
+</codepulse_export>
+```
 
-API uses semantic versioning:
-- **v1**: Current stable version
-- Breaking changes will increment major version
-- New features increment minor version
+**Codes d'erreur :**
+- `400` : Paramètres invalides
+- `404` : Projet non trouvé
+- `500` : Erreur serveur
+
+---
+
+## 📈 Admin Stats API
+
+Statistiques pour le dashboard admin.
+
+### `GET /api/admin/stats`
+
+Récupère les statistiques complètes de téléchargement et d'utilisation.
+
+**Authentification :** Requise (Admin)
+
+**Paramètres de requête :**
+- `period` (optionnel) : Période (`day`, `week`, `month`, `year`) - défaut : `month`
+- `format` (optionnel) : Format réponse (`json`, `csv`) - défaut : `json`
+
+**Réponse JSON :**
+```json
+{
+  "downloads": {
+    "total": 15420,
+    "by_platform": {
+      "mac": 8934,
+      "win": 4123,
+      "linux": 2363
+    },
+    "by_country": {
+      "US": 5420,
+      "DE": 3210,
+      "FR": 2150,
+      "GB": 1890,
+      "CA": 1750
+    },
+    "trend": [
+      {"date": "2024-01-01", "downloads": 45},
+      {"date": "2024-01-02", "downloads": 52}
+    ]
+  },
+  "projects": {
+    "total": 23,
+    "active": 18,
+    "total_scans": 1456
+  },
+  "versions": {
+    "latest": "1.2.3",
+    "distribution": {
+      "1.2.3": 8934,
+      "1.2.2": 4123,
+      "1.2.1": 2363
+    }
+  }
+}
+```
+
+---
+
+## 🔗 GitHub Integration API
+
+Gestion des webhooks GitHub et releases.
+
+### `POST /api/github/webhook`
+
+Traite les événements webhook GitHub pour les releases automatisées.
+
+**Authentification :** Vérification de signature GitHub
+
+**Headers :**
+- `X-GitHub-Event` : Type d'événement (`release`, `push`, etc.)
+- `X-Hub-Signature-256` : Signature SHA-256 pour vérification
+
+**Corps de la requête :**
+```json
+{
+  "action": "published",
+  "release": {
+    "tag_name": "v1.2.3",
+    "name": "Release v1.2.3",
+    "assets": [
+      {
+        "name": "CodePulse-1.2.3.dmg",
+        "browser_download_url": "https://github.com/user/repo/releases/download/v1.2.3/CodePulse-1.2.3.dmg"
+      }
+    ]
+  }
+}
+```
+
+**Réponse :**
+- `200` : Webhook traité avec succès
+- `400` : Signature ou payload invalide
+- `500` : Erreur interne
+
+---
+
+## Modèles de Données
+
+### Structure de Scan
+
+```typescript
+interface Scan {
+  id: string
+  project_id: string
+  created_at: string
+  total: number           // Lignes totales
+  code: number           // Lignes de code
+  comment: number        // Lignes de commentaire
+  blank: number          // Lignes vides
+  core_code_lines: number // Lignes de code (tests/docs exclus)
+  info_lines: number     // Lignes de documentation
+  comment_ratio: number  // Ratio commentaires
+  device_id: string      // Identifiant appareil anonyme
+  version_tag: string    // Version de l'app utilisée
+}
+```
+
+### Répartition par Langage
+
+```typescript
+interface ScanLanguage {
+  scan_id: string
+  language: string
+  lines: number
+  percentage: number
+  files: number
+}
+```
+
+### Analytics de Téléchargement
+
+```typescript
+interface Download {
+  id: string
+  ip_hash: string        // SHA-256 de l'IP + salt
+  country: string        // Code pays ISO
+  region: string         // Région géographique
+  city: string          // Nom de la ville
+  user_agent: string     // User agent client
+  referrer: string       // URL référente
+  platform: 'mac' | 'win' | 'linux'
+  version: string        // Tag de version
+  created_at: string     // Timestamp
+}
+```
+
+## Gestion d'Erreurs
+
+Tous les endpoints suivent les codes HTTP standards :
+
+- `200` : Succès
+- `302` : Redirection (endpoint download)
+- `400` : Mauvaise requête (paramètres invalides)
+- `401` : Non autorisé (auth manquante/invalide)
+- `404` : Non trouvé (ressource inexistante)
+- `500` : Erreur serveur interne
+
+Réponses d'erreur avec corps JSON :
+```json
+{
+  "error": "Description de l'erreur",
+  "details": "Contexte additionnel"
+}
+```
+
+## Sécurité et Confidentialité
+
+- **Anonymisation IP** : Toutes les IPs sont hashées avec un salt
+- **Pas de données personnelles** : Seules les régions géographiques sont conservées
+- **HTTPS obligatoire** : Toutes les requêtes doivent utiliser HTTPS
+- **CORS** : Configuré pour l'accès dashboard uniquement
+- **Rate Limiting** : 100 requêtes/minute par IP pour les endpoints admin
+
+## Technologies Utilisées
+
+- **Next.js API Routes** : Runtime Edge Functions
+- **Supabase** : Base PostgreSQL avec Row Level Security
+- **Papa Parse** : Génération CSV
+- **xml-js** : Conversion XML
+- **Zod** : Validation de types à l'exécution

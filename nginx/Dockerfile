@@ -5,6 +5,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Create directory for SSL certificates
 RUN mkdir -p /etc/nginx/certs
+COPY certificates /etc/nginx/certs
 
 # Create directory for HTML files
 RUN mkdir -p /usr/share/nginx/html
