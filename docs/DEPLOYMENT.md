@@ -1,71 +1,9 @@
-# 🚀 Deployment Guide
+# 🚀 Production Deployment Guide
 
-Complete guide for deploying CodePulse to production.
+Deploy CodePulse to your own infrastructure with complete control.
 
-## 📋 Checklist Before First Release
+## 🚀 Quick Production Setup
 
-- [ ] Update branding (app name, icons, colors)
-- [ ] Configure GitHub repository
-- [ ] Setup Supabase database
-- [ ] Setup Vercel project (web)
-- [ ] Configure secrets in GitHub
-- [ ] Test build locally
-- [ ] Update README with correct URLs
-
-## 🗄️ Database Setup (Supabase)
-
-### 1. Create Project
-
-1. Go to [supabase.com](https://supabase.com)
-2. Click "New Project"
-3. Fill in project details
-4. Wait for database to provision
-
-### 2. Run Migration
-
-1. Go to SQL Editor in Supabase dashboard
-2. Open `supabase-migration.sql` from the repo
-3. Paste and execute
-
-This creates:
-
-- `downloads` table
-- Indexes for performance
-- Row Level Security policies
-
-### 3. Get Credentials
-
-- **Project URL**: Settings → API → Project URL
-- **Service Role Key**: Settings → API → service_role (secret)
-
-⚠️ **Important**: Never commit the service role key to git!
-
-## 🌐 Web Deployment (Vercel)
-
-### Option 1: Vercel Git Integration (Recommended)
-
-1. Go to [vercel.com](https://vercel.com)
-2. Import your GitHub repository
-3. Configure build settings:
-    - **Framework**: Next.js
-    - **Root Directory**: `apps/web`
-    - **Build Command**: `pnpm build`
-    - **Output Directory**: `.next`
-
-4. Add environment variables:
-
-```env
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJxxx...
-DOWNLOAD_IP_SALT=random-secret-32-chars-minimum
-NEXT_ADMIN_USER=admin
-NEXT_ADMIN_PASS=strong-password-here
-GITHUB_TOKEN=ghp_your_token
-GITHUB_REPO=username/codepulse
-```
-
-5. Deploy!
 
 ### Option 2: Vercel CLI
 

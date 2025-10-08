@@ -15,66 +15,12 @@ Guide de démarrage rapide pour lancer CodePulse en local.
 
 ```bash
 xcode-select --install
-```
 
 **Ubuntu/Debian** :
 
 ```bash
 sudo apt update
-sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-```
-
-### Pour l'App Web
-
-- ✅ **Node.js 20+**
-- ✅ **pnpm 9+**
-- ✅ **Compte Supabase** : [Créer un compte](https://supabase.com)
-
-## 🎯 Installation Rapide
-
-### 1. Cloner le Projet
-
-```bash
-git clone https://github.com/AdlarX9/code-pulse.git
-cd code-pulse
-```
-
-### 2. Installer les Dépendances
-
-```bash
-pnpm install
-```
-
-### 3. Générer les Icônes (Desktop)
-
-```bash
-python3 scripts/create-dev-icons.py
-```
-
-## 🖥️ Lancer l'App Desktop
-
-### Méthode 1 : Script Automatique (Recommandé)
-
-```bash
-bash scripts/launch-desktop.sh
-```
-
-### Méthode 2 : Commande Manuelle
-
-```bash
-cd apps/desktop
-pnpm tauri dev
-```
-
-**Première compilation** : 2-5 minutes (Rust compile toutes les dépendances)  
-**Compilations suivantes** : ~10-30 secondes
-
-### Ce qui se passe :
-
-1. ✅ Vite démarre sur `http://localhost:1420`
-2. ✅ Rust compile le backend
-3. ✅ Une fenêtre s'ouvre avec l'application
-4. ✅ Hot-reload activé pour le frontend
+sudo apt install libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgirepository-1.0-dev libglib2.0-dev libgobject-introspection-dev libgstreamer-plugins-bad1.0-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-ugly1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev libgstreamer-plugins-ugly1.0-dev
 
 ### Fonctionnalités :
 

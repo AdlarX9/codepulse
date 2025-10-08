@@ -1,0 +1,80 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+README.md
+CHANGELOG.md
+docs/
+*.md
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+*node_modules/
+.pnpm-store/
+
+# Build artifacts
+*dist/
+*build/
+*target/
+*.next/
+*out/
+*.turbo/
+
+# Environment files (keep example)
+.env
+.env.local
+.env.production
+.env.development
+!.env.example
+
+# OS
+*.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.cache
+
+# Package files
+*.tar.gz
+*.zip
+
+# Development
+.air.toml
+hot-reload/
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+
+# Backups
+backup_*.sql
+*.backup
+
+# Git LFS and binaries
+*.dmg
+*.AppImage
+*.exe
+*.deb
+*.rpm
+*.pkg
+
+# Cache
+.cache/
+.parcel-cache/
+.eslintcache
+apps/**/.cache/

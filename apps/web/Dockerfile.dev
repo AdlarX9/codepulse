@@ -1,0 +1,50 @@
+FROM node:22-alpine
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# We will use the repository root as context and install workspace deps once
+WORKDIR /app
+
+RUN set -eux; \
+    # bascule éventuellement sur un miroir plus fiable
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/main" > /etc/apk/repositories; \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.22/community" >> /etc/apk/repositories; \
+    for i in 1 2 3; do \
+      apk update && \
+      apk add --no-cache \
+        python3 \
+        build-base \
+        pkgconf \
+        cairo-dev pango-dev libjpeg-turbo-dev giflib-dev pixman-dev \
+        freetype-dev fontconfig-dev \
+      && break || { echo "apk failed, retrying in 5s…"; sleep 5; }; \
+    done; \
+    ln -sf /usr/bin/python3 /usr/bin/python
+
+# Copy root workspace files
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+
+# Copy package.json of workspaces needed for the web app
+COPY apps/web/package.json ./apps/web/package.json
+COPY packages/core/package.json ./packages/core/package.json
+COPY packages/telemetry/package.json ./packages/telemetry/package.json
+
+# Install all workspace dependencies with a frozen lockfile
+RUN pnpm install --frozen-lockfile
+
+# Now bring the entire repository (for dev hot reload we mount volumes too)
+COPY . .
+
+# Work inside the web app directory
+WORKDIR /app/apps/web
+
+# Expose port
+EXPOSE 3000
+
+# Set environment for development
+ENV NODE_ENV=development
+ENV WATCHPACK_POLLING=true
+
+# Command to run with hot reload
+CMD ["pnpm", "dev"]
