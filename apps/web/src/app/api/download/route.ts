@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { insertDownload } from '@/lib/supabase'
+import pool from '@/lib/db'
 import { sha256 } from '@/lib/utils'
 import { resolveAssetUrl } from '@/lib/assets'
 import type { Platform } from '@codepulse/core'
@@ -41,18 +41,27 @@ export async function GET(request: NextRequest) {
 			)
 		}
 
-		// Insert download record
+		// Insert download record into PostgreSQL
 		try {
-			await insertDownload({
-				ip_hash: ipHash,
-				country,
-				region,
-				city,
-				user_agent: userAgent,
-				referrer,
-				platform,
-				version,
-			})
+			const client = await pool.connect()
+			try {
+				await client.query(
+					`INSERT INTO downloads (platform, version, country, region, city, referrer, user_agent, ip_hash, created_at) 
+					 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+					[
+						platform,
+						version,
+						country || null,
+						region || null,
+						city || null,
+						referrer || null,
+						userAgent || null,
+						ipHash || null
+					]
+				)
+			} finally {
+				client.release()
+			}
 		} catch (error) {
 			// Log but don't block download
 			console.error('Failed to log download:', error)

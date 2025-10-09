@@ -209,10 +209,10 @@ func (h *ProjectHandler) GetProjectStats(c *gin.Context) {
 	}
 
 	stats := gin.H{
-		"total_scans":      scanCount,
-		"has_scans":        scanCount > 0,
-		"language_stats":   languageStats,
-		"latest_scan":      nil,
+		"total_scans":    scanCount,
+		"has_scans":      scanCount > 0,
+		"language_stats": languageStats,
+		"latest_scan":    nil,
 	}
 
 	if latestScanExists {

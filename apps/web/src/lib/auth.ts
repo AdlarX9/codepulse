@@ -1,7 +1,7 @@
 import { NextAuthOptions, DefaultSession } from 'next-auth'
 import GitHubProvider from 'next-auth/providers/github'
 import GoogleProvider from 'next-auth/providers/google'
-import { supabaseAdmin } from './supabase'
+import pool from './db'
 
 declare module 'next-auth' {
 	interface Session extends DefaultSession {
@@ -54,30 +54,44 @@ export const authOptions: NextAuthOptions = {
 		},
 		async signIn({ user, account, profile }) {
 			if (account?.provider === 'github' && profile) {
-				// Create or update profile with GitHub data
+				// Create or update profile with GitHub data using PostgreSQL
 				try {
 					const githubProfile = profile as any
-					const { error } = await supabaseAdmin.from('profiles').upsert(
-						{
-							user_id: user.id,
-							handle: githubProfile.login || user.email?.split('@')[0] || '',
-							display_name: user.name || githubProfile.name || '',
-							avatar_url: user.image || '',
-							bio: githubProfile.bio || null,
-							links: {
-								github: `https://github.com/${githubProfile.login}`,
-								...(githubProfile.blog && { website: githubProfile.blog }),
-								...(githubProfile.twitter_username && {
-									twitter: `https://twitter.com/${githubProfile.twitter_username}`
-								})
-							}
-						},
-						{
-							onConflict: 'user_id'
-						}
-					)
+					const client = await pool.connect()
 
-					if (error) console.error('Profile upsert error:', error)
+					try {
+						// Upsert user profile
+						await client.query(
+							`
+							INSERT INTO profiles (user_id, handle, display_name, avatar_url, bio, links, visibility, created_at, updated_at)
+							VALUES ($1, $2, $3, $4, $5, $6, 'public', NOW(), NOW())
+							ON CONFLICT (user_id) 
+							DO UPDATE SET 
+								handle = EXCLUDED.handle,
+								display_name = EXCLUDED.display_name,
+								avatar_url = EXCLUDED.avatar_url,
+								bio = EXCLUDED.bio,
+								links = EXCLUDED.links,
+								updated_at = NOW()
+						`,
+							[
+								user.id,
+								githubProfile.login || user.email?.split('@')[0] || '',
+								user.name || githubProfile.name || '',
+								user.image || '',
+								githubProfile.bio || null,
+								JSON.stringify({
+									github: `https://github.com/${githubProfile.login}`,
+									...(githubProfile.blog && { website: githubProfile.blog }),
+									...(githubProfile.twitter_username && {
+										twitter: `https://twitter.com/${githubProfile.twitter_username}`
+									})
+								})
+							]
+						)
+					} finally {
+						client.release()
+					}
 				} catch (error) {
 					console.error('Profile creation error:', error)
 				}

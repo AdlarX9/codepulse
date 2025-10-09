@@ -13,7 +13,7 @@
 		"lint": "turbo run lint",
 		"clean": "turbo run clean && rm -rf node_modules",
 		"release:tag": "node scripts/release-tag.js",
-		"format": "prettier prettier --write . --loglevel debug"
+		"format": "npx prettier --write . --log-level debug"
 	},
 	"devDependencies": {
 		"turbo": "^2.0.0",

@@ -155,7 +155,7 @@ func GetCurrentUser(c *gin.Context) (*models.User, bool) {
 	if !exists {
 		return nil, false
 	}
-	
+
 	userModel, ok := user.(*models.User)
 	return userModel, ok
 }
@@ -166,7 +166,7 @@ func GetCurrentUserID(c *gin.Context) (string, bool) {
 	if !exists {
 		return "", false
 	}
-	
+
 	userIDStr, ok := userID.(string)
 	return userIDStr, ok
 }

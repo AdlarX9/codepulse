@@ -10,12 +10,12 @@ services:
             POSTGRES_USER: codepulse
             POSTGRES_PASSWORD: dev_password
         ports:
-            - "5432:5432"
+            - '5432:5432'
         volumes:
             - postgres_data_dev:/var/lib/postgresql/data
             - ./apps/api/migrations:/docker-entrypoint-initdb.d
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U codepulse -d codepulse_dev"]
+            test: ['CMD-SHELL', 'pg_isready -U codepulse -d codepulse_dev']
             interval: 10s
             timeout: 5s
             retries: 5
@@ -25,7 +25,7 @@ services:
         image: redis:7-alpine
         container_name: codepulse-redis-dev
         ports:
-            - "6379:6379"
+            - '6379:6379'
         command: redis-server --appendonly yes
         volumes:
             - redis_data_dev:/data
@@ -37,7 +37,7 @@ services:
             dockerfile: Dockerfile.dev
         container_name: codepulse-api-dev
         ports:
-            - "8080:8080"
+            - '8080:8080'
         volumes:
             - ./apps/api:/app
             - /app/tmp # Exclude tmp directory
@@ -57,7 +57,7 @@ services:
             redis:
                 condition: service_started
         healthcheck:
-            test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+            test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
             interval: 30s
             timeout: 10s
             retries: 3
@@ -69,9 +69,9 @@ services:
             dockerfile: apps/web/Dockerfile.dev
         container_name: codepulse-web-dev
         ports:
-            - "3000:3000"
+            - '3000:3000'
         working_dir: /app/apps/web
-        command: ["pnpm", "dev", "-p", "3000", "-H", "0.0.0.0"]
+        command: ['pnpm', 'dev', '-p', '3000', '-H', '0.0.0.0']
         volumes:
             - .:/app
             - /app/node_modules

@@ -7,19 +7,19 @@ const nextConfig = {
 
 	// Environment variables
 	env: {
-		NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
+		NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 	},
 
 	// Rewrites for API compatibility
 	async rewrites() {
-		const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-		
+		const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+
 		return [
 			{
 				source: '/api/:path*',
-				destination: `${apiUrl}/v1/:path*`,
-			},
-		];
+				destination: `${apiUrl}/v1/:path*`
+			}
+		]
 	},
 
 	// Security headers
@@ -30,19 +30,19 @@ const nextConfig = {
 				headers: [
 					{
 						key: 'X-Frame-Options',
-						value: 'DENY',
+						value: 'DENY'
 					},
 					{
 						key: 'X-Content-Type-Options',
-						value: 'nosniff',
+						value: 'nosniff'
 					},
 					{
 						key: 'Referrer-Policy',
-						value: 'strict-origin-when-cross-origin',
-					},
-				],
-			},
-		];
+						value: 'strict-origin-when-cross-origin'
+					}
+				]
+			}
+		]
 	},
 
 	// Experimental features
@@ -64,8 +64,8 @@ const nextConfig = {
 		// Optimize bundle size
 		config.resolve.alias = {
 			...config.resolve.alias,
-			'@': require('path').resolve(__dirname, 'src'),
-		};
+			'@': require('path').resolve(__dirname, 'src')
+		}
 
 		return config
 	}

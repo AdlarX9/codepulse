@@ -59,6 +59,10 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	projectHandler := handlers.NewProjectHandler(db)
 	scanHandler := handlers.NewScanHandler(db)
+	downloadHandler := handlers.NewDownloadHandler(db)
+	exportHandler := handlers.NewExportHandler(db)
+	githubHandler := handlers.NewGitHubHandler(db)
+	ogHandler := handlers.NewOGHandler(db)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(db.DB, cfg)
@@ -129,12 +133,36 @@ func main() {
 	{
 		// Map old Next.js routes to new handlers
 		api.POST("/sync/scan", authMiddleware.RequireAuth(), scanHandler.SyncScan)
-		
+
+		// Download routes
+		api.GET("/download", downloadHandler.DownloadAsset)
+
+		// Export routes
+		api.GET("/export", authMiddleware.RequireAuth(), exportHandler.ExportProjectData)
+
+		// Admin routes
+		admin := api.Group("/admin")
+		// admin.Use(authMiddleware.RequireBasicAuth()) // TODO: Implement basic auth middleware
+		admin.GET("/stats", downloadHandler.GetDownloadStats)
+
+		// GitHub integration routes
+		github := api.Group("/github")
+		{
+			github.POST("/webhook", githubHandler.Webhook)
+			github.POST("/link", authMiddleware.RequireAuth(), githubHandler.LinkRepository)
+		}
+
+		// Open Graph routes
+		og := api.Group("/og")
+		{
+			og.GET("/project/:id", ogHandler.GenerateProjectOG)
+		}
+
 		me := api.Group("/me")
 		me.Use(authMiddleware.RequireAuth())
 		{
 			me.GET("/projects", projectHandler.GetProjects)
-			
+
 			meProjects := me.Group("/projects")
 			{
 				meProjects.GET("/:id", projectHandler.GetProject)

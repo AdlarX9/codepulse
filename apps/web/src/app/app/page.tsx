@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase'
+import pool from '@/lib/db'
 import { redirect } from 'next/navigation'
 
 /**
@@ -11,48 +11,54 @@ import { redirect } from 'next/navigation'
  */
 
 async function getProjects(userId: string) {
-	const { data: projects } = await supabaseAdmin
-		.from('projects')
-		.select(
+	const client = await pool.connect()
+	try {
+		// Get projects with latest scan and GitHub links
+		const projectsResult = await client.query(
 			`
-			*,
-			scans!inner (
-				id,
-				created_at,
-				total,
-				code,
-				comment,
-				blank,
-				core_code_lines,
-				info_lines,
-				comment_ratio
-			),
-			github_links (
-				repo_full_name,
-				repo_data
-			)
-		`
+			SELECT 
+				p.*,
+				gl.repo_full_name,
+				gl.repo_data,
+				gl.stars_count
+			FROM projects p
+			LEFT JOIN github_links gl ON p.id = gl.project_id
+			WHERE p.user_id = $1
+			ORDER BY p.created_at DESC
+		`,
+			[userId]
 		)
-		.eq('user_id', userId)
-		.order('created_at', { ascending: false })
 
-	// Get latest scan for each project - TypeScript assertion pour contourner les types
-	const projectsWithLatest =
-		projects?.map(project => {
-			const projectData = project as any
-			const latestScan = projectData.scans?.sort(
-				(a: any, b: any) =>
-					new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-			)[0]
+		const projects = []
+		for (const project of projectsResult.rows) {
+			// Get latest scan for this project
+			const scanResult = await client.query(
+				`
+				SELECT * FROM scans 
+				WHERE project_id = $1 
+				ORDER BY created_at DESC 
+				LIMIT 1
+			`,
+				[project.id]
+			)
 
-			return {
-				...projectData,
-				latest_scan: latestScan,
-				github_link: projectData.github_links?.[0]
-			}
-		}) || []
+			projects.push({
+				...project,
+				latest_scan: scanResult.rows[0] || null,
+				github_link: project.repo_full_name
+					? {
+							repo_full_name: project.repo_full_name,
+							repo_data: project.repo_data,
+							stars_count: project.stars_count
+						}
+					: null
+			})
+		}
 
-	return projectsWithLatest
+		return projects
+	} finally {
+		client.release()
+	}
 }
 
 function ProjectsList({ projects }: { projects: any[] }) {
@@ -166,7 +172,10 @@ export default async function AppPage() {
 					<div className='text-sm'>
 						<span className='font-medium'>{projects.length}</span> projects synced
 					</div>
-					<Link href='/app/settings' className='text-sm text-blue-600 hover:underline'>
+					<Link
+						href={{ pathname: '/app/settings' }}
+						className='text-sm text-blue-600 hover:underline'
+					>
 						Manage sync settings
 					</Link>
 				</div>
@@ -177,7 +186,7 @@ export default async function AppPage() {
 			{projects.length > 0 && (
 				<div className='mt-8 text-center'>
 					<Link
-						href='/app/analytics'
+						href={{ pathname: '/app/analytics' }}
 						className='inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'
 					>
 						View Analytics Dashboard

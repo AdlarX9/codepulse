@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { supabaseAdmin } from '@/lib/supabase'
+import pool from '@/lib/db'
 import { redirect, notFound } from 'next/navigation'
 import {
 	LineChart,
@@ -21,46 +21,86 @@ import {
  */
 
 async function getProjectDetails(projectId: string, userId: string) {
-	// Get project info
-	const { data: project, error: projectError } = await supabaseAdmin
-		.from('projects')
-		.select(
+	const client = await pool.connect()
+	try {
+		// Get project info with GitHub links
+		const projectResult = await client.query(
 			`
-			*,
-			github_links (
-				repo_full_name,
-				repo_data,
-				latest_release,
-				last_commit,
-				stars_count
-			)
-		`
+			SELECT 
+				p.*,
+				gl.repo_full_name,
+				gl.repo_data,
+				gl.latest_release,
+				gl.last_commit,
+				gl.stars_count
+			FROM projects p
+			LEFT JOIN github_links gl ON p.id = gl.project_id
+			WHERE p.id = $1 AND p.user_id = $2
+		`,
+			[projectId, userId]
 		)
-		.eq('id', projectId)
-		.eq('user_id', userId)
-		.single()
 
-	if (projectError || !project) {
-		return null
-	}
+		if (projectResult.rows.length === 0) {
+			return null
+		}
 
-	// Get scans timeline
-	const { data: scans } = await supabaseAdmin
-		.from('scans')
-		.select(
+		const project = projectResult.rows[0]
+
+		// Get scans timeline with language breakdown
+		const scansResult = await client.query(
 			`
-			*,
-			scan_langs (*)
-		`
+			SELECT s.*, 
+				   COALESCE(
+					   json_agg(
+						   json_build_object(
+							   'language', sl.language,
+							   'files', sl.files,
+							   'total', sl.total,
+							   'code', sl.code,
+							   'comment', sl.comment,
+							   'blank', sl.blank
+						   )
+					   ) FILTER (WHERE sl.id IS NOT NULL), 
+					   '[]'::json
+				   ) as scan_langs
+			FROM scans s
+			LEFT JOIN scan_langs sl ON s.id = sl.scan_id
+			WHERE s.project_id = $1
+			GROUP BY s.id
+			ORDER BY s.created_at ASC
+			LIMIT 100
+		`,
+			[projectId]
 		)
-		.eq('project_id', projectId)
-		.order('created_at', { ascending: true })
-		.limit(100) // Last 100 scans
 
-	return {
-		project,
-		scans: scans || [],
-		github_link: project.github_links?.[0]
+		return {
+			project: {
+				...project,
+				github_links: project.repo_full_name
+					? [
+							{
+								repo_full_name: project.repo_full_name,
+								repo_data: project.repo_data,
+								latest_release: project.latest_release,
+								last_commit: project.last_commit,
+								stars_count: project.stars_count
+							}
+						]
+					: []
+			},
+			scans: scansResult.rows || [],
+			github_link: project.repo_full_name
+				? {
+						repo_full_name: project.repo_full_name,
+						repo_data: project.repo_data,
+						latest_release: project.latest_release,
+						last_commit: project.last_commit,
+						stars_count: project.stars_count
+					}
+				: null
+		}
+	} finally {
+		client.release()
 	}
 }
 
@@ -281,7 +321,10 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 							Export CSV
 						</Link>
 						<Link
-							href={`/app/projects/${project.id}/settings`}
+							href={{
+								pathname: '/app/projects/[id]/settings',
+								query: { id: project.id }
+							}}
 							className='px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700'
 						>
 							Settings

@@ -61,7 +61,7 @@ func NewConnection(cfg *config.Config) (*Database, error) {
 	// Test Redis connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	
+
 	if err := rdb.Ping(ctx).Err(); err != nil {
 		log.Printf("Warning: Redis connection failed: %v", err)
 		// Don't fail completely if Redis is not available
@@ -86,6 +86,6 @@ func (d *Database) Close() error {
 	if err != nil {
 		return err
 	}
-	
+
 	return sqlDB.Close()
 }

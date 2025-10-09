@@ -16,16 +16,19 @@ cd code-pulse
 ## Lancement
 
 ### Application Desktop
+
 ```bash
 ./codepulse.sh desktop
 ```
 
 ### Application Web
+
 ```bash
 ./codepulse.sh web
 ```
 
 ### Les Deux Simultanément
+
 ```bash
 ./codepulse.sh dev
 ```
@@ -33,12 +36,14 @@ cd code-pulse
 ## Utilisation
 
 ### Application Desktop
+
 1. **Sélectionner un dossier** à analyser
 2. **Cliquer sur Scanner** pour lancer l'analyse
 3. **Consulter les résultats** : statistiques, graphiques, répartition par langage
 4. **Exporter** les données en CSV ou JSON
 
 ### Application Web
+
 1. **Visiter** http://localhost:3000 (landing page)
 2. **Accéder à `/admin`** pour le dashboard analytics
 3. **Consulter** les statistiques de téléchargement et d'utilisation

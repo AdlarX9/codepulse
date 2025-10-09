@@ -17,11 +17,13 @@ L'application desktop CodePulse est une application native multiplateforme const
 ## Architecture Technique
 
 ### Backend (Rust/Tauri)
+
 - **Moteur de scan** : Analyse syntaxique et comptage de lignes
 - **Parallélisation** : Traitement multi-threads avec Rayon
 - **Performance** : Optimisé pour les gros projets (100k+ fichiers)
 
 ### Frontend (React/TypeScript)
+
 - **UI Framework** : React 18 avec hooks modernes
 - **Styling** : Tailwind CSS avec thème personnalisable
 - **État** : Context API pour gestion globale
@@ -30,11 +32,13 @@ L'application desktop CodePulse est une application native multiplateforme const
 ## Installation & Développement
 
 ### Prérequis
+
 - **Node.js 20+** ([télécharger](https://nodejs.org/))
 - **pnpm 9+** (`npm install -g pnpm`)
 - **Rust 1.70+** ([rustup](https://rustup.rs/))
 
 ### Installation
+
 ```bash
 # 1. Cloner le projet
 git clone https://github.com/AdlarX9/code-pulse.git
@@ -59,13 +63,14 @@ pnpm tauri dev
 2. **Choisir la destination** : Navigateur de fichiers système
 3. **Lancer l'analyse** : Bouton "Scanner" avec barre de progression
 4. **Consulter les résultats** :
-   - Vue d'ensemble avec métriques principales
-   - Répartition par langage avec graphiques
-   - Détail des fichiers avec statistiques individuelles
+    - Vue d'ensemble avec métriques principales
+    - Répartition par langage avec graphiques
+    - Détail des fichiers avec statistiques individuelles
 
 ### Visualisations Disponibles
 
 #### Métriques Globales
+
 - **Lignes totales** : Nombre total de lignes dans le projet
 - **Lignes de code** : Code source uniquement
 - **Lignes de commentaires** : Commentaires et documentation
@@ -73,6 +78,7 @@ pnpm tauri dev
 - **Ratio commentaires** : Pourcentage de commentaires
 
 #### Répartition par Langage
+
 - **Graphique circulaire** : Distribution des langages
 - **Tableau détaillé** : Statistiques par langage
 - **Évolution temporelle** : Historique des scans
@@ -80,10 +86,12 @@ pnpm tauri dev
 ### Export des Données
 
 #### Formats Supportés
+
 - **CSV** : Format tableur standard
 - **JSON** : Structure complète avec métadonnées
 
 #### Données Incluses
+
 - Métriques globales du projet
 - Statistiques par langage
 - Informations temporelles
@@ -97,49 +105,50 @@ La configuration se fait principalement via `tauri.conf.json` :
 
 ```json
 {
-  "build": {
-    "beforeBuildCommand": "pnpm build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": false
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "identifier": "com.codepulse.dev",
-    "category": "DeveloperTool",
-    "copyright": "",
-    "deb": {
-      "depends": []
-    },
-    "macOS": {
-      "frameworks": [],
-      "minimumSystemVersion": "",
-      "exceptionDomain": "",
-      "signingIdentity": null,
-      "entitlements": null
-    }
-  }
+	"build": {
+		"beforeBuildCommand": "pnpm build",
+		"devPath": "http://localhost:1420",
+		"distDir": "../dist",
+		"withGlobalTauri": false
+	},
+	"bundle": {
+		"active": true,
+		"targets": "all",
+		"identifier": "com.codepulse.dev",
+		"category": "DeveloperTool",
+		"copyright": "",
+		"deb": {
+			"depends": []
+		},
+		"macOS": {
+			"frameworks": [],
+			"minimumSystemVersion": "",
+			"exceptionDomain": "",
+			"signingIdentity": null,
+			"entitlements": null
+		}
+	}
 }
 ```
 
 ### Thèmes et Personnalisation
 
 #### Couleurs
+
 Les couleurs sont définies dans `src/styles/globals.css` avec des variables CSS personnalisées :
 
 ```css
 :root {
-  --primary: #3b82f6;
-  --background: #ffffff;
-  --foreground: #1f2937;
-  /* autres couleurs */
+	--primary: #3b82f6;
+	--background: #ffffff;
+	--foreground: #1f2937;
+	/* autres couleurs */
 }
 
-[data-theme="dark"] {
-  --background: #1f2937;
-  --foreground: #f9fafb;
-  /* couleurs dark mode */
+[data-theme='dark'] {
+	--background: #1f2937;
+	--foreground: #f9fafb;
+	/* couleurs dark mode */
 }
 ```
 
@@ -166,6 +175,7 @@ src/
 ### Backend Rust
 
 #### Architecture du Scanner
+
 ```
 src-tauri/src/scanner/
 ├── mod.rs              # Module principal + logique de scan
@@ -197,6 +207,7 @@ pub async fn export_results(format: ExportFormat) -> Result<String, String>
 ### Debugging
 
 #### Logs de Développement
+
 ```bash
 # Lancer avec logs détaillés
 pnpm tauri dev --verbose
@@ -206,6 +217,7 @@ pnpm tauri dev --verbose
 ```
 
 #### Outils de Debug
+
 - **React DevTools** : Inspection des composants
 - **Tauri DevTools** : Debugging du backend Rust
 - **Console navigateur** : Logs frontend
@@ -213,12 +225,14 @@ pnpm tauri dev --verbose
 ## Build & Distribution
 
 ### Build de Développement
+
 ```bash
 cd apps/desktop
 pnpm tauri build --debug
 ```
 
 ### Build de Production
+
 ```bash
 cd apps/desktop
 pnpm tauri build --release
@@ -232,6 +246,7 @@ pnpm tauri build --release
 ### Code Signing (Production)
 
 #### macOS
+
 ```bash
 # Variables d'environnement
 export APPLE_CERTIFICATE=<base64-certificat>
@@ -242,17 +257,19 @@ export APPLE_TEAM_ID=<team-id>
 ```
 
 #### Windows
+
 Configurer dans `tauri.conf.json` :
+
 ```json
 {
-  "tauri": {
-    "bundle": {
-      "windows": {
-        "certificateThumbprint": "...",
-        "digestAlgorithm": "sha256"
-      }
-    }
-  }
+	"tauri": {
+		"bundle": {
+			"windows": {
+				"certificateThumbprint": "...",
+				"digestAlgorithm": "sha256"
+			}
+		}
+	}
 }
 ```
 
@@ -261,12 +278,14 @@ Configurer dans `tauri.conf.json` :
 ### Optimisations Appliquées
 
 #### Backend Rust
+
 - **Parallélisation** : Scan multi-threads
 - **Streaming** : Pas de chargement complet en mémoire
 - **Algorithmes optimisés** : Comptage efficace des lignes
 - **Filtrage prédictif** : Exclusion rapide des fichiers inutiles
 
 #### Frontend React
+
 - **Virtualisation** : Pour les grandes listes de fichiers
 - **Memoization** : Optimisation des re-renders
 - **Lazy Loading** : Composants chargés à la demande
@@ -275,15 +294,16 @@ Configurer dans `tauri.conf.json` :
 ### Benchmarks
 
 | Projet | Fichiers | Temps de scan | Mémoire utilisée |
-|--------|----------|---------------|------------------|
-| Petit  | ~100     | ~0.5s         | ~50MB           |
-| Moyen  | ~1k      | ~2-3s         | ~100MB          |
-| Grand  | ~10k     | ~5-10s        | ~200MB          |
-| XL     | ~100k    | ~30-60s       | ~500MB          |
+| ------ | -------- | ------------- | ---------------- |
+| Petit  | ~100     | ~0.5s         | ~50MB            |
+| Moyen  | ~1k      | ~2-3s         | ~100MB           |
+| Grand  | ~10k     | ~5-10s        | ~200MB           |
+| XL     | ~100k    | ~30-60s       | ~500MB           |
 
 ## Tests
 
 ### Tests Unitaires
+
 ```bash
 # Tests Rust
 cd apps/desktop/src-tauri
@@ -295,6 +315,7 @@ pnpm test
 ```
 
 ### Tests d'Intégration
+
 - Tests de bout en bout avec différents types de projets
 - Validation des exports CSV/JSON
 - Tests de performance avec projets de référence
@@ -302,12 +323,14 @@ pnpm test
 ## Sécurité
 
 ### Privacy by Design
+
 - **Analyse locale uniquement** : Aucun code n'est transmis
 - **Pas de réseau** : Application 100% offline après installation
 - **Données temporaires** : Métriques supprimées après fermeture
 - **Pas de télémétrie** : Aucun tracking utilisateur
 
 ### Sécurité Technique
+
 - **Sandbox Tauri** : Exécution isolée du code système
 - **Accès fichiers limité** : Read-only sur les dossiers sélectionnés
 - **Pas de persistance** : Aucune donnée stockée localement
@@ -317,11 +340,13 @@ pnpm test
 ### Problèmes Courants
 
 #### "Icons not found"
+
 ```bash
 python3 scripts/create-dev-icons.py
 ```
 
 #### Build Rust échoue
+
 ```bash
 cd apps/desktop/src-tauri
 cargo clean
@@ -330,11 +355,13 @@ pnpm tauri dev
 ```
 
 #### Port déjà utilisé (1420)
+
 ```bash
 lsof -ti:1420 | xargs kill -9
 ```
 
 #### Mémoire insuffisante
+
 - Fermer d'autres applications
 - Redémarrer le système
 - Utiliser des dossiers plus petits pour les tests
@@ -342,6 +369,7 @@ lsof -ti:1420 | xargs kill -9
 ### Logs et Debug
 
 #### Activation des logs détaillés
+
 ```bash
 # Dans tauri.conf.json
 {
@@ -359,6 +387,7 @@ lsof -ti:1420 | xargs kill -9
 ```
 
 #### Variables de debug
+
 ```rust
 // Dans le code Rust
 println!("Debug: {:?}", variable);

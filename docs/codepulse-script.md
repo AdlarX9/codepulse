@@ -12,34 +12,34 @@
 
 ### 🚀 Applications
 
-| Commande | Description |
-|----------|-------------|
-| `desktop` | Lance l'application desktop Tauri |
-| `web` | Lance l'application web Next.js |
-| `dev` | Lance desktop et web simultanément |
+| Commande  | Description                        |
+| --------- | ---------------------------------- |
+| `desktop` | Lance l'application desktop Tauri  |
+| `web`     | Lance l'application web Next.js    |
+| `dev`     | Lance desktop et web simultanément |
 
 ### 🛠️ Développement
 
-| Commande | Description |
-|----------|-------------|
-| `setup` | Configuration initiale complète du projet |
-| `icons` | Génère les icônes de développement |
-| `build` | Build toutes les applications |
-| `build-desktop` | Build l'application desktop seulement |
-| `test` | Lance tous les tests (Rust + TypeScript) |
+| Commande        | Description                               |
+| --------------- | ----------------------------------------- |
+| `setup`         | Configuration initiale complète du projet |
+| `icons`         | Génère les icônes de développement        |
+| `build`         | Build toutes les applications             |
+| `build-desktop` | Build l'application desktop seulement     |
+| `test`          | Lance tous les tests (Rust + TypeScript)  |
 
 ### 📦 Releases
 
-| Commande | Description |
-|----------|-------------|
+| Commande            | Description                             |
+| ------------------- | --------------------------------------- |
 | `release <version>` | Crée un tag de release Git (ex: v1.0.0) |
 
 ### 🧹 Utilitaires
 
-| Commande | Description |
-|----------|-------------|
-| `clean` | Nettoie les fichiers temporaires et builds |
-| `help` | Affiche l'aide détaillée |
+| Commande | Description                                |
+| -------- | ------------------------------------------ |
+| `clean`  | Nettoie les fichiers temporaires et builds |
+| `help`   | Affiche l'aide détaillée                   |
 
 ## Exemples
 

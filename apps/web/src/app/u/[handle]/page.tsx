@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { supabaseAdmin } from '@/lib/supabase'
+import pool from '@/lib/db'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 
@@ -9,73 +9,108 @@ import { Metadata } from 'next'
  */
 
 async function getProfile(handle: string) {
-	const { data: profile, error } = await supabaseAdmin
-		.from('profiles')
-		.select(
+	const client = await pool.connect()
+	try {
+		// Get profile with public projects and their scans
+		const profileResult = await client.query(
 			`
-			*,
-			users!inner (
-				email,
-				created_at
-			),
-			projects!inner (
-				id,
-				name,
-				visibility,
-				created_at,
-				scans!inner (
-					total,
-					code,
-					comment,
-					blank,
-					core_code_lines,
-					info_lines,
-					comment_ratio,
-					created_at
-				),
-				github_links (
-					repo_full_name,
-					repo_data,
-					stars_count
-				)
-			)
-		`
+			SELECT 
+				p.*,
+				u.email,
+				u.created_at as user_created_at
+			FROM profiles p
+			INNER JOIN users u ON p.user_id = u.id
+			WHERE p.handle = $1 AND p.visibility = 'public'
+		`,
+			[handle]
 		)
-		.eq('handle', handle)
-		.eq('visibility', 'public')
-		.eq('projects.visibility', 'public')
-		.single()
 
-	if (error || !profile) {
-		return null
-	}
-
-	// Get aggregated stats
-	const publicProjects = profile.projects || []
-	const totalScans = publicProjects.reduce(
-		(sum: number, project: any) => sum + (project.scans?.length || 0),
-		0
-	)
-	const totalLines = publicProjects.reduce((sum: number, project: any) => {
-		const latestScan = project.scans?.sort(
-			(a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-		)[0]
-		return sum + (latestScan?.total || 0)
-	}, 0)
-
-	const totalStars = publicProjects.reduce((sum: number, project: any) => {
-		return sum + (project.github_links?.[0]?.stars_count || 0)
-	}, 0)
-
-	return {
-		profile,
-		projects: publicProjects,
-		stats: {
-			totalProjects: publicProjects.length,
-			totalScans,
-			totalLines,
-			totalStars
+		if (profileResult.rows.length === 0) {
+			return null
 		}
+
+		const profile = profileResult.rows[0]
+
+		// Get public projects with their latest scans and GitHub links
+		const projectsResult = await client.query(
+			`
+			SELECT 
+				pr.*,
+				gl.repo_full_name,
+				gl.repo_data,
+				gl.stars_count
+			FROM projects pr
+			LEFT JOIN github_links gl ON pr.id = gl.project_id
+			WHERE pr.user_id = $1 AND pr.visibility = 'public'
+			ORDER BY pr.created_at DESC
+		`,
+			[profile.user_id]
+		)
+
+		const projects = []
+		let totalScans = 0
+		let totalLines = 0
+		let totalStars = 0
+
+		for (const project of projectsResult.rows) {
+			// Get scans for this project
+			const scansResult = await client.query(
+				`
+				SELECT * FROM scans 
+				WHERE project_id = $1 
+				ORDER BY created_at DESC
+			`,
+				[project.id]
+			)
+
+			const scans = scansResult.rows
+			totalScans += scans.length
+
+			// Get latest scan for total lines calculation
+			if (scans.length > 0) {
+				totalLines += scans[0].total || 0
+			}
+
+			// Add GitHub stars
+			if (project.stars_count) {
+				totalStars += project.stars_count
+			}
+
+			projects.push({
+				...project,
+				scans,
+				github_links: project.repo_full_name
+					? [
+							{
+								repo_full_name: project.repo_full_name,
+								repo_data: project.repo_data,
+								stars_count: project.stars_count
+							}
+						]
+					: []
+			})
+		}
+
+		return {
+			profile: {
+				...profile,
+				users: [
+					{
+						email: profile.email,
+						created_at: profile.user_created_at
+					}
+				]
+			},
+			projects,
+			stats: {
+				totalProjects: projects.length,
+				totalScans,
+				totalLines,
+				totalStars
+			}
+		}
+	} finally {
+		client.release()
 	}
 }
 

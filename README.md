@@ -7,7 +7,7 @@
 
 CodePulse is a cross-platform desktop application that analyzes your codebase and provides detailed statistics, visualizations, and insights—all while keeping your code completely private and offline.
 
-*Before you go any further, check out our detailed documentation [here](docs/README.md).*
+_Before you go any further, check out our detailed documentation [here](docs/README.md)._
 
 ## ✨ Features
 
@@ -43,6 +43,15 @@ CodePulse takes privacy seriously:
 - ✅ No telemetry or crash reporting
 - ✅ Download analytics are **anonymous** (hashed IPs + geographic region only)
 - ✅ Open source—audit the code yourself
+
+## 🏗️ Architecture
+
+CodePulse uses a modern architecture:
+
+- **Desktop App** (Tauri + Rust): Local code analysis engine
+- **Web Dashboard** (Next.js + React): User interface and project management
+- **PostgreSQL Database**: Data persistence for projects, scans, and analytics
+- **GitHub Integration**: Repository linking for enhanced insights
 
 ## 🙏 Acknowledgments
 

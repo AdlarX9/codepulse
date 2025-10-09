@@ -99,19 +99,19 @@ func (h *ScanHandler) SyncScan(c *gin.Context) {
 	}
 
 	scan := models.Scan{
-		UserID:         user.ID,
-		ProjectID:      project.ID,
-		Total:          payload.Totals.Total,
-		Code:           payload.Totals.Code,
-		Comment:        payload.Totals.Comment,
-		Blank:          payload.Totals.Blank,
-		CommentRatio:   commentRatio,
-		CoreCodeLines:  payload.Totals.CoreCodeLines,
-		InfoLines:      payload.Totals.InfoLines,
-		DeviceID:       &payload.DeviceID,
-		VersionTag:     payload.AppVersion,
-		CreatedAt:      scannedAtTime,
-		UpdatedAt:      scannedAtTime,
+		UserID:        user.ID,
+		ProjectID:     project.ID,
+		Total:         payload.Totals.Total,
+		Code:          payload.Totals.Code,
+		Comment:       payload.Totals.Comment,
+		Blank:         payload.Totals.Blank,
+		CommentRatio:  commentRatio,
+		CoreCodeLines: payload.Totals.CoreCodeLines,
+		InfoLines:     payload.Totals.InfoLines,
+		DeviceID:      &payload.DeviceID,
+		VersionTag:    payload.AppVersion,
+		CreatedAt:     scannedAtTime,
+		UpdatedAt:     scannedAtTime,
 	}
 
 	if err := tx.Create(&scan).Error; err != nil {

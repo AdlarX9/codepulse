@@ -22,26 +22,27 @@ fi
 echo "Creating placeholder icons..."
 
 # Generate required sizes
-convert "$ICON_DIR/icon-1024.png" -resize 32x32 "$ICON_DIR/32x32.png"
-convert "$ICON_DIR/icon-1024.png" -resize 128x128 "$ICON_DIR/128x128.png"
-convert "$ICON_DIR/icon-1024.png" -resize 256x256 "$ICON_DIR/128x128@2x.png"
-convert "$ICON_DIR/icon-1024.png" -resize 256x256 "$ICON_DIR/icon.ico"
+convert "logos/FullLogo_Transparent.png" -resize 1024x1024 "$ICON_DIR/1024x1024.png"
+convert "$ICON_DIR/1024x1024.png" -resize 32x32 "$ICON_DIR/32x32.png"
+convert "$ICON_DIR/1024x1024.png" -resize 128x128 "$ICON_DIR/128x128.png"
+convert "$ICON_DIR/1024x1024.png" -resize 256x256 "$ICON_DIR/128x128@2x.png"
+convert "$ICON_DIR/1024x1024.png" -resize 256x256 "$ICON_DIR/icon.ico"
 
 # For macOS .icns (requires iconutil on macOS)
 if [[ "$OSTYPE" == "darwin"* ]]; then
 	ICONSET_DIR="$ICON_DIR/icon.iconset"
 	mkdir -p "$ICONSET_DIR"
 
-	convert "$ICON_DIR/icon-1024.png" -resize 16x16 "$ICONSET_DIR/icon_16x16.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 32x32 "$ICONSET_DIR/icon_16x16@2x.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 32x32 "$ICONSET_DIR/icon_32x32.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 64x64 "$ICONSET_DIR/icon_32x32@2x.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 128x128 "$ICONSET_DIR/icon_128x128.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 256x256 "$ICONSET_DIR/icon_128x128@2x.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 256x256 "$ICONSET_DIR/icon_256x256.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 512x512 "$ICONSET_DIR/icon_256x256@2x.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 512x512 "$ICONSET_DIR/icon_512x512.png"
-	convert "$ICON_DIR/icon-1024.png" -resize 1024x1024 "$ICONSET_DIR/icon_512x512@2x.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 16x16 "$ICONSET_DIR/icon_16x16.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 32x32 "$ICONSET_DIR/icon_16x16@2x.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 32x32 "$ICONSET_DIR/icon_32x32.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 64x64 "$ICONSET_DIR/icon_32x32@2x.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 128x128 "$ICONSET_DIR/icon_128x128.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 256x256 "$ICONSET_DIR/icon_128x128@2x.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 256x256 "$ICONSET_DIR/icon_256x256.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 512x512 "$ICONSET_DIR/icon_256x256@2x.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 512x512 "$ICONSET_DIR/icon_512x512.png"
+	convert "$ICON_DIR/1024x1024.png" -resize 1024x1024 "$ICONSET_DIR/icon_512x512@2x.png"
 
 	iconutil -c icns "$ICONSET_DIR" -o "$ICON_DIR/icon.icns"
 	rm -rf "$ICONSET_DIR"

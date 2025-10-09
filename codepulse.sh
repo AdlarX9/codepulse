@@ -173,6 +173,18 @@ generate_icons() {
 	bash scripts/create-dev-icons.sh
 }
 
+format_code() {
+	echo -e "${BLUE}🎨 Formatage du code...${NC}"
+	npm run format
+	cd apps/api
+	go fmt ./internal/handlers
+	go fmt ./internal/middleware
+	go fmt ./internal/config
+	go fmt ./internal/database
+	go fmt ./internal/models
+	cd ../..
+}
+
 # Main command handling
 case "$1" in
 	"desktop")
@@ -213,6 +225,10 @@ case "$1" in
 		
 	"clean")
 		clean_project
+		;;
+	
+	"format")
+		format_code
 		;;
 		
 	"help"|"--help"|"-h"|"")

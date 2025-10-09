@@ -11,7 +11,7 @@ import (
 type Config struct {
 	Environment string
 	Port        string
-	
+
 	// Database
 	DBHost     string
 	DBPort     string
@@ -19,14 +19,14 @@ type Config struct {
 	DBPassword string
 	DBName     string
 	DBURL      string
-	
+
 	// Redis
 	RedisURL      string
 	RedisPassword string
-	
+
 	// JWT
 	JWTSecret string
-	
+
 	// CORS
 	AllowedOrigins []string
 }
@@ -40,18 +40,18 @@ func Load() (*Config, error) {
 	config := &Config{
 		Environment: getEnv("ENV", "development"),
 		Port:        getEnv("PORT", "8080"),
-		
+
 		// Database
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBPort:     getEnv("DB_PORT", "5432"),
 		DBUser:     getEnv("DB_USER", "codepulse"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
 		DBName:     getEnv("DB_NAME", "codepulse_dev"),
-		
+
 		// Redis
 		RedisURL:      getEnv("REDIS_URL", "localhost:6379"),
 		RedisPassword: getEnv("REDIS_PASSWORD", ""),
-		
+
 		// JWT
 		JWTSecret: getEnv("JWT_SECRET", "your-secret-key"),
 	}
