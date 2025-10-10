@@ -1,15 +1,25 @@
-import { Code2 } from 'lucide-react'
+import { ArrowLeft, Code2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function PrivacyPage() {
 	return (
 		<div className='min-h-screen bg-background'>
-			<header className='border-b'>
-				<div className='container mx-auto px-4 py-4'>
-					<Link href='/' className='flex items-center gap-2 hover:opacity-80 transition'>
-						<Code2 className='h-6 w-6 text-primary' />
-						<span className='text-xl font-bold'>CodePulse</span>
-					</Link>
+			<header className='border-b bg-background relative'>
+				<div className='container mx-auto px-4 py-4 flex items-center justify-between'>
+					<div className='flex-1'>
+						<Link
+							href='/'
+							className='inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors'
+						>
+							<ArrowLeft className='h-4 w-4' />
+							<span className='font-medium'>Back to Home</span>
+						</Link>
+					</div>
+					<div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2'>
+						<Code2 className='h-8 w-8 text-primary' />
+						<span className='text-2xl font-bold tracking-tight'>CodePulse</span>
+					</div>
+					<div className='flex-1' />
 				</div>
 			</header>
 
@@ -105,47 +115,6 @@ export default function PrivacyPage() {
 							Download statistics are retained for analytical purposes. Since all data
 							is anonymized and hashed, there's no way to link records back to
 							individuals.
-						</p>
-					</section>
-
-					<section className='mb-8'>
-						<h2 className='text-2xl font-semibold mb-4'>Third-Party Services</h2>
-						<p className='text-muted-foreground mb-4'>We use the following services:</p>
-						<ul className='list-disc list-inside space-y-2 text-muted-foreground'>
-							<li>
-								<strong>Vercel</strong>: Website hosting and CDN (provides
-								geographic headers)
-							</li>
-							<li>
-								<strong>Supabase</strong>: Database for download statistics
-								(self-hosted option available)
-							</li>
-							<li>
-								<strong>GitHub</strong>: Source code hosting and release
-								distribution
-							</li>
-						</ul>
-					</section>
-
-					<section className='mb-8'>
-						<h2 className='text-2xl font-semibold mb-4'>Open Source</h2>
-						<p className='text-muted-foreground'>
-							CodePulse is fully open source. You can audit our code, self-host the
-							entire stack, or build it yourself. Transparency is our guarantee.
-						</p>
-					</section>
-
-					<section className='mb-8'>
-						<h2 className='text-2xl font-semibold mb-4'>Contact</h2>
-						<p className='text-muted-foreground'>
-							Questions about privacy? Open an issue on our{' '}
-							<a
-								href='https://github.com/username/codepulse'
-								className='text-primary hover:underline'
-							>
-								GitHub repository
-							</a>
-							.
 						</p>
 					</section>
 

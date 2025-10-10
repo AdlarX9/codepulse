@@ -52,7 +52,7 @@ function getAssetFromManifest(manifest: any, platform: Platform, version: string
 }
 
 async function resolveFromGitHub(platform: Platform, version: string): Promise<string> {
-	const repo = process.env.GITHUB_REPO || 'username/codepulse'
+	const repo = process.env.GITHUB_REPO || 'AdlarX9/code-pulse'
 	const token = process.env.GITHUB_TOKEN
 
 	const headers: HeadersInit = {

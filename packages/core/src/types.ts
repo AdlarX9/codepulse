@@ -55,25 +55,37 @@ export interface DownloadEvent {
 	ipHash: string
 	releaseChannel?: string
 	source?: string
+	timestamp: string
 }
 
-export interface AssetManifest {
-	version: string
-	releaseDate: string
-	assets: {
-		mac?: {
-			dmg: string
-			sha256: string
-		}
-		win?: {
-			msi: string
-			exe?: string
-			sha256: string
-		}
-		linux?: {
-			appImage: string
-			deb?: string
-			sha256: string
-		}
-	}
+export interface User {
+	id: string
+	email: string
+	name?: string
+	image?: string
+	isAdmin?: boolean
+	createdAt: string
+	updatedAt: string
+}
+
+export interface AuthSession {
+	user: User
+	expires: string
+}
+
+export interface LoginCredentials {
+	email: string
+	password: string
+}
+
+export interface RegisterData {
+	email: string
+	password: string
+	name?: string
+}
+
+export interface AuthResponse {
+	success: boolean
+	message?: string
+	user?: User
 }
