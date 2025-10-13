@@ -1,6 +1,7 @@
 'use client'
 
-import { Code2, BarChart3, Shield, Zap, Download, Github, User, LogIn } from 'lucide-react'
+import { Code2, BarChart3, Shield, Zap, Download, User } from 'lucide-react'
+import Header from '@/components/Header'
 
 export default function Home() {
 	const downloadUrl = (platform: string) => `/api/download?platform=${platform}&version=latest`
@@ -8,28 +9,7 @@ export default function Home() {
 	return (
 		<div className='min-h-screen bg-gradient-to-b from-gray-50 to-gray-100'>
 			{/* Header */}
-			<header className='border-b bg-white'>
-				<div className='container mx-auto px-4 py-4 flex items-center justify-between'>
-					<div className='flex items-center gap-2'>
-						<Code2 className='h-8 w-8 text-blue-600' />
-						<span className='text-2xl font-bold'>CodePulse</span>
-					</div>
-					<div className='flex items-center gap-4'>
-						<a
-							href='/auth/signin'
-							className='text-gray-600 hover:text-gray-900 transition'
-						>
-							<LogIn className='h-6 w-6' />
-						</a>
-						<a
-							href='/auth/signup'
-							className='text-gray-600 hover:text-gray-900 transition'
-						>
-							<User className='h-6 w-6' />
-						</a>
-					</div>
-				</div>
-			</header>
+			<Header />
 
 			{/* Hero Section */}
 			<section className='container mx-auto px-4 py-20 md:py-32'>

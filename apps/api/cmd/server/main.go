@@ -59,7 +59,6 @@ func main() {
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	projectHandler := handlers.NewProjectHandler(db)
 	scanHandler := handlers.NewScanHandler(db)
-	downloadHandler := handlers.NewDownloadHandler(db)
 	exportHandler := handlers.NewExportHandler(db)
 	githubHandler := handlers.NewGitHubHandler(db)
 	ogHandler := handlers.NewOGHandler(db)
@@ -85,92 +84,55 @@ func main() {
 	// Health check endpoint
 	router.GET("/health", healthHandler.HealthCheck)
 
-	// API v1 routes
-	v1 := router.Group("/v1")
-	{
-		// Public routes
-		auth := v1.Group("/auth")
-		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
-			auth.POST("/logout", authHandler.Logout)
-		}
-
-		// Public project routes
-		public := v1.Group("/u")
-		{
-			public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
-		}
-
-		// Protected routes
-		protected := v1.Group("/")
-		protected.Use(authMiddleware.RequireAuth())
-		{
-			// Auth routes (protected)
-			protected.GET("/auth/me", authHandler.Me)
-
-			// Project routes
-			projects := protected.Group("/me/projects")
-			{
-				projects.GET("", projectHandler.GetProjects)
-				projects.GET("/:id", projectHandler.GetProject)
-				projects.PATCH("/:id", projectHandler.UpdateProject)
-				projects.DELETE("/:id", projectHandler.DeleteProject)
-				projects.GET("/:id/stats", projectHandler.GetProjectStats)
-				projects.GET("/:id/scans", scanHandler.GetScans)
-			}
-
-			// Sync routes
-			sync := protected.Group("/sync")
-			{
-				sync.POST("/scan", scanHandler.SyncScan)
-			}
-		}
-	}
-
 	// Backward compatibility routes (mirror Next.js API structure)
-	api := router.Group("/api")
+api := router.Group("/api")
+{
+	// Map old Next.js routes to new handlers
+	api.POST("/sync/scan", authMiddleware.RequireAuth(), scanHandler.SyncScan)
+
+	// Export routes
+	api.GET("/export", authMiddleware.RequireAuth(), exportHandler.ExportProjectData)
+
+	// GitHub integration routes
+	github := api.Group("/github")
 	{
-		// Map old Next.js routes to new handlers
-		api.POST("/sync/scan", authMiddleware.RequireAuth(), scanHandler.SyncScan)
-
-		// Download routes
-		api.GET("/download", downloadHandler.DownloadAsset)
-
-		// Export routes
-		api.GET("/export", authMiddleware.RequireAuth(), exportHandler.ExportProjectData)
-
-		// Admin routes
-		admin := api.Group("/admin")
-		// admin.Use(authMiddleware.RequireBasicAuth()) // TODO: Implement basic auth middleware
-		admin.GET("/stats", downloadHandler.GetDownloadStats)
-
-		// GitHub integration routes
-		github := api.Group("/github")
-		{
-			github.POST("/webhook", githubHandler.Webhook)
-			github.POST("/link", authMiddleware.RequireAuth(), githubHandler.LinkRepository)
-		}
-
-		// Open Graph routes
-		og := api.Group("/og")
-		{
-			og.GET("/project/:id", ogHandler.GenerateProjectOG)
-		}
-
-		me := api.Group("/me")
-		me.Use(authMiddleware.RequireAuth())
-		{
-			me.GET("/projects", projectHandler.GetProjects)
-
-			meProjects := me.Group("/projects")
-			{
-				meProjects.GET("/:id", projectHandler.GetProject)
-				meProjects.PATCH("/:id", projectHandler.UpdateProject)
-				meProjects.GET("/:id/scans", scanHandler.GetScans)
-			}
-		}
+		github.POST("/webhook", githubHandler.Webhook)
+		github.POST("/link", authMiddleware.RequireAuth(), githubHandler.LinkRepository)
 	}
+
+	// Open Graph routes
+	og := api.Group("/og")
+	{
+		og.GET("/project/:id", ogHandler.GenerateProjectOG)
+	}
+
+	// Protected user routes
+	me := api.Group("/me")
+	me.Use(authMiddleware.RequireAuth())
+	{
+		me.GET("/projects", projectHandler.GetProjects)
+		me.GET("/projects/:id", projectHandler.GetProject)
+		me.PATCH("/projects/:id", projectHandler.UpdateProject)
+		me.GET("/projects/:id/scans", scanHandler.GetScans)
+		me.DELETE("/projects/:id", projectHandler.DeleteProject)
+		me.GET("/projects/:id/stats", projectHandler.GetProjectStats)
+	}
+
+	// Public routes
+	auth := api.Group("/auth")
+	{
+		auth.POST("/register", authHandler.Register)
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/logout", authHandler.Logout)
+		auth.GET("/me", authMiddleware.RequireAuth(), authHandler.Me)
+	}
+
+	// Public project routes
+	public := api.Group("/u")
+	{
+		public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
+	}
+}
 
 	// Create HTTP server
 	srv := &http.Server{

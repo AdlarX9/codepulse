@@ -18,8 +18,8 @@ import {
 	Legend,
 	ResponsiveContainer
 } from 'recharts'
-import { Download, Calendar, Filter } from 'lucide-react'
-import { formatDate, formatNumber } from '@/lib/utils'
+import { Download, Calendar } from 'lucide-react'
+import { formatNumber } from '@/lib/utils'
 
 interface DownloadStat {
 	id: string

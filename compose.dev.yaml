@@ -51,6 +51,7 @@ services:
             - REDIS_URL=redis:6379
             - JWT_SECRET=dev_jwt_secret_key
             - PORT=8080
+        restart: unless-stopped
         depends_on:
             postgres:
                 condition: service_healthy
@@ -83,6 +84,7 @@ services:
             - CHOKIDAR_USEPOLLING=true
         depends_on:
             - api
+        restart: unless-stopped
 
 volumes:
     postgres_data_dev:

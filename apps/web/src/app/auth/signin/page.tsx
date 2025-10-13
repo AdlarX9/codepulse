@@ -39,6 +39,24 @@ export default function SignInPage() {
 		}
 	}
 
+	const handleForgotPassword = async () => {
+		const email = prompt('Enter your email address:')
+		if (!email) return
+
+		try {
+			await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/forgot-password`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ email })
+			})
+			alert('If the email exists, a reset link has been sent')
+		} catch (err) {
+			alert('Failed to send reset email')
+		}
+	}
+
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setFormData(prev => ({
 			...prev,
@@ -116,6 +134,16 @@ export default function SignInPage() {
 					>
 						{isLoading ? 'Signing in...' : 'Sign In'}
 					</button>
+
+					<div className='text-center'>
+						<button
+							type='button'
+							onClick={handleForgotPassword}
+							className='text-sm text-blue-600 hover:text-blue-700 font-medium'
+						>
+							Forgot your password?
+						</button>
+					</div>
 				</form>
 
 				<div className='text-center'>

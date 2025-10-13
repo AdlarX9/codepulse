@@ -35,8 +35,8 @@ export default function ContactPage() {
 							we'd love to hear from you.
 						</p>
 						<p className='text-muted-foreground mb-6'>
-							<strong>Bug reports</strong> are welcome! If you find an issue or have an idea for a new feature, don't
-							hesitate to contact us directly.
+							<strong>Bug reports</strong> are welcome! If you find an issue or have
+							an idea for a new feature, don't hesitate to contact us directly.
 						</p>
 					</section>
 
