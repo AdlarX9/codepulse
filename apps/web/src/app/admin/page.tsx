@@ -18,8 +18,11 @@ import {
 	Legend,
 	ResponsiveContainer
 } from 'recharts'
-import { Download, Calendar } from 'lucide-react'
+import { Download, Calendar, Lock, LogOut } from 'lucide-react'
 import { formatNumber } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 interface DownloadStat {
 	id: string
@@ -46,17 +49,60 @@ const COLORS = {
 }
 
 export default function AdminPage() {
+	const [isAuthenticated, setIsAuthenticated] = useState(false)
+	const [isLoading, setIsLoading] = useState(false)
+	const [loginData, setLoginData] = useState({ email: '', password: '' })
+	const [loginError, setLoginError] = useState('')
 	const [stats, setStats] = useState<DownloadStat[]>([])
 	const [aggregated, setAggregated] = useState<AggregatedStats | null>(null)
-	const [loading, setLoading] = useState(true)
 	const [period, setPeriod] = useState(30) // days
+	const router = useRouter()
+
+	async function handleLogin(e: React.FormEvent) {
+		e.preventDefault()
+		setLoginError('')
+		setIsLoading(true)
+
+		try {
+			const response = await fetch('/api/admin/auth', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					email: loginData.email,
+					password: loginData.password
+				})
+			})
+
+			if (response.ok) {
+				setIsAuthenticated(true)
+				setLoginData({ email: '', password: '' })
+			} else {
+				const error = await response.json()
+				setLoginError(error.error || 'Authentication failed')
+			}
+		} catch (error) {
+			setLoginError('Authentication failed')
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	async function handleLogout() {
+		setIsAuthenticated(false)
+		setStats([])
+		setAggregated(null)
+		router.push('/')
+	}
 
 	useEffect(() => {
-		fetchStats()
-	}, [period])
+		if (isAuthenticated) {
+			fetchStats()
+		}
+	}, [isAuthenticated, period])
 
 	async function fetchStats() {
-		setLoading(true)
 		try {
 			const response = await fetch(`/api/admin/stats?period=${period}`)
 			if (!response.ok) throw new Error('Failed to fetch stats')
@@ -65,8 +111,6 @@ export default function AdminPage() {
 			setAggregated(aggregateStats(data.downloads))
 		} catch (error) {
 			console.error('Failed to fetch stats:', error)
-		} finally {
-			setLoading(false)
 		}
 	}
 
@@ -120,12 +164,74 @@ export default function AdminPage() {
 		a.click()
 	}
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className='min-h-screen flex items-center justify-center'>
 				<div className='text-center'>
 					<div className='animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4' />
-					<p className='text-muted-foreground'>Loading stats...</p>
+					<p className='text-muted-foreground'>Loading...</p>
+				</div>
+			</div>
+		)
+	}
+
+	if (!isAuthenticated) {
+		return (
+			<div className='min-h-screen flex items-center justify-center bg-background'>
+				<div className='w-full max-w-md'>
+					<Card>
+						<CardHeader className='text-center'>
+							<CardTitle className='flex items-center justify-center gap-2'>
+								<Lock className='h-5 w-5' />
+								Admin Access
+							</CardTitle>
+							<CardDescription>
+								Please sign in to access the admin dashboard
+							</CardDescription>
+						</CardHeader>
+						<CardContent>
+							<form onSubmit={handleLogin} className='space-y-4'>
+								<div className='space-y-2'>
+									<label htmlFor='email' className='text-sm font-medium'>Email</label>
+									<input
+										id='email'
+										type='email'
+										className='w-full px-3 py-2 border border-gray-300 rounded-md'
+										value={loginData.email}
+										onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+										required
+									/>
+								</div>
+								<div className='space-y-2'>
+									<label htmlFor='password' className='text-sm font-medium'>Password</label>
+									<input
+										id='password'
+										type='password'
+										className='w-full px-3 py-2 border border-gray-300 rounded-md'
+										value={loginData.password}
+										onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+										required
+									/>
+								</div>
+								{loginError && (
+									<div className='text-sm text-destructive text-center'>
+										{loginError}
+									</div>
+								)}
+								<Button type='submit' className='w-full' disabled={isLoading}>
+									{isLoading ? 'Signing in...' : 'Sign In'}
+								</Button>
+								<div className='pt-2'>
+									<Link href='/' className='w-full inline-flex'>
+										<Button variant='outline' className='w-full' type='button'>
+											<ArrowLeft className='h-4 w-4 mr-2' />
+											Back to landing
+										</Button>
+									</Link>
+								</div>
+							</form>
+						</CardContent>
+					</Card>
 				</div>
 			</div>
 		)
@@ -134,8 +240,12 @@ export default function AdminPage() {
 	return (
 		<div className='min-h-screen bg-background'>
 			<header className='border-b'>
-				<div className='container mx-auto px-4 py-4'>
+				<div className='container mx-auto px-4 py-4 flex items-center justify-between'>
 					<h1 className='text-2xl font-bold'>CodePulse Admin Dashboard</h1>
+					<Button onClick={handleLogout} variant='outline' size='sm'>
+						<LogOut className='h-4 w-4 mr-2' />
+						Logout
+					</Button>
 				</div>
 			</header>
 

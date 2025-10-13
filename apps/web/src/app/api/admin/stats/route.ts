@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
-import { checkBasicAuth, createUnauthorizedResponse } from '@/lib/auth'
 
 // Define types for database query results
 interface PlatformRow {
@@ -24,11 +23,6 @@ interface TrendRow {
 }
 
 export async function GET(request: NextRequest) {
-	// Check Basic Auth
-	if (!checkBasicAuth(request)) {
-		return createUnauthorizedResponse()
-	}
-
 	try {
 		const { searchParams } = new URL(request.url)
 		const period = parseInt(searchParams.get('period') || '30')

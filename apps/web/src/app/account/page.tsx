@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { authService } from '@/lib/auth-service'
+import { authService, User } from '@/lib/auth-service'
 import { Code2, ArrowLeft, Save, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 
 export default function AccountSettingsPage() {
-	const [user, setUser] = useState<any>(null)
+	const [user, setUser] = useState<User | null>(null)
 	const [isLoading, setIsLoading] = useState(true)
 	const [activeTab, setActiveTab] = useState('profile')
 	const [formData, setFormData] = useState({
@@ -78,7 +78,7 @@ export default function AccountSettingsPage() {
 			}
 
 			setMessage('Email updated successfully')
-			setUser(prev => prev ? { ...prev, email: formData.email } : prev)
+			setUser((prev: User | null) => prev ? { ...prev, email: formData.email } : prev)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to update email')
 		} finally {

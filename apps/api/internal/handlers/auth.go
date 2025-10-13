@@ -165,7 +165,10 @@ func (h *AuthHandler) Me(c *gin.Context) {
 	}
 
 	// Load user with profile
-	h.db.DB.Preload("Profile").First(user, user.ID)
+	if err := h.db.DB.Preload("Profile").Where("id = ?", user.ID).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"user": user})
 }
