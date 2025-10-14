@@ -69,6 +69,8 @@ func Load() (*Config, error) {
 		config.AllowedOrigins = []string{
 			"http://localhost:3000",
 			"http://localhost:3001",
+			"http://localhost:1420", // Vite dev server for Tauri
+			"tauri://localhost",     // Tauri scheme
 		}
 	}
 

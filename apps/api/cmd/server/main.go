@@ -49,6 +49,7 @@ func main() {
 			&models.GitHubLink{},
 			&models.Download{},
 			&models.Session{},
+			&models.DeviceLoginSession{},
 		); err != nil {
 			log.Printf("Auto-migration failed: %v", err)
 		}
@@ -60,7 +61,6 @@ func main() {
 	projectHandler := handlers.NewProjectHandler(db)
 	scanHandler := handlers.NewScanHandler(db)
 	exportHandler := handlers.NewExportHandler(db)
-	githubHandler := handlers.NewGitHubHandler(db)
 	ogHandler := handlers.NewOGHandler(db)
 
 	// Initialize middleware
@@ -85,54 +85,59 @@ func main() {
 	router.GET("/health", healthHandler.HealthCheck)
 
 	// Backward compatibility routes (mirror Next.js API structure)
-api := router.Group("/api")
-{
-	// Map old Next.js routes to new handlers
-	api.POST("/sync/scan", authMiddleware.RequireAuth(), scanHandler.SyncScan)
-
-	// Export routes
-	api.GET("/export", authMiddleware.RequireAuth(), exportHandler.ExportProjectData)
-
-	// GitHub integration routes
-	github := api.Group("/github")
+	api := router.Group("/api")
 	{
-		github.POST("/webhook", githubHandler.Webhook)
-		github.POST("/link", authMiddleware.RequireAuth(), githubHandler.LinkRepository)
-	}
+		// Map old Next.js routes to new handlers
+		api.POST("/sync/scan", authMiddleware.RequireAuth(), scanHandler.SyncScan)
 
-	// Open Graph routes
-	og := api.Group("/og")
-	{
-		og.GET("/project/:id", ogHandler.GenerateProjectOG)
-	}
+		// Export routes
+		api.GET("/export", authMiddleware.RequireAuth(), exportHandler.ExportProjectData)
 
-	// Protected user routes
-	me := api.Group("/me")
-	me.Use(authMiddleware.RequireAuth())
-	{
-		me.GET("/projects", projectHandler.GetProjects)
-		me.GET("/projects/:id", projectHandler.GetProject)
-		me.PATCH("/projects/:id", projectHandler.UpdateProject)
-		me.GET("/projects/:id/scans", scanHandler.GetScans)
-		me.DELETE("/projects/:id", projectHandler.DeleteProject)
-		me.GET("/projects/:id/stats", projectHandler.GetProjectStats)
-	}
+		// Open Graph routes
+		og := api.Group("/og")
+		{
+			og.GET("/project/:id", ogHandler.GenerateProjectOG)
+		}
 
-	// Public routes
-	auth := api.Group("/auth")
-	{
-		auth.POST("/register", authHandler.Register)
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/logout", authHandler.Logout)
-		auth.GET("/me", authMiddleware.RequireAuth(), authHandler.Me)
-	}
+		// Protected user routes
+		me := api.Group("/me")
+		me.Use(authMiddleware.RequireAuth())
+		{
+			me.GET("/projects", projectHandler.GetProjects)
+			me.GET("/projects/:id", projectHandler.GetProject)
+			me.PATCH("/projects/:id", projectHandler.UpdateProject)
+			me.GET("/projects/:id/scans", scanHandler.GetScans)
+			me.DELETE("/projects/:id", projectHandler.DeleteProject)
+			me.GET("/projects/:id/stats", projectHandler.GetProjectStats)
 
-	// Public project routes
-	public := api.Group("/u")
-	{
-		public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
+			// Profile management
+			me.GET("/profile", authHandler.GetProfile)
+			me.PATCH("/profile", authHandler.UpdateProfile)
+		}
+
+		// Public routes
+		auth := api.Group("/auth")
+		{
+			auth.POST("/register", authHandler.Register)
+			auth.POST("/login", authHandler.Login)
+			auth.POST("/logout", authHandler.Logout)
+			auth.GET("/me", authMiddleware.RequireAuth(), authHandler.Me)
+			auth.PUT("/email", authMiddleware.RequireAuth(), authHandler.UpdateEmail)
+			auth.PUT("/password", authMiddleware.RequireAuth(), authHandler.UpdatePassword)
+			auth.DELETE("/account", authMiddleware.RequireAuth(), authHandler.DeleteAccount)
+
+			// Device login flow for desktop
+			auth.POST("/device/start", authHandler.DeviceStart)
+			auth.POST("/device/complete", authMiddleware.RequireAuth(), authHandler.DeviceComplete)
+			auth.GET("/device/poll", authHandler.DevicePoll)
+		}
+
+		// Public project routes
+		public := api.Group("/u")
+		{
+			public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
+		}
 	}
-}
 
 	// Create HTTP server
 	srv := &http.Server{

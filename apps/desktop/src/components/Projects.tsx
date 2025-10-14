@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
 import { Plus, Folder, Calendar, Github, Settings, Trash2, BarChart3 } from 'lucide-react'
+import { api } from '../lib/api'
 
 // Types locaux temporairement (seront remplacés par @codepulse/core une fois construit)
 interface Project {
@@ -45,41 +46,31 @@ export default function Projects({ onProjectSelect }: ProjectsProps) {
 			setLoading(true)
 			setError(null)
 
-			// Mock data for now - in production this would call your API
-			const mockProjects: Project[] = [
-				{
-					id: '1',
-					name: 'CodePulse Desktop',
-					path: '/Users/alexis/Documents/Code/projets/code-pulse/apps/desktop',
-					description: 'Desktop application for CodePulse',
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-					userId: '1',
-					githubLink: {
-						repoFullName: 'alexis/codepulse',
-						starsCount: 42
-					},
-					latestScan: {
-						id: 'scan1',
-						totalFiles: 156,
-						totalLines: 12543,
-						totalCode: 8934,
-						totalComments: 2341,
-						createdAt: new Date().toISOString()
-					}
-				},
-				{
-					id: '2',
-					name: 'Personal Website',
-					path: '/Users/alexis/Documents/Code/personal-site',
-					description: 'My personal portfolio website',
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-					userId: '1'
+			const data = await api.getProjects()
+			const mapped: Project[] = (data || []).map((p: any) => {
+				const latest = Array.isArray(p.scans) && p.scans.length > 0 ? p.scans[0] : null
+				return {
+					id: p.id,
+					name: p.name || 'Project',
+					path: '',
+					description: undefined,
+					createdAt: p.created_at,
+					updatedAt: p.updated_at,
+					userId: p.user_id,
+					githubLink: undefined,
+					latestScan: latest
+						? {
+								id: latest.id,
+								totalFiles: latest.total,
+								totalLines: latest.total,
+								totalCode: latest.code,
+								totalComments: latest.comment,
+								createdAt: latest.created_at
+							}
+						: undefined
 				}
-			]
-
-			setProjects(mockProjects)
+			})
+			setProjects(mapped)
 		} catch (err) {
 			setError('Failed to load projects')
 			console.error('Error loading projects:', err)
@@ -90,7 +81,7 @@ export default function Projects({ onProjectSelect }: ProjectsProps) {
 
 	async function deleteProject(projectId: string) {
 		try {
-			// Mock API call - in production this would call your API
+			await api.deleteProject(projectId)
 			setProjects(prev => prev.filter(p => p.id !== projectId))
 		} catch (err) {
 			console.error('Error deleting project:', err)

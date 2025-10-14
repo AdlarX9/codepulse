@@ -15,6 +15,7 @@ import {
 	FileText
 } from 'lucide-react'
 import Dashboard from './Dashboard'
+import { api } from '../lib/api'
 
 // Types locaux temporairement (seront remplacés par @codepulse/core une fois construit)
 interface Project {
@@ -43,9 +44,10 @@ interface Project {
 interface ProjectDetailsProps {
 	projectId: string
 	onBack: () => void
+	onOpenSettings?: () => void
 }
 
-export default function ProjectDetails({ projectId, onBack }: ProjectDetailsProps) {
+export default function ProjectDetails({ projectId, onBack, onOpenSettings }: ProjectDetailsProps) {
 	const [project, setProject] = useState<Project | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
@@ -61,30 +63,33 @@ export default function ProjectDetails({ projectId, onBack }: ProjectDetailsProp
 			setLoading(true)
 			setError(null)
 
-			// Mock data for now - in production this would call your API
-			const mockProject: Project = {
-				id: projectId,
-				name: 'CodePulse Desktop',
-				path: '/Users/alexis/Documents/Code/projets/code-pulse/apps/desktop',
-				description: 'Desktop application for CodePulse',
-				createdAt: new Date().toISOString(),
-				updatedAt: new Date().toISOString(),
-				userId: '1',
-				githubLink: {
-					repoFullName: 'alexis/codepulse',
-					starsCount: 42
-				},
-				latestScan: {
-					id: 'scan1',
-					totalFiles: 156,
-					totalLines: 12543,
-					totalCode: 8934,
-					totalComments: 2341,
-					createdAt: new Date().toISOString()
-				}
+			const data = await api.getProject(projectId)
+			const p = data.project || data
+			const scans = Array.isArray(p.scans) ? p.scans : []
+			const latest = scans.length > 0 ? scans[0] : null
+
+			const mapped: Project = {
+				id: p.id,
+				name: p.name || 'Project',
+				path: '',
+				description: undefined,
+				createdAt: p.created_at,
+				updatedAt: p.updated_at,
+				userId: p.user_id,
+				githubLink: undefined,
+				latestScan: latest
+					? {
+							id: latest.id,
+							totalFiles: latest.total,
+							totalLines: latest.total,
+							totalCode: latest.code,
+							totalComments: latest.comment,
+							createdAt: latest.created_at
+						}
+					: undefined
 			}
 
-			setProject(mockProject)
+			setProject(mapped)
 		} catch (err) {
 			setError('Failed to load project')
 			console.error('Error loading project:', err)
@@ -132,10 +137,10 @@ export default function ProjectDetails({ projectId, onBack }: ProjectDetailsProp
 						code: 219
 					}
 				],
-				duration: 2.3,
+				duration_ms: 2300,
 				mean: 80.3,
 				median: 75.0,
-				stdDev: 45.2
+				std_dev: 45.2
 			}
 
 			setScanResult(mockScanResult)
@@ -333,7 +338,11 @@ export default function ProjectDetails({ projectId, onBack }: ProjectDetailsProp
 				</CardHeader>
 				<CardContent>
 					<div className='flex gap-4'>
-						<Button variant='outline' className='flex-1'>
+						<Button
+							variant='outline'
+							className='flex-1'
+							onClick={() => onOpenSettings?.()}
+						>
 							<Settings className='h-4 w-4 mr-2' />
 							Project Settings
 						</Button>

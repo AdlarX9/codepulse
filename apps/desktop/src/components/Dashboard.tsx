@@ -18,7 +18,9 @@ import {
 	MessageSquare,
 	FileText,
 	ChevronDown,
-	ChevronRight
+	ChevronRight,
+	RefreshCw,
+	FolderOpen
 } from 'lucide-react'
 import { Button } from './ui/Button'
 import { Card } from './ui/Card'
@@ -28,11 +30,13 @@ import type { ScanResult } from '@/types'
 interface DashboardProps {
 	result: ScanResult
 	onReset: () => void
+	onRescan?: () => void
+	onChooseFolder?: () => void
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6']
 
-export default function Dashboard({ result, onReset }: DashboardProps) {
+export default function Dashboard({ result, onReset, onRescan, onChooseFolder }: DashboardProps) {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [languageFilter, setLanguageFilter] = useState<string | null>(null)
 	const [showFileDetails, setShowFileDetails] = useState(false) // Collapsed by default
@@ -72,11 +76,27 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 						</p>
 					</div>
 				</div>
+				{(onChooseFolder || onRescan) && (
+					<div className='flex gap-2'>
+						{onChooseFolder && (
+							<Button variant='outline' size='sm' onClick={onChooseFolder}>
+								<FolderOpen className='h-4 w-4 mr-2' />
+								Choose Folder
+							</Button>
+						)}
+						{onRescan && (
+							<Button variant='outline' size='sm' onClick={onRescan}>
+								<RefreshCw className='h-4 w-4 mr-2' />
+								Rescan
+							</Button>
+						)}
+					</div>
+				)}
 			</div>
 
 			{/* KPI Cards */}
 			<div className='grid grid-cols-2 md:grid-cols-5 gap-4'>
-				<Card className='p-4'>
+				<Card className='rounded-md border bg-gray-50 p-4'>
 					<div className='flex items-center gap-2 text-muted-foreground mb-1'>
 						<FileCode className='h-4 w-4' />
 						<span className='text-sm'>Files</span>
@@ -84,7 +104,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 					<div className='text-2xl font-bold'>{formatNumber(result.total_files)}</div>
 				</Card>
 
-				<Card className='p-4'>
+				<Card className='rounded-md border bg-gray-50 p-4'>
 					<div className='flex items-center gap-2 text-muted-foreground mb-1'>
 						<FileText className='h-4 w-4' />
 						<span className='text-sm'>Total Lines</span>
@@ -92,7 +112,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 					<div className='text-2xl font-bold'>{formatNumber(result.total_lines)}</div>
 				</Card>
 
-				<Card className='p-4'>
+				<Card className='rounded-md border bg-gray-50 p-4'>
 					<div className='flex items-center gap-2 text-muted-foreground mb-1'>
 						<Code2 className='h-4 w-4' />
 						<span className='text-sm'>Code</span>
@@ -103,7 +123,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 					</div>
 				</Card>
 
-				<Card className='p-4'>
+				<Card className='rounded-md border bg-gray-50 p-4'>
 					<div className='flex items-center gap-2 text-muted-foreground mb-1'>
 						<MessageSquare className='h-4 w-4' />
 						<span className='text-sm'>Comments</span>
@@ -114,7 +134,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 					</div>
 				</Card>
 
-				<Card className='p-4'>
+				<Card className='rounded-md border bg-gray-50 p-4'>
 					<div className='text-muted-foreground mb-1 text-sm'>Blank</div>
 					<div className='text-2xl font-bold'>{formatNumber(result.total_blank)}</div>
 				</Card>
@@ -123,7 +143,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 			{/* Charts */}
 			<div className='grid lg:grid-cols-2 gap-6'>
 				{/* Pie Chart */}
-				<Card className='p-6'>
+				<Card className='rounded-md border bg-gray-50 p-6'>
 					<h3 className='text-lg font-semibold mb-4'>Languages Distribution</h3>
 					<ResponsiveContainer width='100%' height={300}>
 						<PieChart>
@@ -152,7 +172,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 				</Card>
 
 				{/* Bar Chart */}
-				<Card className='p-6'>
+				<Card className='rounded-md border bg-gray-50 p-6'>
 					<h3 className='text-lg font-semibold mb-4'>Top Languages (by code lines)</h3>
 					<ResponsiveContainer width='100%' height={300}>
 						<BarChart data={languageData.slice(0, 10)}>
@@ -166,7 +186,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 			</div>
 
 			{/* File Table */}
-			<Card className='p-6'>
+			<Card className='rounded-md border bg-gray-50 p-6'>
 				<div className='flex items-center justify-between mb-4'>
 					<button
 						onClick={() => setShowFileDetails(!showFileDetails)}
@@ -246,7 +266,7 @@ export default function Dashboard({ result, onReset }: DashboardProps) {
 			</Card>
 
 			{/* Stats Summary */}
-			<Card className='p-6'>
+			<Card className='rounded-md border bg-gray-50 p-6'>
 				<h3 className='text-lg font-semibold mb-4'>Statistics</h3>
 				<div className='grid md:grid-cols-3 gap-4 text-sm'>
 					<div>

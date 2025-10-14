@@ -60,17 +60,20 @@ export default function AccountSettingsPage() {
 		}
 
 		try {
-			const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/email`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${authService.getToken()}`
-				},
-				body: JSON.stringify({
-					new_email: formData.email,
-					password: formData.currentPassword
-				})
-			})
+			const response = await fetch(
+				`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/email`,
+				{
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${authService.getToken()}`
+					},
+					body: JSON.stringify({
+						new_email: formData.email,
+						password: formData.currentPassword
+					})
+				}
+			)
 
 			if (!response.ok) {
 				const error = await response.json()
@@ -78,7 +81,7 @@ export default function AccountSettingsPage() {
 			}
 
 			setMessage('Email updated successfully')
-			setUser((prev: User | null) => prev ? { ...prev, email: formData.email } : prev)
+			setUser((prev: User | null) => (prev ? { ...prev, email: formData.email } : prev))
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to update email')
 		} finally {
@@ -105,17 +108,20 @@ export default function AccountSettingsPage() {
 		}
 
 		try {
-			const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/password`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${authService.getToken()}`
-				},
-				body: JSON.stringify({
-					current_password: formData.currentPassword,
-					new_password: formData.newPassword
-				})
-			})
+			const response = await fetch(
+				`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/password`,
+				{
+					method: 'PUT',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${authService.getToken()}`
+					},
+					body: JSON.stringify({
+						current_password: formData.currentPassword,
+						new_password: formData.newPassword
+					})
+				}
+			)
 
 			if (!response.ok) {
 				const error = await response.json()
@@ -138,7 +144,9 @@ export default function AccountSettingsPage() {
 
 	const handleDeleteAccount = async (e: React.FormEvent) => {
 		e.preventDefault()
-		if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+		if (
+			!confirm('Are you sure you want to delete your account? This action cannot be undone.')
+		) {
 			return
 		}
 
@@ -147,16 +155,19 @@ export default function AccountSettingsPage() {
 		setMessage('')
 
 		try {
-			const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/account`, {
-				method: 'DELETE',
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${authService.getToken()}`
-				},
-				body: JSON.stringify({
-					password: formData.deletePassword
-				})
-			})
+			const response = await fetch(
+				`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/account`,
+				{
+					method: 'DELETE',
+					headers: {
+						'Content-Type': 'application/json',
+						Authorization: `Bearer ${authService.getToken()}`
+					},
+					body: JSON.stringify({
+						password: formData.deletePassword
+					})
+				}
+			)
 
 			if (!response.ok) {
 				const error = await response.json()
@@ -194,10 +205,7 @@ export default function AccountSettingsPage() {
 						<span className='text-2xl font-bold'>CodePulse</span>
 					</div>
 					<div className='flex items-center gap-4'>
-						<Link
-							href='/'
-							className='text-gray-600 hover:text-gray-900 transition'
-						>
+						<Link href='/' className='text-gray-600 hover:text-gray-900 transition'>
 							<ArrowLeft className='h-6 w-6' />
 						</Link>
 						<button
@@ -253,7 +261,9 @@ export default function AccountSettingsPage() {
 						<div className='p-6'>
 							{activeTab === 'profile' && (
 								<div>
-									<h2 className='text-xl font-semibold mb-4'>Profile Information</h2>
+									<h2 className='text-xl font-semibold mb-4'>
+										Profile Information
+									</h2>
 									<div className='space-y-4'>
 										<div>
 											<label className='block text-sm font-medium text-gray-700 mb-1'>
@@ -277,7 +287,10 @@ export default function AccountSettingsPage() {
 										<h2 className='text-xl font-semibold mb-4'>Change Email</h2>
 										<form onSubmit={handleUpdateEmail} className='space-y-4'>
 											<div>
-												<label htmlFor='email' className='block text-sm font-medium text-gray-700 mb-1'>
+												<label
+													htmlFor='email'
+													className='block text-sm font-medium text-gray-700 mb-1'
+												>
 													New Email Address
 												</label>
 												<input
@@ -291,7 +304,10 @@ export default function AccountSettingsPage() {
 												/>
 											</div>
 											<div>
-												<label htmlFor='currentPassword' className='block text-sm font-medium text-gray-700 mb-1'>
+												<label
+													htmlFor='currentPassword'
+													className='block text-sm font-medium text-gray-700 mb-1'
+												>
 													Current Password
 												</label>
 												<input
@@ -315,10 +331,15 @@ export default function AccountSettingsPage() {
 									</div>
 
 									<div>
-										<h2 className='text-xl font-semibold mb-4'>Change Password</h2>
+										<h2 className='text-xl font-semibold mb-4'>
+											Change Password
+										</h2>
 										<form onSubmit={handleUpdatePassword} className='space-y-4'>
 											<div>
-												<label htmlFor='currentPassword' className='block text-sm font-medium text-gray-700 mb-1'>
+												<label
+													htmlFor='currentPassword'
+													className='block text-sm font-medium text-gray-700 mb-1'
+												>
 													Current Password
 												</label>
 												<input
@@ -332,7 +353,10 @@ export default function AccountSettingsPage() {
 												/>
 											</div>
 											<div>
-												<label htmlFor='newPassword' className='block text-sm font-medium text-gray-700 mb-1'>
+												<label
+													htmlFor='newPassword'
+													className='block text-sm font-medium text-gray-700 mb-1'
+												>
 													New Password
 												</label>
 												<input
@@ -346,7 +370,10 @@ export default function AccountSettingsPage() {
 												/>
 											</div>
 											<div>
-												<label htmlFor='confirmPassword' className='block text-sm font-medium text-gray-700 mb-1'>
+												<label
+													htmlFor='confirmPassword'
+													className='block text-sm font-medium text-gray-700 mb-1'
+												>
 													Confirm New Password
 												</label>
 												<input
@@ -373,15 +400,21 @@ export default function AccountSettingsPage() {
 
 							{activeTab === 'danger' && (
 								<div>
-									<h2 className='text-xl font-semibold mb-4 text-red-600'>Danger Zone</h2>
+									<h2 className='text-xl font-semibold mb-4 text-red-600'>
+										Danger Zone
+									</h2>
 									<div className='border border-red-200 rounded-md p-4'>
 										<h3 className='font-medium mb-2'>Delete Account</h3>
 										<p className='text-sm text-gray-600 mb-4'>
-											Once you delete your account, there is no going back. Please be certain.
+											Once you delete your account, there is no going back.
+											Please be certain.
 										</p>
 										<form onSubmit={handleDeleteAccount} className='space-y-4'>
 											<div>
-												<label htmlFor='deletePassword' className='block text-sm font-medium text-gray-700 mb-1'>
+												<label
+													htmlFor='deletePassword'
+													className='block text-sm font-medium text-gray-700 mb-1'
+												>
 													Confirm Password
 												</label>
 												<input

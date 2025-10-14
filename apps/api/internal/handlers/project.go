@@ -20,8 +20,9 @@ func NewProjectHandler(db *database.Database) *ProjectHandler {
 }
 
 type UpdateProjectRequest struct {
-	Name       *string `json:"name"`
-	Visibility *string `json:"visibility"`
+	Name       *string         `json:"name"`
+	Visibility *string         `json:"visibility"`
+	Settings   *models.JSONMap `json:"settings"`
 }
 
 // GetProjects handles GET /me/projects
@@ -106,6 +107,9 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	}
 	if req.Visibility != nil {
 		updates["visibility"] = *req.Visibility
+	}
+	if req.Settings != nil {
+		updates["settings"] = *req.Settings
 	}
 
 	if err := h.db.DB.Model(&project).Updates(updates).Error; err != nil {

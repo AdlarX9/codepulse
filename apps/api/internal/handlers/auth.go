@@ -9,14 +9,204 @@ import (
 	"codepulse-api/internal/middleware"
 	"codepulse-api/internal/models"
 
+	crand "crypto/rand"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"math/big"
 )
 
 type AuthHandler struct {
 	db     *database.Database
 	config *config.Config
+}
+
+// GetProfile handles GET /me/profile
+func (h *AuthHandler) GetProfile(c *gin.Context) {
+	user, exists := middleware.GetCurrentUser(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	var profile models.Profile
+	if err := h.db.DB.Where("user_id = ?", user.ID).First(&profile).Error; err != nil {
+		// Create default profile if missing
+		profile = models.Profile{
+			UserID:     user.ID,
+			Visibility: "private",
+		}
+		_ = h.db.DB.Create(&profile).Error
+	}
+
+	c.JSON(http.StatusOK, gin.H{"profile": profile})
+}
+
+// UpdateProfile handles PATCH /me/profile
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	user, exists := middleware.GetCurrentUser(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	var req struct {
+		DisplayName *string         `json:"display_name"`
+		AvatarURL   *string         `json:"avatar_url"`
+		Bio         *string         `json:"bio"`
+		Links       *models.JSONMap `json:"links"`
+		Visibility  *string         `json:"visibility"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	if req.Visibility != nil && *req.Visibility != "private" && *req.Visibility != "public" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Visibility must be 'private' or 'public'"})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.DisplayName != nil {
+		updates["display_name"] = *req.DisplayName
+	}
+	if req.AvatarURL != nil {
+		updates["avatar_url"] = *req.AvatarURL
+	}
+	if req.Bio != nil {
+		updates["bio"] = *req.Bio
+	}
+	if req.Links != nil {
+		updates["links"] = *req.Links
+	}
+	if req.Visibility != nil {
+		updates["visibility"] = *req.Visibility
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
+		return
+	}
+
+	if err := h.db.DB.Model(&models.Profile{}).Where("user_id = ?", user.ID).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	var profile models.Profile
+	if err := h.db.DB.Where("user_id = ?", user.ID).First(&profile).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload profile"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"profile": profile})
+}
+
+// DeviceStart handles POST /auth/device/start (desktop device flow)
+func (h *AuthHandler) DeviceStart(c *gin.Context) {
+	// generate short verification code
+	code, err := generateDeviceCode(8)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate code"})
+		return
+	}
+	session := models.DeviceLoginSession{
+		Code:      code,
+		Completed: false,
+		ExpiresAt: time.Now().Add(10 * time.Minute),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}
+	if err := h.db.DB.Create(&session).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create device session"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":       code,
+		"expires_at": session.ExpiresAt,
+	})
+}
+
+// DevicePoll handles GET /auth/device/poll?code=XXXX
+func (h *AuthHandler) DevicePoll(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "code is required"})
+		return
+	}
+	var session models.DeviceLoginSession
+	if err := h.db.DB.Where("code = ?", code).First(&session).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "invalid code"})
+		return
+	}
+	if time.Now().After(session.ExpiresAt) {
+		c.JSON(http.StatusGone, gin.H{"error": "expired"})
+		return
+	}
+	if session.Completed && session.Token != nil {
+		c.JSON(http.StatusOK, gin.H{"completed": true, "token": session.Token})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"completed": false})
+}
+
+// DeviceComplete handles POST /auth/device/complete (requires auth)
+func (h *AuthHandler) DeviceComplete(c *gin.Context) {
+	user, exists := middleware.GetCurrentUser(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+	var req struct {
+		Code string `json:"code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.Code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+		return
+	}
+	var session models.DeviceLoginSession
+	if err := h.db.DB.Where("code = ?", req.Code).First(&session).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "invalid code"})
+		return
+	}
+	if time.Now().After(session.ExpiresAt) {
+		c.JSON(http.StatusGone, gin.H{"error": "expired"})
+		return
+	}
+	if session.Completed {
+		c.JSON(http.StatusConflict, gin.H{"error": "already completed"})
+		return
+	}
+
+	token, err := h.generateToken(user.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		return
+	}
+	session.Completed = true
+	session.UserID = &user.ID
+	session.Token = &token
+	session.UpdatedAt = time.Now()
+	if err := h.db.DB.Save(&session).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete device session"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func generateDeviceCode(n int) (string, error) {
+	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	res := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := crand.Int(crand.Reader, big.NewInt(int64(len(alphabet))))
+		if err != nil {
+			return "", err
+		}
+		res[i] = alphabet[num.Int64()]
+	}
+	return string(res), nil
 }
 
 func NewAuthHandler(db *database.Database, cfg *config.Config) *AuthHandler {

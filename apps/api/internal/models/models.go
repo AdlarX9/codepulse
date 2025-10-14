@@ -45,6 +45,7 @@ type Project struct {
 	ProjectKeyHash string         `json:"project_key_hash" gorm:"not null"`
 	Name           *string        `json:"name"`
 	Visibility     string         `json:"visibility" gorm:"type:varchar(10);default:'private';check:visibility IN ('private','public')"`
+	Settings       *JSONMap       `json:"settings" gorm:"type:jsonb"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `json:"-" gorm:"index"`
@@ -159,6 +160,21 @@ type Session struct {
 	Token     string    `json:"token" gorm:"not null;uniqueIndex"`
 	ExpiresAt time.Time `json:"expires_at" gorm:"not null"`
 	CreatedAt time.Time `json:"created_at"`
+
+	// Relations
+	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
+}
+
+// DeviceLoginSession supports desktop device-code login flow
+type DeviceLoginSession struct {
+	ID        string    `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Code      string    `json:"code" gorm:"uniqueIndex;not null"`
+	UserID    *string   `json:"user_id" gorm:"type:uuid"`
+	Token     *string   `json:"token"`
+	Completed bool      `json:"completed" gorm:"default:false"`
+	ExpiresAt time.Time `json:"expires_at" gorm:"not null"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Relations
 	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`

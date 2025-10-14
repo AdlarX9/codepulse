@@ -16,7 +16,7 @@ export interface AuthError {
 }
 
 class AuthService {
-	private baseUrl = "http://localhost:8080/api"
+	private baseUrl = 'http://localhost:8080/api'
 
 	async signIn(email: string, password: string): Promise<AuthResponse> {
 		const response = await fetch(`${this.baseUrl}/auth/login`, {

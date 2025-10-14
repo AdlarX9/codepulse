@@ -31,6 +31,23 @@ export default function SignInPage() {
 
 		try {
 			await authService.signIn(formData.email, formData.password)
+			// Device login completion for desktop app, if requested
+			const deviceCode = searchParams.get('device_code')
+			if (deviceCode) {
+				try {
+					await fetch(
+						`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/auth/device/complete`,
+						{
+							method: 'POST',
+							headers: {
+								'Content-Type': 'application/json',
+								Authorization: `Bearer ${authService.getToken()}`
+							},
+							body: JSON.stringify({ code: deviceCode })
+						}
+					)
+				} catch {}
+			}
 			router.push(callbackUrl as any)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Sign in failed')
@@ -44,13 +61,16 @@ export default function SignInPage() {
 		if (!email) return
 
 		try {
-			await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/forgot-password`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({ email })
-			})
+			await fetch(
+				`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/v1'}/auth/forgot-password`,
+				{
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({ email })
+				}
+			)
 			alert('If the email exists, a reset link has been sent')
 		} catch (err) {
 			alert('Failed to send reset email')

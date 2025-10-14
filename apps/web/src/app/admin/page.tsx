@@ -192,24 +192,38 @@ export default function AdminPage() {
 						<CardContent>
 							<form onSubmit={handleLogin} className='space-y-4'>
 								<div className='space-y-2'>
-									<label htmlFor='email' className='text-sm font-medium'>Email</label>
+									<label htmlFor='email' className='text-sm font-medium'>
+										Email
+									</label>
 									<input
 										id='email'
 										type='email'
 										className='w-full px-3 py-2 border border-gray-300 rounded-md'
 										value={loginData.email}
-										onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+										onChange={e =>
+											setLoginData(prev => ({
+												...prev,
+												email: e.target.value
+											}))
+										}
 										required
 									/>
 								</div>
 								<div className='space-y-2'>
-									<label htmlFor='password' className='text-sm font-medium'>Password</label>
+									<label htmlFor='password' className='text-sm font-medium'>
+										Password
+									</label>
 									<input
 										id='password'
 										type='password'
 										className='w-full px-3 py-2 border border-gray-300 rounded-md'
 										value={loginData.password}
-										onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+										onChange={e =>
+											setLoginData(prev => ({
+												...prev,
+												password: e.target.value
+											}))
+										}
 										required
 									/>
 								</div>
