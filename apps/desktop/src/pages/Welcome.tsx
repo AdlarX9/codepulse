@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Code2, ArrowRight, User, FolderOpen, ShieldCheck, Sparkles } from 'lucide-react'
+import { Code2, ArrowRight, User, FolderOpen, ShieldCheck, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 
 interface WelcomePageProps {
 	onContinueWithAccount: () => void
 	onContinueWithoutAccount: () => void
+	isAuthLoading?: boolean
 }
 
 export default function WelcomePage({
 	onContinueWithAccount,
-	onContinueWithoutAccount
+	onContinueWithoutAccount,
+	isAuthLoading = false
 }: WelcomePageProps) {
 	const [hoveringAnalyze, setHoveringAnalyze] = useState(false)
 
@@ -173,9 +175,14 @@ export default function WelcomePage({
 									size='lg'
 									className='w-full gap-2'
 									onClick={onContinueWithAccount}
+									disabled={isAuthLoading}
 								>
-									Sign in
-									<User className='h-4 w-4' />
+									{isAuthLoading ? (
+										<Loader2 className='h-4 w-4 animate-spin' />
+									) : (
+										<User className='h-4 w-4' />
+									)}
+									{isAuthLoading ? 'Signing in...' : 'Sign in'}
 								</Button>
 								<p className='text-xs text-muted-foreground text-center'>
 									You can also sign in later from the top-right corner.

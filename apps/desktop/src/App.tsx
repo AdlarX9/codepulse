@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard'
 import WelcomePage from './pages/Welcome'
 import ProfileManagement from './pages/ProfileManagement'
 import ProjectSettings from './pages/ProjectSettings'
+import { ConsoleOverlay } from './components/ConsoleOverlay'
 import { api, type User as ApiUser } from './lib/api'
 import { open as openExternal } from '@tauri-apps/api/shell'
 import { open as openDialog } from '@tauri-apps/api/dialog'
@@ -24,7 +25,8 @@ function App() {
 		'welcome' | 'projects' | 'project-details' | 'profile' | 'project-settings' | 'analysis'
 	>('welcome')
 	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-	const [_, setAuthLoading] = useState(false)
+	const [_authError, setAuthError] = useState<string | null>(null) // Reserved for future auth error display
+	const [authLoading, setAuthLoading] = useState(false)
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 	const [scanPath, setScanPath] = useState<string>('')
 
@@ -95,16 +97,27 @@ function App() {
 			const { code } = await api.authDeviceStart()
 			// open web sign-in with device_code
 			const url = `${api.WEB_BASE}/auth/signin?callbackUrl=%2F&device_code=${encodeURIComponent(code)}`
+
+			// Dans les apps Tauri, utiliser openExternal au lieu de window.open
+			// window.open ne fonctionne pas correctement dans les webviews Tauri
 			try {
 				await openExternal(url)
-			} catch {
-				window.open(url, '_blank')
+			} catch (error) {
+				console.warn('Failed to open external URL:', error)
+				// Fallback: essayer de copier l'URL dans le presse-papiers ou afficher une instruction
+				console.log('Please open this URL manually in your browser:', url)
 			}
+
 			// poll until completed
 			const start = Date.now()
-			const timeoutMs = 10 * 60 * 1000
+			const timeoutMs = 10 * 60 * 1000 // 10 minutes
+
+			// Ajouter un indicateur de progression
+			console.log('Waiting for authentication...')
+
 			while (Date.now() - start < timeoutMs) {
 				await new Promise(r => setTimeout(r, 2000))
+
 				try {
 					const res = await api.authDevicePoll(code)
 					if (res.completed && res.token) {
@@ -113,11 +126,21 @@ function App() {
 						if (user) {
 							setCurrentUser(user)
 							changeView('projects')
+							console.log('Authentication successful!')
 							break
 						}
 					}
-				} catch {}
+				} catch (error) {
+					// Silencieusement ignorer les erreurs de polling
+					console.debug('Polling attempt failed:', error)
+				}
 			}
+
+			// Si on arrive ici, c'est que le timeout a été atteint
+			console.warn('Authentication timeout reached')
+		} catch (error) {
+			console.error('Authentication failed:', error)
+			setAuthError('Authentication failed. Please try again.')
 		} finally {
 			setAuthLoading(false)
 		}
@@ -125,11 +148,13 @@ function App() {
 
 	return (
 		<div className='min-h-screen bg-background'>
+			<ConsoleOverlay />
 			<main>
 				{currentView === 'welcome' && (
 					<WelcomePage
 						onContinueWithAccount={startDeviceLogin}
 						onContinueWithoutAccount={handleContinueWithoutAccount}
+						isAuthLoading={authLoading}
 					/>
 				)}
 

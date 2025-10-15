@@ -46,3 +46,14 @@ declare module '*.webp' {
 	const src: string
 	export default src
 }
+
+// Console overlay globals
+interface Window {
+	__consoleOverlay?: {
+		toggle(enabled: boolean): void
+	}
+}
+
+interface ImportMetaEnv {
+	readonly VITE_CONSOLE_OVERLAY?: string
+}
