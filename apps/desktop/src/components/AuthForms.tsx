@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Button } from './ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
+import { API_BASE } from '../lib/api'
 
-// Types locaux temporairement (seront remplacés par @codepulse/core une fois construit)
+// Types locaux temporairement définis ici
 interface LoginCredentials {
 	email: string
 	password: string
@@ -48,10 +49,10 @@ class ApiAuthService implements AuthService {
 	private apiUrl: string
 	private token: string | null = null
 
-	constructor(apiUrl: string = 'http://localhost:8080/v1') {
+	constructor(apiUrl: string = API_BASE) {
 		this.apiUrl = apiUrl
 		// Try to load token from localStorage
-		this.token = localStorage.getItem('auth_token')
+		this.token = localStorage.getItem('auth-token')
 	}
 
 	async login(credentials: LoginCredentials): Promise<AuthResponse> {
@@ -68,7 +69,7 @@ class ApiAuthService implements AuthService {
 
 			if (response.ok && data.token) {
 				this.token = data.token
-				localStorage.setItem('auth_token', data.token)
+				localStorage.setItem('auth-token', data.token)
 
 				return {
 					success: true,
@@ -104,7 +105,7 @@ class ApiAuthService implements AuthService {
 
 			if (response.ok && responseData.token) {
 				this.token = responseData.token
-				localStorage.setItem('auth_token', responseData.token)
+				localStorage.setItem('auth-token', responseData.token)
 
 				return {
 					success: true,
@@ -140,7 +141,7 @@ class ApiAuthService implements AuthService {
 			console.error('Logout error:', error)
 		} finally {
 			this.token = null
-			localStorage.removeItem('auth_token')
+			localStorage.removeItem('auth-token')
 		}
 	}
 
@@ -162,7 +163,7 @@ class ApiAuthService implements AuthService {
 			} else {
 				// Token might be invalid, clear it
 				this.token = null
-				localStorage.removeItem('auth_token')
+				localStorage.removeItem('auth-token')
 				return null
 			}
 		} catch (error) {
@@ -181,7 +182,7 @@ function createAuthService(): AuthService {
 }
 
 interface AuthFormProps {
-	onSuccess: () => void
+	onSuccess: (user: User, token: string) => void
 }
 
 export function LoginForm({ onSuccess }: AuthFormProps) {
@@ -201,8 +202,8 @@ export function LoginForm({ onSuccess }: AuthFormProps) {
 
 		try {
 			const result = await authService.login(credentials)
-			if (result.success && result.user) {
-				onSuccess()
+			if (result.success && result.user && result.token) {
+				onSuccess(result.user, result.token)
 			} else {
 				setError(result.message || 'Login failed')
 			}
@@ -291,8 +292,8 @@ export function RegisterForm({ onSuccess }: AuthFormProps) {
 
 		try {
 			const result = await authService.register(formData)
-			if (result.success && result.user) {
-				onSuccess()
+			if (result.success && result.user && result.token) {
+				onSuccess(result.user, result.token)
 			} else {
 				setError(result.message || 'Registration failed')
 			}
@@ -360,7 +361,7 @@ export function RegisterForm({ onSuccess }: AuthFormProps) {
 						<input
 							id='password'
 							type='password'
-							placeholder='Minimum 8 characters'
+							placeholder='Password'
 							value={formData.password}
 							onChange={e =>
 								setFormData((prev: RegisterData) => ({
@@ -370,7 +371,6 @@ export function RegisterForm({ onSuccess }: AuthFormProps) {
 							}
 							className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 							required
-							minLength={8}
 						/>
 					</div>
 					{error && (

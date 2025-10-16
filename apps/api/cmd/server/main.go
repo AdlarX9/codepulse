@@ -104,10 +104,12 @@ func main() {
 		me.Use(authMiddleware.RequireAuth())
 		{
 			me.GET("/projects", projectHandler.GetProjects)
+			me.POST("/projects", projectHandler.CreateProject)
 			me.GET("/projects/:id", projectHandler.GetProject)
 			me.PATCH("/projects/:id", projectHandler.UpdateProject)
-			me.GET("/projects/:id/scans", scanHandler.GetScans)
 			me.DELETE("/projects/:id", projectHandler.DeleteProject)
+			me.GET("/projects/:id/scans", scanHandler.GetScans)
+			me.POST("/projects/:id/snapshot", scanHandler.CreateSnapshot)
 			me.GET("/projects/:id/stats", projectHandler.GetProjectStats)
 
 			// Profile management
@@ -125,11 +127,6 @@ func main() {
 			auth.PUT("/email", authMiddleware.RequireAuth(), authHandler.UpdateEmail)
 			auth.PUT("/password", authMiddleware.RequireAuth(), authHandler.UpdatePassword)
 			auth.DELETE("/account", authMiddleware.RequireAuth(), authHandler.DeleteAccount)
-
-			// Device login flow for desktop
-			auth.POST("/device/start", authHandler.DeviceStart)
-			auth.POST("/device/complete", authMiddleware.RequireAuth(), authHandler.DeviceComplete)
-			auth.GET("/device/poll", authHandler.DevicePoll)
 		}
 
 		// Public project routes

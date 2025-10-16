@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 
 	"codepulse-api/internal/database"
@@ -10,6 +12,61 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
+
+type CreateProjectRequest struct {
+	Name        *string         `json:"name"`
+	Description *string         `json:"description"`
+	Path        *string         `json:"path"`
+	Visibility  *string         `json:"visibility"`
+	Settings    *models.JSONMap `json:"settings"`
+}
+
+// CreateProject handles POST /me/projects
+func (h *ProjectHandler) CreateProject(c *gin.Context) {
+	userID, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	var req CreateProjectRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+
+	// Validate visibility if provided
+	if req.Visibility != nil && *req.Visibility != "private" && *req.Visibility != "public" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Visibility must be 'private' or 'public'"})
+		return
+	}
+
+	// Generate project key hash from path (for now, use a simple hash of the path)
+	projectKeyHash := ""
+	if req.Path != nil {
+		projectKeyHash = fmt.Sprintf("%x", sha256.Sum256([]byte(*req.Path)))
+	}
+
+	// Create project
+	project := models.Project{
+		UserID:         userID,
+		ProjectKeyHash: projectKeyHash,
+		Name:           req.Name,
+		Visibility:     "private", // Default to private
+		Settings:       req.Settings,
+	}
+
+	if req.Visibility != nil {
+		project.Visibility = *req.Visibility
+	}
+
+	if err := h.db.DB.Create(&project).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create project"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"project": project})
+}
 
 type ProjectHandler struct {
 	db *database.Database

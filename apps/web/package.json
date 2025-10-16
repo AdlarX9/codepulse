@@ -9,8 +9,6 @@
 		"lint": "next lint"
 	},
 	"dependencies": {
-		"@codepulse/core": "workspace:*",
-		"@codepulse/telemetry": "workspace:*",
 		"@satorijs/satori": "^4.2.5",
 		"@supabase/supabase-js": "^2.43.0",
 		"@types/pg": "^8.15.5",

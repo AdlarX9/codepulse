@@ -17,7 +17,7 @@ import {
 import Dashboard from './Dashboard'
 import { api } from '../lib/api'
 
-// Types locaux temporairement (seront remplacés par @codepulse/core une fois construit)
+// Types locaux définis ici
 interface Project {
 	id: string
 	name: string

@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react'
-import { LogOut, User, Settings as SettingsIcon } from 'lucide-react'
-import { Button } from './components/ui/Button'
 import Projects from './components/Projects'
 import ProjectDetails from './components/ProjectDetails'
 import Dashboard from './components/Dashboard'
@@ -9,24 +7,34 @@ import ProfileManagement from './pages/ProfileManagement'
 import ProjectSettings from './pages/ProjectSettings'
 import { ConsoleOverlay } from './components/ConsoleOverlay'
 import { api, type User as ApiUser } from './lib/api'
-import { open as openExternal } from '@tauri-apps/api/shell'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
 import type { ScanResult, UserSettings } from './types'
+import AuthPage from './pages/Auth'
 
 type User = ApiUser
 
 function App() {
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
 	const [currentView, setCurrentView] = useState<
-		'welcome' | 'projects' | 'project-details' | 'profile' | 'project-settings' | 'analysis'
+		| 'welcome'
+		| 'projects'
+		| 'project-details'
+		| 'profile'
+		| 'project-settings'
+		| 'analysis'
+		| 'auth'
 	>('welcome')
 	const [previousView, setPreviousView] = useState<
-		'welcome' | 'projects' | 'project-details' | 'profile' | 'project-settings' | 'analysis'
+		| 'welcome'
+		| 'projects'
+		| 'project-details'
+		| 'profile'
+		| 'project-settings'
+		| 'analysis'
+		| 'auth'
 	>('welcome')
 	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
-	const [_authError, setAuthError] = useState<string | null>(null) // Reserved for future auth error display
-	const [authLoading, setAuthLoading] = useState(false)
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 	const [scanPath, setScanPath] = useState<string>('')
 
@@ -52,6 +60,7 @@ function App() {
 			| 'profile'
 			| 'project-settings'
 			| 'analysis'
+			| 'auth'
 	) {
 		if (view !== currentView) {
 			setPreviousView(currentView)
@@ -91,70 +100,14 @@ function App() {
 		changeView('welcome')
 	}
 
-	async function startDeviceLogin() {
-		setAuthLoading(true)
-		try {
-			const { code } = await api.authDeviceStart()
-			// open web sign-in with device_code
-			const url = `${api.WEB_BASE}/auth/signin?callbackUrl=%2F&device_code=${encodeURIComponent(code)}`
-
-			// Dans les apps Tauri, utiliser openExternal au lieu de window.open
-			// window.open ne fonctionne pas correctement dans les webviews Tauri
-			try {
-				await openExternal(url)
-			} catch (error) {
-				console.warn('Failed to open external URL:', error)
-				// Fallback: essayer de copier l'URL dans le presse-papiers ou afficher une instruction
-				console.log('Please open this URL manually in your browser:', url)
-			}
-
-			// poll until completed
-			const start = Date.now()
-			const timeoutMs = 10 * 60 * 1000 // 10 minutes
-
-			// Ajouter un indicateur de progression
-			console.log('Waiting for authentication...')
-
-			while (Date.now() - start < timeoutMs) {
-				await new Promise(r => setTimeout(r, 2000))
-
-				try {
-					const res = await api.authDevicePoll(code)
-					if (res.completed && res.token) {
-						api.setToken(res.token as unknown as string)
-						const user = await api.getCurrentUser()
-						if (user) {
-							setCurrentUser(user)
-							changeView('projects')
-							console.log('Authentication successful!')
-							break
-						}
-					}
-				} catch (error) {
-					// Silencieusement ignorer les erreurs de polling
-					console.debug('Polling attempt failed:', error)
-				}
-			}
-
-			// Si on arrive ici, c'est que le timeout a été atteint
-			console.warn('Authentication timeout reached')
-		} catch (error) {
-			console.error('Authentication failed:', error)
-			setAuthError('Authentication failed. Please try again.')
-		} finally {
-			setAuthLoading(false)
-		}
-	}
-
 	return (
 		<div className='min-h-screen bg-background'>
 			<ConsoleOverlay />
 			<main>
 				{currentView === 'welcome' && (
 					<WelcomePage
-						onContinueWithAccount={startDeviceLogin}
+						onContinueWithAccount={() => changeView('auth')}
 						onContinueWithoutAccount={handleContinueWithoutAccount}
-						isAuthLoading={authLoading}
 					/>
 				)}
 
@@ -182,35 +135,12 @@ function App() {
 
 				{currentView === 'projects' && (
 					<div className='container mx-auto p-6'>
-						<header className='border-b mb-6'>
-							<div className='flex items-center justify-between px-4 py-3'>
-								<div className='flex items-center gap-2'>
-									<div className='w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold'>
-										CP
-									</div>
-									<h1 className='text-xl font-bold'>CodePulse</h1>
-								</div>
-
-								<div className='flex items-center gap-2'>
-									<div className='flex items-center gap-2 text-sm text-muted-foreground'>
-										<User className='h-4 w-4' />
-										{currentUser?.handle || currentUser?.email || 'Guest'}
-									</div>
-									<Button variant='ghost' size='sm' onClick={handleLogout}>
-										<LogOut className='h-4 w-4' />
-									</Button>
-									<Button
-										variant='ghost'
-										size='sm'
-										onClick={() => changeView('profile')}
-									>
-										<SettingsIcon className='h-4 w-4' />
-									</Button>
-								</div>
-							</div>
-						</header>
-
-						<Projects onProjectSelect={handleProjectSelect} />
+						<Projects
+							onProjectSelect={handleProjectSelect}
+							onLogout={handleLogout}
+							onOpenProfile={() => changeView('profile')}
+							currentUser={currentUser}
+						/>
 					</div>
 				)}
 
@@ -235,6 +165,34 @@ function App() {
 						<ProjectSettings
 							projectId={selectedProjectId}
 							onBack={() => changeView('project-details')}
+						/>
+					</div>
+				)}
+
+				{currentView === 'auth' && (
+					<div className='container mx-auto p-6'>
+						<AuthPage
+							onSuccess={async (user, token) => {
+								try {
+									api.setToken(token)
+									const refreshed = await api.getCurrentUser()
+									if (refreshed) {
+										setCurrentUser(refreshed)
+									} else {
+										setCurrentUser({
+											// minimal mapping fallback
+											id: (user as any).id,
+											email: (user as any).email,
+											handle: (user as any)?.profile?.handle
+										} as any)
+									}
+									changeView('projects')
+								} catch (e) {
+									console.error('Post-auth handling failed:', e)
+									changeView('projects')
+								}
+							}}
+							onBack={() => changeView('welcome')}
 						/>
 					</div>
 				)}

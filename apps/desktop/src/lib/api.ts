@@ -53,18 +53,6 @@ function authHeaders(): Record<string, string> {
 	return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-async function authDeviceStart(): Promise<DeviceStartResponse> {
-	const res = await fetch(`${API_BASE}/auth/device/start`, { method: 'POST' })
-	if (!res.ok) throw new Error('Failed to start device login')
-	return res.json()
-}
-
-async function authDevicePoll(code: string): Promise<DevicePollResponse> {
-	const res = await fetch(`${API_BASE}/auth/device/poll?code=${encodeURIComponent(code)}`)
-	if (!res.ok) throw new Error('Polling failed')
-	return res.json()
-}
-
 async function getCurrentUser(): Promise<User | null> {
 	const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() as HeadersInit })
 	if (!res.ok) return null
@@ -125,21 +113,73 @@ async function deleteProject(id: string): Promise<void> {
 	if (!res.ok) throw new Error('Failed to delete project')
 }
 
+async function createProject(projectData: {
+	name?: string
+	description?: string
+	path?: string
+	visibility?: string
+	settings?: any
+}): Promise<any> {
+	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
+	const res = await fetch(`${API_BASE}/me/projects`, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify(projectData)
+	})
+	if (!res.ok) throw new Error('Failed to create project')
+	return res.json()
+}
+
+async function rescanProject(
+	projectId: string,
+	scanData: {
+		project_key_hash: string
+		totals: {
+			total: number
+			code: number
+			comment: number
+			blank: number
+			core_code_lines: number
+			info_lines: number
+		}
+		per_language: Array<{
+			language: string
+			files: number
+			total: number
+			code: number
+			comment: number
+			blank: number
+		}>
+		device_id: string
+		app_version?: string
+		scanned_at: string
+	}
+): Promise<any> {
+	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
+	const res = await fetch(`${API_BASE}/me/projects/${projectId}/snapshot`, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify(scanData)
+	})
+	if (!res.ok) throw new Error('Failed to save scan snapshot')
+	return res.json()
+}
+
 export const api = {
 	API_BASE,
 	WEB_BASE,
 	getToken,
 	setToken,
 	clearToken,
-	authDeviceStart,
-	authDevicePoll,
 	getCurrentUser,
 	getProjects,
 	getProject,
-	getProfile,
-	updateProfile,
+	createProject,
 	updateProject,
 	deleteProject,
+	rescanProject,
+	getProfile,
+	updateProfile,
 	updateEmail,
 	updatePassword
 }

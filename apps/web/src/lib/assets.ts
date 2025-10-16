@@ -1,4 +1,4 @@
-import type { Platform } from '@codepulse/core'
+type Platform = 'mac' | 'win' | 'linux'
 
 interface AssetInfo {
 	url: string
