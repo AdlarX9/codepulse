@@ -97,10 +97,13 @@ function App() {
 		setSelectedProjectId(null)
 	}
 
-	function handleLogout() {
-		api.clearToken()
-		setCurrentUser(null)
-		changeView('welcome')
+	async function handleLogout() {
+		try {
+			await api.clearToken()
+		} finally {
+			setCurrentUser(null)
+			changeView('welcome')
+		}
 	}
 
 	return (
@@ -143,7 +146,12 @@ function App() {
 						<Projects
 							onProjectSelect={handleProjectSelect}
 							onLogout={handleLogout}
-							onOpenProfile={() => changeView('profile')}
+							onOpenSettings={() => changeView('settings')}
+							onOpenProjectSettings={(id: string) => {
+								setSelectedProjectId(id)
+								changeView('project-settings')
+							}}
+							onStartIndividualScan={selectAndScan}
 							currentUser={currentUser}
 						/>
 					</div>
@@ -179,7 +187,7 @@ function App() {
 						<AuthPage
 							onSuccess={async (user, token) => {
 								try {
-									api.setToken(token)
+									await api.setToken(token)
 									const refreshed = await api.getCurrentUser()
 									if (refreshed) {
 										setCurrentUser(refreshed)

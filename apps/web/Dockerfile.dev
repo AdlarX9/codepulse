@@ -19,24 +19,15 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy workspace configuration files first
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-
-# Copy package.json files for dependencies resolution
-COPY apps/web/package.json ./apps/web/package.json
-COPY packages/core/package.json ./packages/core/package.json
-COPY packages/telemetry/package.json ./packages/telemetry/package.json
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
 
 # Copy source code (now much smaller due to .dockerignore)
-COPY apps/web/ ./apps/web/
-COPY packages/core/ ./packages/core/
-COPY packages/telemetry/ ./packages/telemetry/
+COPY . /app/apps/web/
 
 # Set working directory for the web app
 WORKDIR /app/apps/web
+
+# Install dependencies
+RUN pnpm install
 
 # Expose port
 EXPOSE 3000

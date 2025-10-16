@@ -42,7 +42,7 @@ type Profile struct {
 type Project struct {
 	ID             string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID         string         `json:"user_id" gorm:"type:uuid;not null"`
-	ProjectKeyHash string         `json:"project_key_hash" gorm:"not null"`
+	ProjectKeyHash *string        `json:"project_key_hash" gorm:"index"`
 	Name           *string        `json:"name"`
 	Visibility     string         `json:"visibility" gorm:"type:varchar(10);default:'private';check:visibility IN ('private','public')"`
 	Settings       *JSONMap       `json:"settings" gorm:"type:jsonb"`

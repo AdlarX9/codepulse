@@ -82,7 +82,7 @@ func (h *ScanHandler) SyncScan(c *gin.Context) {
 	// Upsert project
 	project := models.Project{
 		UserID:         user.ID,
-		ProjectKeyHash: payload.ProjectKeyHash,
+		ProjectKeyHash: &payload.ProjectKeyHash,
 	}
 
 	if err := tx.Where("user_id = ? AND project_key_hash = ?", user.ID, payload.ProjectKeyHash).

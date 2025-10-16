@@ -16,6 +16,9 @@ import {
 } from 'lucide-react'
 import Dashboard from './Dashboard'
 import { api } from '../lib/api'
+import { invoke } from '@tauri-apps/api/tauri'
+import { open as openDialog } from '@tauri-apps/api/dialog'
+import type { ScanResult, UserSettings } from '@/types'
 
 // Types locaux définis ici
 interface Project {
@@ -52,7 +55,7 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 	const [scanning, setScanning] = useState(false)
-	const [scanResult, setScanResult] = useState<any>(null)
+	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 
 	useEffect(() => {
 		loadProject()
@@ -62,17 +65,15 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 		try {
 			setLoading(true)
 			setError(null)
-
-			const data = await api.getProject(projectId)
-			const p = data.project || data
-			const scans = Array.isArray(p.scans) ? p.scans : []
-			const latest = scans.length > 0 ? scans[0] : null
-
+			const data = await api.getProjectDetails(projectId)
+			const p = data.project || {}
+			const latest = data?.stats?.latest_scan || null
+			let boundPath = await invoke<string | null>('get_project_binding', { projectId: projectId })
 			const mapped: Project = {
 				id: p.id,
 				name: p.name || 'Project',
-				path: '',
-				description: undefined,
+				path: boundPath || '',
+				description: p.description || undefined,
 				createdAt: p.created_at,
 				updatedAt: p.updated_at,
 				userId: p.user_id,
@@ -88,7 +89,6 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 						}
 					: undefined
 			}
-
 			setProject(mapped)
 		} catch (err) {
 			setError('Failed to load project')
@@ -100,50 +100,64 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 
 	async function startScan() {
 		if (!project) return
-
 		try {
 			setScanning(true)
-
-			// Mock scan - in production this would call your Tauri backend
-			await new Promise(resolve => setTimeout(resolve, 3000))
-
-			const mockScanResult = {
-				totalFiles: 156,
-				totalLines: 12543,
-				totalCode: 8934,
-				totalComments: 2341,
-				commentPercentage: 18.7,
-				codePercentage: 71.2,
-				languages: {
-					TypeScript: { files: 89, total: 8934, blank: 1234, comment: 2341, code: 8934 },
-					JavaScript: { files: 12, total: 1200, blank: 100, comment: 200, code: 900 },
-					CSS: { files: 8, total: 800, blank: 50, comment: 100, code: 650 }
-				},
-				files: [
-					{
-						path: 'src/App.tsx',
-						language: 'TypeScript',
-						total: 286,
-						blank: 23,
-						comment: 45,
-						code: 218
-					},
-					{
-						path: 'src/components/Dashboard.tsx',
-						language: 'TypeScript',
-						total: 269,
-						blank: 18,
-						comment: 32,
-						code: 219
-					}
-				],
-				duration_ms: 2300,
-				mean: 80.3,
-				median: 75.0,
-				std_dev: 45.2
+			// Ensure path binding
+			let boundPath = await invoke<string | null>('get_project_binding', { projectId: project.id })
+			if (!boundPath) {
+				const selected = (await openDialog({ directory: true, multiple: false })) as string | null
+				if (!selected) {
+					setScanning(false)
+					return
+				}
+				await invoke('set_project_binding', { projectId: project.id, basePath: selected })
+				boundPath = selected
 			}
-
-			setScanResult(mockScanResult)
+			// Merge settings
+			const settings = await invoke<UserSettings>('get_settings')
+			try {
+				const details = await api.getProject(projectId)
+				const p = details.project || details
+				const ps = (p.settings as any) || {}
+				const overrideKeys: (keyof UserSettings)[] = [
+					'excluded_dirs',
+					'excluded_extensions',
+					'excluded_patterns',
+					'follow_symlinks',
+					'excluded_languages',
+					'allowed_languages'
+				]
+				for (const k of overrideKeys) if (ps && ps[k] !== undefined) (settings as any)[k] = ps[k]
+			} catch {}
+			// Run scan
+			const result = await invoke<ScanResult>('scan_directory', { path: boundPath, settings })
+			setScanResult(result)
+			// Send snapshot
+			const project_key_hash = await invoke<string>('compute_project_key_hash', { basePath: boundPath })
+			await api.rescanProject(project.id, {
+				project_key_hash,
+				totals: {
+					total: result.total_lines,
+					code: result.total_code,
+					comment: result.total_comments,
+					blank: result.total_blank,
+					core_code_lines: result.total_code,
+					info_lines: result.total_comments + result.total_blank
+				},
+				per_language: Object.entries(result.languages || {}).map(([language, stats]: [string, any]) => ({
+					language,
+					files: (stats as any).files,
+					total: (stats as any).total,
+					code: (stats as any).code,
+					comment: (stats as any).comment,
+					blank: (stats as any).blank
+				})),
+				device_id: settings.device_id,
+				app_version: '1.0.0',
+				scanned_at: Math.floor(Date.now() / 1000).toString()
+			})
+			// Reload brief info
+			await loadProject()
 		} catch (err) {
 			console.error('Error scanning project:', err)
 		} finally {

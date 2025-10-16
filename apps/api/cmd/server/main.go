@@ -114,6 +114,9 @@ func main() {
 			// Project Details
 			me.GET("/projects/:id/details", projectHandler.GetProjectDetails)
 
+			// Project Scans (snapshot)
+			me.POST("/projects/:id/snapshot", scanHandler.CreateSnapshot)
+
 			// Read/Update Profile
 			me.GET("/profile", authHandler.GetProfile)
 			me.PATCH("/profile", authHandler.UpdateProfile)

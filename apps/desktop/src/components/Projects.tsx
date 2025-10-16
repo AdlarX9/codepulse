@@ -44,19 +44,27 @@ interface Project {
 interface ProjectsProps {
 	onProjectSelect?: (project: Project) => void
 	onLogout?: () => void
-	onOpenProfile?: () => void
+	onOpenSettings?: () => void
+	onOpenProjectSettings?: (projectId: string) => void
+	onStartIndividualScan?: () => Promise<void>
 	currentUser?: any
 }
 
 export default function Projects({
 	onProjectSelect,
 	onLogout,
-	onOpenProfile,
+	onOpenSettings,
+	onOpenProjectSettings,
+	onStartIndividualScan,
 	currentUser
 }: ProjectsProps) {
 	const [projects, setProjects] = useState<Project[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
+	const [showAddProjectModal, setShowAddProjectModal] = useState(false)
+	const [selectedPath, setSelectedPath] = useState<string | null>(null)
+	const [projectName, setProjectName] = useState('')
+	const [projectDescription, setProjectDescription] = useState('')
 
 	useEffect(() => {
 		loadProjects()
@@ -111,38 +119,105 @@ export default function Projects({
 
 	async function handleAddProject() {
 		try {
-			// For now, create a project with a default name
-			// In the future, this could open a dialog for project details
+			// Select folder path
+			const path = await openDialog({ directory: true, multiple: false }) as string | null
+			if (!path) return // User cancelled
+
+			setSelectedPath(path)
+			setProjectName(`Project ${new Date().toLocaleDateString()}`)
+			setProjectDescription('Created from desktop app')
+			setShowAddProjectModal(true)
+		} catch (err) {
+			console.error('Error selecting folder:', err)
+		}
+	}
+
+	async function handleConfirmAddProject() {
+		if (!selectedPath || !projectName.trim()) return
+
+		try {
 			const projectData = {
-				name: `Project ${new Date().toLocaleDateString()}`,
-				description: 'Created from desktop app'
+				name: projectName.trim(),
+				description: projectDescription.trim() || 'Created from desktop app',
+				path: selectedPath
 			}
 
 			const result = await api.createProject(projectData)
 			if (result.project) {
+				// Set the project binding to the selected path
+				await invoke('set_project_binding', { projectId: result.project.id, basePath: selectedPath })
+
 				// Reload projects to show the new one
 				loadProjects()
+
+				// Automatically scan the newly created project
+				await handleScanProject(result.project)
+
+				// Redirect to project details page
+				onProjectSelect?.(result.project)
 			}
+
+			// Close modal
+			setShowAddProjectModal(false)
+			setSelectedPath(null)
+			setProjectName('')
+			setProjectDescription('')
 		} catch (err) {
 			console.error('Error creating project:', err)
 		}
 	}
 
+	function handleCancelAddProject() {
+		setShowAddProjectModal(false)
+		setSelectedPath(null)
+		setProjectName('')
+		setProjectDescription('')
+	}
+
 	async function handleScanProject(project: Project) {
 		try {
-			// Get settings for the scan
+			// Resolve local binding path for this project
+			let boundPath = await invoke<string | null>('get_project_binding', { projectId: project.id })
+			if (!boundPath) {
+				const selected = (await openDialog({ directory: true, multiple: false })) as string | null
+				if (!selected) return
+				await invoke('set_project_binding', { projectId: project.id, basePath: selected })
+				boundPath = selected
+			}
+
+			// Get global settings and merge with project-level settings if any
 			const settings = await invoke<UserSettings>('get_settings')
+			try {
+				const projectData = await api.getProject(project.id)
+				const p = projectData.project || projectData
+				const ps = (p.settings as any) || {}
+				// Overlay known keys if present
+				const overrideKeys: (keyof UserSettings)[] = [
+					'excluded_dirs',
+					'excluded_extensions',
+					'excluded_patterns',
+					'follow_symlinks',
+					'excluded_languages',
+					'allowed_languages'
+				]
+				for (const k of overrideKeys) {
+					if (ps && ps[k] !== undefined) {
+						;(settings as any)[k] = ps[k]
+					}
+				}
+			} catch {}
 
 			// Perform scan using Tauri backend
 			const result = await invoke<ScanResult>('scan_directory', {
-				path: project.path, // This should be the project path, but we don't have it in the current data model
+				path: boundPath,
 				settings
 			})
 
 			// Save scan snapshot to backend
 			if (result) {
+				const project_key_hash = await invoke<string>('compute_project_key_hash', { basePath: boundPath })
 				await api.rescanProject(project.id, {
-					project_key_hash: project.id, // Using project ID as key hash for now
+					project_key_hash,
 					totals: {
 						total: result.total_lines,
 						code: result.total_code,
@@ -161,13 +236,16 @@ export default function Projects({
 							blank: stats.blank
 						})
 					),
-					device_id: 'desktop-app',
+					device_id: settings.device_id,
 					app_version: '1.0.0',
 					scanned_at: Math.floor(Date.now() / 1000).toString()
 				})
 
 				// Reload projects to show updated scan data
 				loadProjects()
+
+				// Redirect to project details page after scan
+				onProjectSelect?.(project)
 			}
 		} catch (err) {
 			console.error('Error scanning project:', err)
@@ -175,59 +253,8 @@ export default function Projects({
 	}
 
 	async function handleManualScan() {
-		try {
-			// Allow user to select a folder to scan (like the non-authenticated flow)
-			const selected = (await openDialog({ directory: true, multiple: false })) as
-				| string
-				| null
-			if (!selected) return
-
-			const settings = await invoke<UserSettings>('get_settings')
-			const result = await invoke<ScanResult>('scan_directory', { path: selected, settings })
-
-			// Create a new project with the scan data
-			if (result) {
-				const projectData = {
-					name: `Scanned ${new Date().toLocaleDateString()}`,
-					path: selected,
-					description: 'Created from manual scan'
-				}
-
-				const projectResult = await api.createProject(projectData)
-				if (projectResult.project) {
-					// Save the scan data
-					await api.rescanProject(projectResult.project.id, {
-						project_key_hash: projectResult.project.id,
-						totals: {
-							total: result.total_lines,
-							code: result.total_code,
-							comment: result.total_comments,
-							blank: result.total_blank,
-							core_code_lines: result.total_code,
-							info_lines: result.total_comments + result.total_blank
-						},
-						per_language: Object.entries(result.languages || {}).map(
-							([language, stats]: [string, any]) => ({
-								language,
-								files: stats.files,
-								total: stats.total,
-								code: stats.code,
-								comment: stats.comment,
-								blank: stats.blank
-							})
-						),
-						device_id: 'desktop-app',
-						app_version: '1.0.0',
-						scanned_at: Math.floor(Date.now() / 1000).toString()
-					})
-
-					// Reload projects to show the new one
-					loadProjects()
-				}
-			}
-		} catch (err) {
-			console.error('Error in manual scan:', err)
-		}
+		// On Projects page, Scan Folder must perform an individual scan (no project creation)
+		if (onStartIndividualScan) await onStartIndividualScan()
 	}
 
 	function formatDate(dateString: string) {
@@ -275,7 +302,7 @@ export default function Projects({
 						<Button variant='ghost' size='sm' onClick={onLogout}>
 							<LogOut className='h-4 w-4' />
 						</Button>
-						<Button variant='ghost' size='sm' onClick={onOpenProfile}>
+						<Button variant='ghost' size='sm' onClick={onOpenSettings}>
 							<SettingsIcon className='h-4 w-4' />
 						</Button>
 					</div>
@@ -330,7 +357,14 @@ export default function Projects({
 										)}
 									</div>
 									<div className='flex gap-1'>
-										<Button variant='ghost' size='sm'>
+										<Button
+											variant='ghost'
+											size='sm'
+											onClick={e => {
+												e.stopPropagation()
+												onOpenProjectSettings?.(project.id)
+											}}
+										>
 											<Settings className='h-4 w-4' />
 										</Button>
 										<Button
@@ -366,8 +400,8 @@ export default function Projects({
 										<div className='flex items-center gap-2 text-sm text-muted-foreground'>
 											<BarChart3 className='h-4 w-4' />
 											<span>
-												{formatNumber(project.latestScan.totalFiles)} files,{' '}
-												{formatNumber(project.latestScan.totalLines)} lines
+												{formatNumber(project.latestScan.totalCode)} code lines,{' '}
+												{formatNumber(project.latestScan.totalLines)} total lines
 											</span>
 										</div>
 									)}
@@ -401,6 +435,63 @@ export default function Projects({
 					))}
 				</div>
 			</div>
+
+			{/* Add Project Modal */}
+			{showAddProjectModal && (
+				<div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+					<div className='bg-white rounded-lg shadow-xl max-w-md w-full mx-4'>
+						<div className='p-6'>
+							<h2 className='text-xl font-bold mb-4'>Add New Project</h2>
+
+							<div className='space-y-4'>
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Project Name
+									</label>
+									<input
+										type='text'
+										value={projectName}
+										onChange={(e) => setProjectName(e.target.value)}
+										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+										placeholder='Enter project name'
+									/>
+								</div>
+
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Description (Optional)
+									</label>
+									<input
+										type='text'
+										value={projectDescription}
+										onChange={(e) => setProjectDescription(e.target.value)}
+										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+										placeholder='Enter project description'
+									/>
+								</div>
+
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Folder Path
+									</label>
+									<div className='w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-600'>
+										{selectedPath}
+									</div>
+								</div>
+							</div>
+
+							<div className='flex gap-3 mt-6'>
+								<Button onClick={handleCancelAddProject} variant='outline' className='flex-1'>
+									Cancel
+								</Button>
+								<Button onClick={handleConfirmAddProject} className='flex-1'>
+									Add Project
+								</Button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }

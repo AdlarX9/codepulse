@@ -7,6 +7,7 @@ mod sync;
 mod categories;
 mod updater;
 mod auth;
+mod projects;
 
 use scanner::{ScanResult, to_snapshot};
 use settings::{UserSettings, load_settings, save_settings};
@@ -96,6 +97,26 @@ async fn clear_auth_token() -> Result<(), String> {
     clear_token()
 }
 
+#[tauri::command]
+async fn get_project_binding(projectId: &str) -> Result<Option<String>, String> {
+    projects::get_binding(projectId)
+}
+
+#[tauri::command]
+async fn set_project_binding(projectId: &str, basePath: &str) -> Result<(), String> {
+    projects::set_binding(projectId, basePath)
+}
+
+#[tauri::command]
+async fn clear_project_binding(projectId: &str) -> Result<(), String> {
+    projects::clear_binding(projectId)
+}
+
+#[tauri::command]
+async fn compute_project_key_hash(basePath: &str) -> Result<String, String> {
+    projects::compute_project_key_hash(basePath)
+}
+
 fn main() {
     // Load settings for background tasks
     let settings = load_settings().expect("Failed to load settings");
@@ -138,6 +159,10 @@ fn main() {
             get_auth_token,
             set_auth_token,
             clear_auth_token,
+            get_project_binding,
+            set_project_binding,
+            clear_project_binding,
+            compute_project_key_hash,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

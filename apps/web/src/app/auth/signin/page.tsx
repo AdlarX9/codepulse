@@ -1,18 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { authService } from '@/lib/auth-service'
 import { Code2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
-export default function SignInPage() {
+function SignInPageContent({ callbackUrl, deviceCode }: { callbackUrl: string; deviceCode?: string | null }) {
 	const [formData, setFormData] = useState({ email: '', password: '' })
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState('')
 	const router = useRouter()
-	const searchParams = useSearchParams()
-	const callbackUrl: string = searchParams.get('callbackUrl') ?? '/'
 
 	useEffect(() => {
 		const checkAuth = async () => {
@@ -32,7 +30,6 @@ export default function SignInPage() {
 		try {
 			await authService.signIn(formData.email, formData.password)
 			// Device login completion for desktop app, if requested
-			const deviceCode = searchParams.get('device_code')
 			if (deviceCode) {
 				try {
 					await fetch(
@@ -188,4 +185,20 @@ export default function SignInPage() {
 			</div>
 		</div>
 	)
+}
+
+export default function SignInPage() {
+	return (
+		<Suspense fallback={<div>Loading...</div>}>
+			<SearchParamsHandler />
+		</Suspense>
+	)
+}
+
+function SearchParamsHandler() {
+	const searchParams = useSearchParams()
+	const callbackUrl: string = searchParams.get('callbackUrl') ?? '/'
+	const deviceCode = searchParams.get('device_code')
+
+	return <SignInPageContent callbackUrl={callbackUrl} deviceCode={deviceCode} />
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"codepulse-api/internal/database"
 	"codepulse-api/internal/middleware"
@@ -42,16 +43,23 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		return
 	}
 
-	// Generate project key hash from path (for now, use a simple hash of the path)
+	// Generate project key hash from path or create a unique one
 	projectKeyHash := ""
 	if req.Path != nil {
 		projectKeyHash = fmt.Sprintf("%x", sha256.Sum256([]byte(*req.Path)))
+	} else {
+		// Generate a unique hash for projects without path (e.g., using user ID and timestamp)
+		uniqueData := fmt.Sprintf("%s-%d", userID, time.Now().UnixNano())
+		projectKeyHash = fmt.Sprintf("%x", sha256.Sum256([]byte(uniqueData)))
 	}
+
+	// Delete any existing project with the same user_id and project_key_hash to allow recreation
+	h.db.DB.Unscoped().Where("user_id = ? AND project_key_hash = ?", userID, projectKeyHash).Delete(&models.Project{})
 
 	// Create project
 	project := models.Project{
 		UserID:         userID,
-		ProjectKeyHash: projectKeyHash,
+		ProjectKeyHash: &projectKeyHash,
 		Name:           req.Name,
 		Visibility:     "private", // Default to private
 		Settings:       req.Settings,
@@ -62,7 +70,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	}
 
 	if err := h.db.DB.Create(&project).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create project"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

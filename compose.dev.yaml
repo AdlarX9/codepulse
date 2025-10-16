@@ -66,15 +66,15 @@ services:
     # Next.js Web App with hot reload
     web:
         build:
-            context: .
-            dockerfile: apps/web/Dockerfile.dev
+            context: ./apps/web
+            dockerfile: Dockerfile.dev
         container_name: codepulse-web-dev
         ports:
             - '3000:3000'
         working_dir: /app/apps/web
         command: ['pnpm', 'dev', '-p', '3000', '-H', '0.0.0.0']
         volumes:
-            - .:/app
+            - ./apps/web:/app/apps/web
             - /app/node_modules
             - /app/apps/web/.next
         environment:
