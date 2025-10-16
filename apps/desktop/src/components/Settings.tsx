@@ -7,10 +7,10 @@ import { Autocomplete } from './ui/Autocomplete'
 import type { UserSettings } from '../types'
 import { ALL_LANGUAGES, COMMON_EXCLUDED_LANGUAGES } from '../constants/languages'
 interface SettingsProps {
-	onClose: () => void
+	onBack: () => void
 }
 
-export default function Settings({ onClose }: SettingsProps) {
+export default function Settings({ onBack }: SettingsProps) {
 	const [settings, setSettings] = useState<UserSettings>({
 		excluded_dirs: [],
 		excluded_extensions: [],
@@ -54,7 +54,7 @@ export default function Settings({ onClose }: SettingsProps) {
 		setSaving(true)
 		try {
 			await invoke('update_settings', { settings })
-			onClose()
+			onBack()
 		} catch (error) {
 			console.error('Failed to save settings:', error)
 			alert(`Failed to save settings: ${error}`)
@@ -100,7 +100,7 @@ export default function Settings({ onClose }: SettingsProps) {
 			<div className='max-w-5xl mx-auto'>
 				<div className='flex items-center justify-between mb-6'>
 					<h1 className='text-3xl font-bold'>Settings</h1>
-					<Button variant='ghost' size='sm' onClick={onClose}>
+					<Button variant='ghost' size='sm' onClick={onBack}>
 						<X className='h-5 w-5' />
 					</Button>
 				</div>
@@ -551,7 +551,7 @@ export default function Settings({ onClose }: SettingsProps) {
 
 					{/* Actions */}
 					<div className='flex justify-end gap-3'>
-						<Button variant='outline' onClick={onClose}>
+						<Button variant='outline' onClick={onBack}>
 							Cancel
 						</Button>
 						<Button onClick={saveSettings} disabled={saving}>

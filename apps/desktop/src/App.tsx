@@ -3,13 +3,13 @@ import Projects from './components/Projects'
 import ProjectDetails from './components/ProjectDetails'
 import Dashboard from './components/Dashboard'
 import WelcomePage from './pages/Welcome'
-import ProfileManagement from './pages/ProfileManagement'
 import ProjectSettings from './pages/ProjectSettings'
 import { ConsoleOverlay } from './components/ConsoleOverlay'
 import { api, type User as ApiUser } from './lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
 import type { ScanResult, UserSettings } from './types'
+import SettingsPage from './components/Settings'
 import AuthPage from './pages/Auth'
 
 type User = ApiUser
@@ -22,6 +22,7 @@ function App() {
 		| 'project-details'
 		| 'profile'
 		| 'project-settings'
+		| 'settings'
 		| 'analysis'
 		| 'auth'
 	>('welcome')
@@ -31,6 +32,7 @@ function App() {
 		| 'project-details'
 		| 'profile'
 		| 'project-settings'
+		| 'settings'
 		| 'analysis'
 		| 'auth'
 	>('welcome')
@@ -59,6 +61,7 @@ function App() {
 			| 'project-details'
 			| 'profile'
 			| 'project-settings'
+			| 'settings'
 			| 'analysis'
 			| 'auth'
 	) {
@@ -108,6 +111,7 @@ function App() {
 					<WelcomePage
 						onContinueWithAccount={() => changeView('auth')}
 						onContinueWithoutAccount={handleContinueWithoutAccount}
+						onOpenSettings={() => changeView('settings')}
 					/>
 				)}
 
@@ -129,6 +133,7 @@ function App() {
 								})
 								setScanResult(result)
 							}}
+							onOpenSettings={() => changeView('settings')}
 						/>
 					</div>
 				)}
@@ -154,9 +159,9 @@ function App() {
 					</div>
 				)}
 
-				{currentView === 'profile' && (
+				{currentView === 'settings' && (
 					<div className='container mx-auto p-6'>
-						<ProfileManagement onBack={() => changeView('projects')} />
+						<SettingsPage onBack={() => changeView(previousView)} />
 					</div>
 				)}
 

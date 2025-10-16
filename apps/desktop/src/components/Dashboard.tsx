@@ -20,7 +20,8 @@ import {
 	ChevronDown,
 	ChevronRight,
 	RefreshCw,
-	FolderOpen
+	FolderOpen,
+	Settings
 } from 'lucide-react'
 import { Button } from './ui/Button'
 import { Card } from './ui/Card'
@@ -32,11 +33,12 @@ interface DashboardProps {
 	onReset: () => void
 	onRescan?: () => void
 	onChooseFolder?: () => void
+	onOpenSettings?: () => void
 }
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6']
 
-export default function Dashboard({ result, onReset, onRescan, onChooseFolder }: DashboardProps) {
+export default function Dashboard({ result, onReset, onRescan, onChooseFolder, onOpenSettings }: DashboardProps) {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [languageFilter, setLanguageFilter] = useState<string | null>(null)
 	const [showFileDetails, setShowFileDetails] = useState(false) // Collapsed by default
@@ -76,7 +78,7 @@ export default function Dashboard({ result, onReset, onRescan, onChooseFolder }:
 						</p>
 					</div>
 				</div>
-				{(onChooseFolder || onRescan) && (
+				{(onChooseFolder || onRescan || onOpenSettings) && (
 					<div className='flex gap-2'>
 						{onChooseFolder && (
 							<Button variant='outline' size='sm' onClick={onChooseFolder}>
@@ -88,6 +90,12 @@ export default function Dashboard({ result, onReset, onRescan, onChooseFolder }:
 							<Button variant='outline' size='sm' onClick={onRescan}>
 								<RefreshCw className='h-4 w-4 mr-2' />
 								Rescan
+							</Button>
+						)}
+						{onOpenSettings && (
+							<Button variant='outline' size='sm' onClick={onOpenSettings}>
+								<Settings className='h-4 w-4 mr-2' />
+								Settings
 							</Button>
 						)}
 					</div>

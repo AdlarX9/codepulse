@@ -152,45 +152,6 @@ func (h *ScanHandler) SyncScan(c *gin.Context) {
 	})
 }
 
-// GetScans handles GET /projects/:id/scans
-func (h *ScanHandler) GetScans(c *gin.Context) {
-	projectID := c.Param("id")
-	userID, exists := middleware.GetCurrentUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	// Verify project ownership
-	var project models.Project
-	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
-		return
-	}
-
-	// Get scans with language stats
-	var scans []models.Scan
-	query := h.db.DB.Where("project_id = ?", projectID).
-		Preload("ScanLangs").
-		Order("created_at DESC")
-
-	// Add pagination
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset := (page - 1) * limit
-
-	if err := query.Offset(offset).Limit(limit).Find(&scans).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch scans"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"scans": scans,
-		"page":  page,
-		"limit": limit,
-	})
-}
-
 // CreateSnapshot handles POST /projects/:id/snapshot
 func (h *ScanHandler) CreateSnapshot(c *gin.Context) {
 	projectID := c.Param("id")

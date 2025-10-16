@@ -104,15 +104,17 @@ func main() {
 		me.Use(authMiddleware.RequireAuth())
 		{
 			me.GET("/projects", projectHandler.GetProjects)
+
+			// CRUD Projects
 			me.POST("/projects", projectHandler.CreateProject)
 			me.GET("/projects/:id", projectHandler.GetProject)
 			me.PATCH("/projects/:id", projectHandler.UpdateProject)
 			me.DELETE("/projects/:id", projectHandler.DeleteProject)
-			me.GET("/projects/:id/scans", scanHandler.GetScans)
-			me.POST("/projects/:id/snapshot", scanHandler.CreateSnapshot)
-			me.GET("/projects/:id/stats", projectHandler.GetProjectStats)
 
-			// Profile management
+			// Project Details
+			me.GET("/projects/:id/details", projectHandler.GetProjectDetails)
+
+			// Read/Update Profile
 			me.GET("/profile", authHandler.GetProfile)
 			me.PATCH("/profile", authHandler.UpdateProfile)
 		}
@@ -120,12 +122,13 @@ func main() {
 		// Public routes
 		auth := api.Group("/auth")
 		{
+			// Auth
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/logout", authHandler.Logout)
 			auth.GET("/me", authMiddleware.RequireAuth(), authHandler.Me)
-			auth.PUT("/email", authMiddleware.RequireAuth(), authHandler.UpdateEmail)
-			auth.PUT("/password", authMiddleware.RequireAuth(), authHandler.UpdatePassword)
+
+			// Account Management
 			auth.DELETE("/account", authMiddleware.RequireAuth(), authHandler.DeleteAccount)
 		}
 

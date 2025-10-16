@@ -1,3 +1,5 @@
+import { invoke } from '@tauri-apps/api/tauri'
+
 export interface User {
 	id: string
 	email: string
@@ -5,25 +7,18 @@ export interface User {
 	created_at?: string
 }
 
-async function updateEmail(new_email: string, password: string): Promise<void> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
-	const res = await fetch(`${API_BASE}/auth/email`, {
-		method: 'PUT',
+async function updateProfile(body: any): Promise<any> {
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
+	const res = await fetch(`${API_BASE}/me/profile`, {
+		method: 'PATCH',
 		headers,
-		body: JSON.stringify({ new_email, password })
+		body: JSON.stringify(body)
 	})
-	if (!res.ok) throw new Error('Failed to update email')
+	if (!res.ok) throw new Error('Failed to update profile')
+	return res.json()
 }
 
-async function updatePassword(current_password: string, new_password: string): Promise<void> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
-	const res = await fetch(`${API_BASE}/auth/password`, {
-		method: 'PUT',
-		headers,
-		body: JSON.stringify({ current_password, new_password })
-	})
-	if (!res.ok) throw new Error('Failed to update password')
-}
 export interface DeviceStartResponse {
 	code: string
 	expires_at: string
@@ -38,30 +33,49 @@ export const API_BASE: string =
 export const WEB_BASE: string =
 	(import.meta as any).env?.VITE_WEB_BASE_URL || 'http://localhost:3000'
 
-function getToken(): string | null {
-	return localStorage.getItem('auth-token')
-}
-function setToken(token: string) {
-	localStorage.setItem('auth-token', token)
-}
-function clearToken() {
-	localStorage.removeItem('auth-token')
+async function getToken(): Promise<string | null> {
+	try {
+		const token = await invoke<string | null>('get_auth_token')
+		return token
+	} catch (error) {
+		console.error('Failed to get token:', error)
+		return null
+	}
 }
 
-function authHeaders(): Record<string, string> {
-	const token = getToken()
+async function setToken(token: string): Promise<void> {
+	try {
+		await invoke('set_auth_token', { token })
+	} catch (error) {
+		console.error('Failed to set token:', error)
+		throw error
+	}
+}
+
+async function clearToken(): Promise<void> {
+	try {
+		await invoke('clear_auth_token')
+	} catch (error) {
+		console.error('Failed to clear token:', error)
+		throw error
+	}
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+	const token = await getToken()
 	return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 async function getCurrentUser(): Promise<User | null> {
-	const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() as HeadersInit })
+	const headers = await getAuthHeaders()
+	const res = await fetch(`${API_BASE}/auth/me`, { headers })
 	if (!res.ok) return null
 	const data = await res.json()
 	return data.user as User
 }
 
 async function getProjects(): Promise<any[]> {
-	const headers: Record<string, string> = { 'Content-Type': 'application/json', ...authHeaders() }
+	const headers = await getAuthHeaders()
 	const res = await fetch(`${API_BASE}/me/projects`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch projects')
 	const data = await res.json()
@@ -69,33 +83,29 @@ async function getProjects(): Promise<any[]> {
 }
 
 async function getProject(id: string): Promise<any> {
-	const res = await fetch(`${API_BASE}/me/projects/${id}`, {
-		headers: authHeaders() as HeadersInit
-	})
+	const headers = await getAuthHeaders()
+	const res = await fetch(`${API_BASE}/me/projects/${id}`, { headers })
+	if (!res.ok) throw new Error('Project not found')
+	return res.json()
+}
+
+async function getProjectDetails(id: string): Promise<any> {
+	const headers = await getAuthHeaders()
+	const res = await fetch(`${API_BASE}/me/projects/${id}/details`, { headers })
 	if (!res.ok) throw new Error('Project not found')
 	return res.json()
 }
 
 async function getProfile(): Promise<any> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
+	const headers = await getAuthHeaders()
 	const res = await fetch(`${API_BASE}/me/profile`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch profile')
 	return res.json()
 }
 
-async function updateProfile(body: any): Promise<any> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
-	const res = await fetch(`${API_BASE}/me/profile`, {
-		method: 'PATCH',
-		headers,
-		body: JSON.stringify(body)
-	})
-	if (!res.ok) throw new Error('Failed to update profile')
-	return res.json()
-}
-
 async function updateProject(id: string, body: any): Promise<any> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
 	const res = await fetch(`${API_BASE}/me/projects/${id}`, {
 		method: 'PATCH',
 		headers,
@@ -106,9 +116,10 @@ async function updateProject(id: string, body: any): Promise<any> {
 }
 
 async function deleteProject(id: string): Promise<void> {
+	const headers = await getAuthHeaders()
 	const res = await fetch(`${API_BASE}/me/projects/${id}`, {
 		method: 'DELETE',
-		headers: authHeaders() as HeadersInit
+		headers
 	})
 	if (!res.ok) throw new Error('Failed to delete project')
 }
@@ -120,7 +131,8 @@ async function createProject(projectData: {
 	visibility?: string
 	settings?: any
 }): Promise<any> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
 	const res = await fetch(`${API_BASE}/me/projects`, {
 		method: 'POST',
 		headers,
@@ -155,7 +167,8 @@ async function rescanProject(
 		scanned_at: string
 	}
 ): Promise<any> {
-	const headers: Record<string, string> = { ...authHeaders(), 'Content-Type': 'application/json' }
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
 	const res = await fetch(`${API_BASE}/me/projects/${projectId}/snapshot`, {
 		method: 'POST',
 		headers,
@@ -174,12 +187,11 @@ export const api = {
 	getCurrentUser,
 	getProjects,
 	getProject,
+	getProjectDetails,
 	createProject,
 	updateProject,
 	deleteProject,
 	rescanProject,
 	getProfile,
-	updateProfile,
-	updateEmail,
-	updatePassword
+	updateProfile
 }

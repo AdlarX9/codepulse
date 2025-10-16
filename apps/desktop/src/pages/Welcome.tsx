@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Code2, ArrowRight, User, FolderOpen, ShieldCheck, Sparkles } from 'lucide-react'
+import { Code2, ArrowRight, User, FolderOpen, ShieldCheck, Sparkles, Settings } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
 
 interface WelcomePageProps {
 	onContinueWithAccount: () => void
 	onContinueWithoutAccount: () => void
+	onOpenSettings?: () => void
 }
 
 export default function WelcomePage({
 	onContinueWithAccount,
-	onContinueWithoutAccount
+	onContinueWithoutAccount,
+	onOpenSettings
 }: WelcomePageProps) {
 	const [hoveringAnalyze, setHoveringAnalyze] = useState(false)
 
@@ -59,6 +61,10 @@ export default function WelcomePage({
 				<Button variant='ghost' onClick={onContinueWithAccount} className='gap-2'>
 					<User className='h-4 w-4' />
 					Sign in
+				</Button>
+				<Button variant='ghost' onClick={onOpenSettings} className='gap-2'>
+					<Settings className='h-4 w-4' />
+					Settings
 				</Button>
 			</header>
 

@@ -54,51 +54,138 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		Bio         *string         `json:"bio"`
 		Links       *models.JSONMap `json:"links"`
 		Visibility  *string         `json:"visibility"`
+		Email       *string         `json:"email"`
+		Password    *string         `json:"password"`
+		CurrentPassword *string     `json:"current_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
 		return
 	}
 
+	// Validate profile visibility if provided
 	if req.Visibility != nil && *req.Visibility != "private" && *req.Visibility != "public" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Visibility must be 'private' or 'public'"})
 		return
 	}
 
-	updates := map[string]interface{}{}
+	// Start transaction for potential multiple updates
+	tx := h.db.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Update profile fields
+	profileUpdates := map[string]interface{}{}
 	if req.DisplayName != nil {
-		updates["display_name"] = *req.DisplayName
+		profileUpdates["display_name"] = *req.DisplayName
 	}
 	if req.AvatarURL != nil {
-		updates["avatar_url"] = *req.AvatarURL
+		profileUpdates["avatar_url"] = *req.AvatarURL
 	}
 	if req.Bio != nil {
-		updates["bio"] = *req.Bio
+		profileUpdates["bio"] = *req.Bio
 	}
 	if req.Links != nil {
-		updates["links"] = *req.Links
+		profileUpdates["links"] = *req.Links
 	}
 	if req.Visibility != nil {
-		updates["visibility"] = *req.Visibility
+		profileUpdates["visibility"] = *req.Visibility
 	}
 
-	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
+	// Update profile if there are profile fields to update
+	if len(profileUpdates) > 0 {
+		if err := tx.Model(&models.Profile{}).Where("user_id = ?", user.ID).Updates(profileUpdates).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+			return
+		}
+	}
+
+	// Update email if provided
+	if req.Email != nil {
+		// Verify current password if email is being changed
+		if req.CurrentPassword == nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Current password required to update email"})
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.CurrentPassword)); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password"})
+			return
+		}
+
+		// Check if new email is already taken
+		var existingUser models.User
+		if err := tx.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+			tx.Rollback()
+			c.JSON(http.StatusConflict, gin.H{"error": "Email already in use"})
+			return
+		}
+
+		// Update email
+		if err := tx.Model(user).Update("email", req.Email).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
+			return
+		}
+	}
+
+	// Update password if provided
+	if req.Password != nil {
+		// Verify current password if password is being changed
+		if req.CurrentPassword == nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Current password required to update password"})
+			return
+		}
+
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.CurrentPassword)); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password"})
+			return
+		}
+
+		// Hash new password
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+			return
+		}
+
+		// Update password
+		if err := tx.Model(user).Update("password", string(hashedPassword)).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
+			return
+		}
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
 		return
 	}
 
-	if err := h.db.DB.Model(&models.Profile{}).Where("user_id = ?", user.ID).Updates(updates).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+	// Reload updated user and profile
+	var updatedUser models.User
+	if err := h.db.DB.Preload("Profile").Where("id = ?", user.ID).First(&updatedUser).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload user data"})
 		return
 	}
 
-	var profile models.Profile
-	if err := h.db.DB.Where("user_id = ?", user.ID).First(&profile).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload profile"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"profile": profile})
+	c.JSON(http.StatusOK, gin.H{
+		"profile": updatedUser.Profile,
+		"user": gin.H{
+			"id":    updatedUser.ID,
+			"email": updatedUser.Email,
+		},
+	})
 }
 
 func NewAuthHandler(db *database.Database, cfg *config.Config) *AuthHandler {
@@ -273,76 +360,14 @@ type UpdatePasswordRequest struct {
 	NewPassword     string `json:"new_password" binding:"required,min=8"`
 }
 
-// UpdateEmail handles PUT /auth/email
+// UpdateEmail handles PUT /auth/email (deprecated - use PATCH /me/profile)
 func (h *AuthHandler) UpdateEmail(c *gin.Context) {
-	var req UpdateEmailRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
-		return
-	}
-
-	user, exists := middleware.GetCurrentUser(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	// Verify current password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password"})
-		return
-	}
-
-	// Check if new email is already taken
-	var existingUser models.User
-	if err := h.db.DB.Where("email = ?", req.NewEmail).First(&existingUser).Error; err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "Email already in use"})
-		return
-	}
-
-	// Update email
-	if err := h.db.DB.Model(user).Update("email", req.NewEmail).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Account deleted successfully"})
+	c.JSON(http.StatusGone, gin.H{"error": "This endpoint is deprecated. Use PATCH /me/profile instead."})
 }
 
-// UpdatePassword handles PUT /auth/password
+// UpdatePassword handles PUT /auth/password (deprecated - use PATCH /me/profile)
 func (h *AuthHandler) UpdatePassword(c *gin.Context) {
-	var req UpdatePasswordRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
-		return
-	}
-
-	user, exists := middleware.GetCurrentUser(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	// Verify current password
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.CurrentPassword)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password"})
-		return
-	}
-
-	// Hash new password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
-		return
-	}
-
-	// Update password
-	if err := h.db.DB.Model(user).Update("password", string(hashedPassword)).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+	c.JSON(http.StatusGone, gin.H{"error": "This endpoint is deprecated. Use PATCH /me/profile instead."})
 }
 
 // DeleteAccount handles DELETE /auth/account

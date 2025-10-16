@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"codepulse-api/internal/database"
 	"codepulse-api/internal/middleware"
@@ -117,9 +118,6 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 
 	var project models.Project
 	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).
-		Preload("Scans", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(10)
-		}).
 		Preload("GitHubLinks").
 		First(&project).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
@@ -235,8 +233,14 @@ func (h *ProjectHandler) GetPublicProject(c *gin.Context) {
 	})
 }
 
-// GetProjectStats handles GET /me/projects/:id/stats
+// GetProjectStats handles GET /me/projects/:id/stats (deprecated - use /details instead)
 func (h *ProjectHandler) GetProjectStats(c *gin.Context) {
+	// This function is deprecated - use GetProjectDetails instead
+	c.Redirect(http.StatusMovedPermanently, "/me/projects/"+c.Param("id")+"/details")
+}
+
+// GetProjectDetails handles GET /me/projects/:id/details
+func (h *ProjectHandler) GetProjectDetails(c *gin.Context) {
 	projectID := c.Param("id")
 	userID, exists := middleware.GetCurrentUserID(c)
 	if !exists {
@@ -244,9 +248,11 @@ func (h *ProjectHandler) GetProjectStats(c *gin.Context) {
 		return
 	}
 
-	// Verify project ownership
+	// Verify project ownership and get basic project info
 	var project models.Project
-	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).First(&project).Error; err != nil {
+	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).
+		Preload("GitHubLinks").
+		First(&project).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
@@ -269,16 +275,41 @@ func (h *ProjectHandler) GetProjectStats(c *gin.Context) {
 			Find(&languageStats)
 	}
 
-	stats := gin.H{
-		"total_scans":    scanCount,
-		"has_scans":      scanCount > 0,
-		"language_stats": languageStats,
-		"latest_scan":    nil,
+	// Get all scans with pagination
+	var scans []models.Scan
+	query := h.db.DB.Where("project_id = ?", projectID).
+		Preload("ScanLangs").
+		Order("created_at DESC")
+
+	// Add pagination
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	offset := (page - 1) * limit
+
+	if err := query.Offset(offset).Limit(limit).Find(&scans).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch scans"})
+		return
+	}
+
+	// Build response combining project info, scans, and statistics
+	response := gin.H{
+		"project": project,
+		"scans":   scans,
+		"stats": gin.H{
+			"total_scans":    scanCount,
+			"has_scans":      scanCount > 0,
+			"language_stats": languageStats,
+			"latest_scan":    nil,
+		},
+		"pagination": gin.H{
+			"page":  page,
+			"limit": limit,
+		},
 	}
 
 	if latestScanExists {
-		stats["latest_scan"] = latestScan
+		response["stats"].(gin.H)["latest_scan"] = latestScan
 	}
 
-	c.JSON(http.StatusOK, stats)
+	c.JSON(http.StatusOK, response)
 }

@@ -6,9 +6,11 @@ mod settings;
 mod sync;
 mod categories;
 mod updater;
+mod auth;
 
 use scanner::{ScanResult, to_snapshot};
 use settings::{UserSettings, load_settings, save_settings};
+use auth::{get_token, set_token, clear_token};
 use tauri::{Window, State};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc};
@@ -79,6 +81,21 @@ async fn check_for_updates() -> Result<updater::UpdateCheck, String> {
     updater::check_for_updates(&mut settings).await
 }
 
+#[tauri::command]
+async fn get_auth_token() -> Result<Option<String>, String> {
+    get_token()
+}
+
+#[tauri::command]
+async fn set_auth_token(token: Option<String>) -> Result<(), String> {
+    set_token(token)
+}
+
+#[tauri::command]
+async fn clear_auth_token() -> Result<(), String> {
+    clear_token()
+}
+
 fn main() {
     // Load settings for background tasks
     let settings = load_settings().expect("Failed to load settings");
@@ -118,6 +135,9 @@ fn main() {
             get_settings,
             update_settings,
             check_for_updates,
+            get_auth_token,
+            set_auth_token,
+            clear_auth_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
