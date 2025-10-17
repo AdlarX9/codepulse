@@ -61,6 +61,9 @@ type Scan struct {
 	ID            string    `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID        string    `json:"user_id" gorm:"type:uuid;not null"`
 	ProjectID     string    `json:"project_id" gorm:"type:uuid;not null"`
+	RepositoryID  *string   `json:"repository_id" gorm:"type:uuid;index"`
+	CommitSHA     *string   `json:"commit_sha" gorm:"index"`
+	PullRequest   *int      `json:"pull_request" gorm:"index"`
 	Total         int       `json:"total" gorm:"not null"`
 	Code          int       `json:"code" gorm:"not null"`
 	Comment       int       `json:"comment" gorm:"not null"`
@@ -74,9 +77,10 @@ type Scan struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 
 	// Relations
-	User      *User      `json:"user,omitempty" gorm:"foreignKey:UserID"`
-	Project   *Project   `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
-	ScanLangs []ScanLang `json:"scan_langs,omitempty" gorm:"foreignKey:ScanID"`
+	User       *User       `json:"user,omitempty" gorm:"foreignKey:UserID"`
+	Project    *Project    `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
+	Repository *Repository `json:"repository,omitempty" gorm:"foreignKey:RepositoryID"`
+	ScanLangs  []ScanLang  `json:"scan_langs,omitempty" gorm:"foreignKey:ScanID"`
 }
 
 // ScanLang represents programming language statistics for a scan
@@ -178,4 +182,122 @@ type DeviceLoginSession struct {
 
 	// Relations
 	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
+}
+
+// Organization represents a multi-tenant organization
+type Organization struct {
+	ID        string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name      string         `json:"name" gorm:"not null"`
+	Slug      string         `json:"slug" gorm:"uniqueIndex;not null"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Memberships   []Membership    `json:"memberships,omitempty" gorm:"foreignKey:OrgID"`
+	Subscriptions []Subscription  `json:"subscriptions,omitempty" gorm:"foreignKey:OrgID"`
+	Repositories  []Repository    `json:"repositories,omitempty" gorm:"foreignKey:OrgID"`
+	Policies      []QualityBudget `json:"policies,omitempty" gorm:"foreignKey:OrgID"`
+	Integrations  []Integration   `json:"integrations,omitempty" gorm:"foreignKey:OrgID"`
+}
+
+// Membership represents a user's membership in an organization
+type Membership struct {
+	ID        string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	OrgID     string         `json:"org_id" gorm:"type:uuid;not null;index:idx_membership_org_user,unique"`
+	UserID    string         `json:"user_id" gorm:"type:uuid;not null;index:idx_membership_org_user,unique"`
+	Role      string         `json:"role" gorm:"type:varchar(20);not null;check:role IN ('owner','admin','member')"`
+	CreatedAt time.Time      `json:"created_at"`
+	DeletedAt gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrgID"`
+	User         *User         `json:"user,omitempty" gorm:"foreignKey:UserID"`
+}
+
+// Subscription represents an organization's billing subscription
+type Subscription struct {
+	ID                   string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	OrgID                string         `json:"org_id" gorm:"type:uuid;not null;index"`
+	Plan                 string         `json:"plan" gorm:"type:varchar(20);not null;check:plan IN ('free','pro','team','enterprise')"`
+	Seats                int            `json:"seats" gorm:"default:1"`
+	Status               string         `json:"status" gorm:"type:varchar(20);default:'active';check:status IN ('active','canceled','past_due','trialing')"`
+	CurrentPeriodEnd     *time.Time     `json:"current_period_end"`
+	StripeCustomerID     *string        `json:"stripe_customer_id" gorm:"index"`
+	StripeSubscriptionID *string        `json:"stripe_subscription_id" gorm:"index"`
+	CreatedAt            time.Time      `json:"created_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
+	DeletedAt            gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrgID"`
+}
+
+// Repository represents a code repository linked to an organization
+type Repository struct {
+	ID            string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	OrgID         string         `json:"org_id" gorm:"type:uuid;not null;index"`
+	Provider      string         `json:"provider" gorm:"type:varchar(20);default:'github';check:provider IN ('github','gitlab','bitbucket')"`
+	ExternalID    string         `json:"external_id" gorm:"not null;index"`
+	FullName      string         `json:"full_name" gorm:"not null"`
+	Visibility    string         `json:"visibility" gorm:"type:varchar(10);default:'private';check:visibility IN ('private','public','internal')"`
+	DefaultBranch *string        `json:"default_branch"`
+	RepoData      *JSONMap       `json:"repo_data" gorm:"type:jsonb"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrgID"`
+	Scans        []Scan        `json:"scans,omitempty" gorm:"foreignKey:RepositoryID"`
+}
+
+// QualityBudget represents quality guardrails and policies
+type QualityBudget struct {
+	ID         string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	OrgID      string         `json:"org_id" gorm:"type:uuid;not null;index"`
+	Scope      string         `json:"scope" gorm:"type:varchar(20);not null;check:scope IN ('org','repo','project')"`
+	RefID      *string        `json:"ref_id" gorm:"type:uuid;index"`
+	Name       string         `json:"name" gorm:"not null"`
+	Thresholds *JSONMap       `json:"thresholds" gorm:"type:jsonb;not null"`
+	Mode       string         `json:"mode" gorm:"type:varchar(10);default:'soft';check:mode IN ('soft','hard')"`
+	Enabled    bool           `json:"enabled" gorm:"default:true"`
+	CreatedAt  time.Time      `json:"created_at"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	DeletedAt  gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrgID"`
+}
+
+// Integration represents third-party integrations (Slack, GitHub, etc.)
+type Integration struct {
+	ID            string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	OrgID         string         `json:"org_id" gorm:"type:uuid;not null;index"`
+	Provider      string         `json:"provider" gorm:"type:varchar(20);not null;check:provider IN ('slack','github','email')"`
+	Config        *JSONMap       `json:"config" gorm:"type:jsonb"`
+	EncryptedData *string        `json:"encrypted_data" gorm:"type:text"`
+	Enabled       bool           `json:"enabled" gorm:"default:true"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrgID"`
+}
+
+// AuditLog represents audit trail for sensitive actions
+type AuditLog struct {
+	ID        string    `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	OrgID     *string   `json:"org_id" gorm:"type:uuid;index"`
+	UserID    string    `json:"user_id" gorm:"type:uuid;not null;index"`
+	Action    string    `json:"action" gorm:"not null"`
+	Resource  string    `json:"resource" gorm:"not null"`
+	Details   *JSONMap  `json:"details" gorm:"type:jsonb"`
+	IPAddress *string   `json:"ip_address"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// Relations
+	Organization *Organization `json:"organization,omitempty" gorm:"foreignKey:OrgID"`
+	User         *User         `json:"user,omitempty" gorm:"foreignKey:UserID"`
 }

@@ -68,7 +68,9 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 			const data = await api.getProjectDetails(projectId)
 			const p = data.project || {}
 			const latest = data?.stats?.latest_scan || null
-			let boundPath = await invoke<string | null>('get_project_binding', { projectId: projectId })
+			let boundPath = await invoke<string | null>('get_project_binding', {
+				projectId: projectId
+			})
 			const mapped: Project = {
 				id: p.id,
 				name: p.name || 'Project',
@@ -103,9 +105,13 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 		try {
 			setScanning(true)
 			// Ensure path binding
-			let boundPath = await invoke<string | null>('get_project_binding', { projectId: project.id })
+			let boundPath = await invoke<string | null>('get_project_binding', {
+				projectId: project.id
+			})
 			if (!boundPath) {
-				const selected = (await openDialog({ directory: true, multiple: false })) as string | null
+				const selected = (await openDialog({ directory: true, multiple: false })) as
+					| string
+					| null
 				if (!selected) {
 					setScanning(false)
 					return
@@ -127,13 +133,16 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 					'excluded_languages',
 					'allowed_languages'
 				]
-				for (const k of overrideKeys) if (ps && ps[k] !== undefined) (settings as any)[k] = ps[k]
+				for (const k of overrideKeys)
+					if (ps && ps[k] !== undefined) (settings as any)[k] = ps[k]
 			} catch {}
 			// Run scan
 			const result = await invoke<ScanResult>('scan_directory', { path: boundPath, settings })
 			setScanResult(result)
 			// Send snapshot
-			const project_key_hash = await invoke<string>('compute_project_key_hash', { basePath: boundPath })
+			const project_key_hash = await invoke<string>('compute_project_key_hash', {
+				basePath: boundPath
+			})
 			await api.rescanProject(project.id, {
 				project_key_hash,
 				totals: {
@@ -144,14 +153,16 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 					core_code_lines: result.total_code,
 					info_lines: result.total_comments + result.total_blank
 				},
-				per_language: Object.entries(result.languages || {}).map(([language, stats]: [string, any]) => ({
-					language,
-					files: (stats as any).files,
-					total: (stats as any).total,
-					code: (stats as any).code,
-					comment: (stats as any).comment,
-					blank: (stats as any).blank
-				})),
+				per_language: Object.entries(result.languages || {}).map(
+					([language, stats]: [string, any]) => ({
+						language,
+						files: (stats as any).files,
+						total: (stats as any).total,
+						code: (stats as any).code,
+						comment: (stats as any).comment,
+						blank: (stats as any).blank
+					})
+				),
 				device_id: settings.device_id,
 				app_version: '1.0.0',
 				scanned_at: Math.floor(Date.now() / 1000).toString()
@@ -195,12 +206,8 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 
 	if (scanResult) {
 		return (
-			<div>
+			<div className='px-6 pt-3'>
 				<div className='flex items-center gap-4 mb-6'>
-					<Button variant='ghost' onClick={() => setScanResult(null)}>
-						<ArrowLeft className='h-4 w-4 mr-2' />
-						Back to Project
-					</Button>
 					<h1 className='text-2xl font-bold'>{project.name} - Scan Results</h1>
 				</div>
 				<Dashboard result={scanResult} onReset={() => setScanResult(null)} />

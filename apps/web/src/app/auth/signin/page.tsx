@@ -6,7 +6,13 @@ import { authService } from '@/lib/auth-service'
 import { Code2, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
-function SignInPageContent({ callbackUrl, deviceCode }: { callbackUrl: string; deviceCode?: string | null }) {
+function SignInPageContent({
+	callbackUrl,
+	deviceCode
+}: {
+	callbackUrl: string
+	deviceCode?: string | null
+}) {
 	const [formData, setFormData] = useState({ email: '', password: '' })
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState('')

@@ -1,22 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
-import {
-	Plus,
-	Folder,
-	Calendar,
-	Github,
-	Settings,
-	Trash2,
-	BarChart3,
-	User,
-	LogOut,
-	Settings as SettingsIcon
-} from 'lucide-react'
+import { Plus, Folder, Calendar, Github, Settings, Trash2, BarChart3 } from 'lucide-react'
 import { api } from '../lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
 import type { ScanResult, UserSettings } from '../types'
+import Dashboard from './Dashboard'
 
 interface Project {
 	id: string
@@ -43,21 +33,10 @@ interface Project {
 
 interface ProjectsProps {
 	onProjectSelect?: (project: Project) => void
-	onLogout?: () => void
-	onOpenSettings?: () => void
 	onOpenProjectSettings?: (projectId: string) => void
-	onStartIndividualScan?: () => Promise<void>
-	currentUser?: any
 }
 
-export default function Projects({
-	onProjectSelect,
-	onLogout,
-	onOpenSettings,
-	onOpenProjectSettings,
-	onStartIndividualScan,
-	currentUser
-}: ProjectsProps) {
+export default function Projects({ onProjectSelect, onOpenProjectSettings }: ProjectsProps) {
 	const [projects, setProjects] = useState<Project[]>([])
 	const [loading, setLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
@@ -65,6 +44,8 @@ export default function Projects({
 	const [selectedPath, setSelectedPath] = useState<string | null>(null)
 	const [projectName, setProjectName] = useState('')
 	const [projectDescription, setProjectDescription] = useState('')
+	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
+	const [scannedProjectName, setScannedProjectName] = useState<string>('')
 
 	useEffect(() => {
 		loadProjects()
@@ -120,7 +101,7 @@ export default function Projects({
 	async function handleAddProject() {
 		try {
 			// Select folder path
-			const path = await openDialog({ directory: true, multiple: false }) as string | null
+			const path = (await openDialog({ directory: true, multiple: false })) as string | null
 			if (!path) return // User cancelled
 
 			setSelectedPath(path)
@@ -145,7 +126,10 @@ export default function Projects({
 			const result = await api.createProject(projectData)
 			if (result.project) {
 				// Set the project binding to the selected path
-				await invoke('set_project_binding', { projectId: result.project.id, basePath: selectedPath })
+				await invoke('set_project_binding', {
+					projectId: result.project.id,
+					basePath: selectedPath
+				})
 
 				// Reload projects to show the new one
 				loadProjects()
@@ -177,9 +161,13 @@ export default function Projects({
 	async function handleScanProject(project: Project) {
 		try {
 			// Resolve local binding path for this project
-			let boundPath = await invoke<string | null>('get_project_binding', { projectId: project.id })
+			let boundPath = await invoke<string | null>('get_project_binding', {
+				projectId: project.id
+			})
 			if (!boundPath) {
-				const selected = (await openDialog({ directory: true, multiple: false })) as string | null
+				const selected = (await openDialog({ directory: true, multiple: false })) as
+					| string
+					| null
 				if (!selected) return
 				await invoke('set_project_binding', { projectId: project.id, basePath: selected })
 				boundPath = selected
@@ -212,10 +200,14 @@ export default function Projects({
 				path: boundPath,
 				settings
 			})
+			setScanResult(result)
+			setScannedProjectName(project.name)
 
 			// Save scan snapshot to backend
 			if (result) {
-				const project_key_hash = await invoke<string>('compute_project_key_hash', { basePath: boundPath })
+				const project_key_hash = await invoke<string>('compute_project_key_hash', {
+					basePath: boundPath
+				})
 				await api.rescanProject(project.id, {
 					project_key_hash,
 					totals: {
@@ -243,18 +235,10 @@ export default function Projects({
 
 				// Reload projects to show updated scan data
 				loadProjects()
-
-				// Redirect to project details page after scan
-				onProjectSelect?.(project)
 			}
 		} catch (err) {
 			console.error('Error scanning project:', err)
 		}
-	}
-
-	async function handleManualScan() {
-		// On Projects page, Scan Folder must perform an individual scan (no project creation)
-		if (onStartIndividualScan) await onStartIndividualScan()
 	}
 
 	function formatDate(dateString: string) {
@@ -282,41 +266,23 @@ export default function Projects({
 		)
 	}
 
-	return (
-		<div className='space-y-6'>
-			{/* Header */}
-			<header className='border-b mb-6'>
-				<div className='flex items-center justify-between px-4 py-3'>
-					<div className='flex items-center gap-2'>
-						<div className='w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold'>
-							CP
-						</div>
-						<h1 className='text-xl font-bold'>CodePulse</h1>
-					</div>
-
-					<div className='flex items-center gap-2'>
-						<div className='flex items-center gap-2 text-sm text-muted-foreground'>
-							<User className='h-4 w-4' />
-							{currentUser?.handle || currentUser?.email || 'Guest'}
-						</div>
-						<Button variant='ghost' size='sm' onClick={onLogout}>
-							<LogOut className='h-4 w-4' />
-						</Button>
-						<Button variant='ghost' size='sm' onClick={onOpenSettings}>
-							<SettingsIcon className='h-4 w-4' />
-						</Button>
-					</div>
+	if (scanResult) {
+		return (
+			<div className='px-6 pt-3'>
+				<div className='flex items-center gap-4 mb-6'>
+					<h1 className='text-2xl font-bold'>{scannedProjectName} - Scan Results</h1>
 				</div>
-			</header>
+				<Dashboard result={scanResult} onReset={() => setScanResult(null)} />
+			</div>
+		)
+	}
 
+	return (
+		<div className='space-y-6 px-6 pt-3'>
 			<div className='space-y-4'>
 				<div className='flex items-center justify-between'>
 					<h2 className='text-2xl font-bold'>Your Projects</h2>
 					<div className='flex gap-2'>
-						<Button variant='outline' onClick={handleManualScan}>
-							<Folder className='h-4 w-4 mr-2' />
-							Scan Folder
-						</Button>
 						<Button onClick={handleAddProject}>
 							<Plus className='h-4 w-4 mr-2' />
 							Add Project
@@ -342,10 +308,7 @@ export default function Projects({
 
 				<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
 					{projects.map(project => (
-						<Card
-							key={project.id}
-							className='hover:shadow-md transition-shadow cursor-pointer'
-						>
+						<Card key={project.id} className='border rounded-md'>
 							<CardHeader className='pb-3'>
 								<div className='flex items-start justify-between'>
 									<div className='flex-1'>
@@ -400,8 +363,9 @@ export default function Projects({
 										<div className='flex items-center gap-2 text-sm text-muted-foreground'>
 											<BarChart3 className='h-4 w-4' />
 											<span>
-												{formatNumber(project.latestScan.totalCode)} code lines,{' '}
-												{formatNumber(project.latestScan.totalLines)} total lines
+												{formatNumber(project.latestScan.totalCode)} code
+												lines, {formatNumber(project.latestScan.totalLines)}{' '}
+												total lines
 											</span>
 										</div>
 									)}
@@ -451,7 +415,7 @@ export default function Projects({
 									<input
 										type='text'
 										value={projectName}
-										onChange={(e) => setProjectName(e.target.value)}
+										onChange={e => setProjectName(e.target.value)}
 										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 										placeholder='Enter project name'
 									/>
@@ -464,7 +428,7 @@ export default function Projects({
 									<input
 										type='text'
 										value={projectDescription}
-										onChange={(e) => setProjectDescription(e.target.value)}
+										onChange={e => setProjectDescription(e.target.value)}
 										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
 										placeholder='Enter project description'
 									/>
@@ -481,7 +445,11 @@ export default function Projects({
 							</div>
 
 							<div className='flex gap-3 mt-6'>
-								<Button onClick={handleCancelAddProject} variant='outline' className='flex-1'>
+								<Button
+									onClick={handleCancelAddProject}
+									variant='outline'
+									className='flex-1'
+								>
 									Cancel
 								</Button>
 								<Button onClick={handleConfirmAddProject} className='flex-1'>

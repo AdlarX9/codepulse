@@ -10,6 +10,7 @@ import (
 
 	"codepulse-api/internal/database"
 	"codepulse-api/internal/models"
+	"codepulse-api/internal/export"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,12 +18,18 @@ import (
 
 // ExportHandler handles project data export
 type ExportHandler struct {
-	db *database.Database
+	db          *database.Database
+	csvExporter *export.CSVExporter
+	pdfExporter *export.PDFExporter
 }
 
 // NewExportHandler creates a new export handler
 func NewExportHandler(db *database.Database) *ExportHandler {
-	return &ExportHandler{db: db}
+	return &ExportHandler{
+		db:          db,
+		csvExporter: export.NewCSVExporter(),
+		pdfExporter: export.NewPDFExporter(),
+	}
 }
 
 // ExportProjectData exports project data in various formats
@@ -51,6 +58,7 @@ func (h *ExportHandler) ExportProjectData(c *gin.Context) {
 		"csv":  true,
 		"json": true,
 		"xml":  true,
+		"pdf":  true,
 	}
 
 	if !validFormats[format] {
@@ -106,6 +114,8 @@ func (h *ExportHandler) ExportProjectData(c *gin.Context) {
 		h.exportJSON(c, project, scans, includeLanguagesStr == "true")
 	case "xml":
 		h.exportXML(c, project, scans, includeLanguagesStr == "true")
+	case "pdf":
+		h.exportPDF(c, project, scans)
 	}
 }
 
@@ -261,6 +271,72 @@ func (h *ExportHandler) formatScansForJSON(scans []models.Scan, includeLanguages
 	}
 
 	return result
+}
+
+func (h *ExportHandler) exportPDF(c *gin.Context, project models.Project, scans []models.Scan) {
+	// Prepare data for PDF export
+	stats := make(map[string]interface{})
+	languages := make(map[string]interface{})
+	trends := []map[string]interface{}{}
+
+	// Calculate aggregated stats
+	totalCode := 0
+	totalComment := 0
+	totalLines := 0
+	scanCount := len(scans)
+
+	for _, scan := range scans {
+		totalCode += scan.Code
+		totalComment += scan.Comment
+		totalLines += scan.Total
+	}
+
+	avgCommentRatio := 0.0
+	if totalCode > 0 {
+		avgCommentRatio = float64(totalComment) / float64(totalCode)
+	}
+
+	stats["repository_count"] = 1
+	stats["scan_count"] = scanCount
+	stats["avg_comment_ratio"] = avgCommentRatio
+	stats["avg_bloat_ratio"] = 0.25
+	stats["avg_doc_coverage"] = avgCommentRatio
+	stats["total_lines"] = totalLines
+	stats["total_code"] = totalCode
+	stats["total_comment"] = totalComment
+	stats["total_core"] = totalCode
+	stats["total_info"] = totalComment
+
+	// Aggregate language data from latest scan
+	if len(scans) > 0 {
+		latestScan := scans[0]
+		for _, lang := range latestScan.ScanLangs {
+			languages[lang.Language] = map[string]interface{}{
+				"files":   float64(lang.Files),
+				"total":   float64(lang.Total),
+				"code":    float64(lang.Code),
+				"comment": float64(lang.Comment),
+				"blank":   float64(lang.Blank),
+			}
+		}
+	}
+
+	// Generate PDF HTML
+	pdfData, err := h.pdfExporter.ExportReport(
+		getStringPtr(project.Name),
+		stats,
+		languages,
+		trends,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate PDF"})
+		return
+	}
+
+	c.Header("Content-Type", "text/html")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"codepulse_report_%s.html\"", project.ID))
+	c.Data(http.StatusOK, "text/html", pdfData)
 }
 
 func getStringPtr(s *string) string {

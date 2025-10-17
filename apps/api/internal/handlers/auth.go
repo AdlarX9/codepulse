@@ -49,14 +49,14 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	var req struct {
-		DisplayName *string         `json:"display_name"`
-		AvatarURL   *string         `json:"avatar_url"`
-		Bio         *string         `json:"bio"`
-		Links       *models.JSONMap `json:"links"`
-		Visibility  *string         `json:"visibility"`
-		Email       *string         `json:"email"`
-		Password    *string         `json:"password"`
-		CurrentPassword *string     `json:"current_password"`
+		DisplayName     *string         `json:"display_name"`
+		AvatarURL       *string         `json:"avatar_url"`
+		Bio             *string         `json:"bio"`
+		Links           *models.JSONMap `json:"links"`
+		Visibility      *string         `json:"visibility"`
+		Email           *string         `json:"email"`
+		Password        *string         `json:"password"`
+		CurrentPassword *string         `json:"current_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})

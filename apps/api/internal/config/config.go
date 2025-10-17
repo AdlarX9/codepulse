@@ -29,6 +29,28 @@ type Config struct {
 
 	// CORS
 	AllowedOrigins []string
+
+	// GitHub App
+	GitHubAppID         string
+	GitHubPrivateKey    []byte
+	GitHubWebhookSecret string
+
+	// Stripe
+	StripeSecretKey       string
+	StripeWebhookSecret   string
+	StripePricePro        string
+	StripePriceTeam       string
+	StripePriceEnterprise string
+
+	// Slack
+	SlackClientID      string
+	SlackClientSecret  string
+	SlackSigningSecret string
+	SlackRedirectURI   string
+
+	// Email
+	PostmarkToken string
+	EmailFromAddr string
 }
 
 func Load() (*Config, error) {
@@ -54,6 +76,28 @@ func Load() (*Config, error) {
 
 		// JWT
 		JWTSecret: getEnv("JWT_SECRET", "your-secret-key"),
+
+		// GitHub App
+		GitHubAppID:         getEnv("GITHUB_APP_ID", ""),
+		GitHubPrivateKey:    []byte(getEnv("GITHUB_PRIVATE_KEY", "")),
+		GitHubWebhookSecret: getEnv("GITHUB_WEBHOOK_SECRET", ""),
+
+		// Stripe
+		StripeSecretKey:       getEnv("STRIPE_SECRET_KEY", ""),
+		StripeWebhookSecret:   getEnv("STRIPE_WEBHOOK_SECRET", ""),
+		StripePricePro:        getEnv("STRIPE_PRICE_PRO", ""),
+		StripePriceTeam:       getEnv("STRIPE_PRICE_TEAM", ""),
+		StripePriceEnterprise: getEnv("STRIPE_PRICE_ENTERPRISE", ""),
+
+		// Slack
+		SlackClientID:      getEnv("SLACK_CLIENT_ID", ""),
+		SlackClientSecret:  getEnv("SLACK_CLIENT_SECRET", ""),
+		SlackSigningSecret: getEnv("SLACK_SIGNING_SECRET", ""),
+		SlackRedirectURI:   getEnv("SLACK_REDIRECT_URI", "http://localhost:8080/api/integrations/slack/callback"),
+
+		// Email
+		PostmarkToken: getEnv("POSTMARK_TOKEN", ""),
+		EmailFromAddr: getEnv("EMAIL_FROM_ADDR", "noreply@codepulse.dev"),
 	}
 
 	// Build database URL

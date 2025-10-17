@@ -11,9 +11,12 @@ import (
 
 	"codepulse-api/internal/config"
 	"codepulse-api/internal/database"
+	"codepulse-api/internal/email"
 	"codepulse-api/internal/handlers"
 	"codepulse-api/internal/middleware"
 	"codepulse-api/internal/models"
+	"codepulse-api/internal/websocket"
+	"codepulse-api/internal/worker"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -50,6 +53,13 @@ func main() {
 			&models.Download{},
 			&models.Session{},
 			&models.DeviceLoginSession{},
+			&models.Organization{},
+			&models.Membership{},
+			&models.Subscription{},
+			&models.Repository{},
+			&models.QualityBudget{},
+			&models.Integration{},
+			&models.AuditLog{},
 		); err != nil {
 			log.Printf("Auto-migration failed: %v", err)
 		}
@@ -62,9 +72,28 @@ func main() {
 	scanHandler := handlers.NewScanHandler(db)
 	exportHandler := handlers.NewExportHandler(db)
 	ogHandler := handlers.NewOGHandler(db)
+	orgHandler := handlers.NewOrgHandler(db)
+	policyHandler := handlers.NewPolicyHandler(db)
+	githubHandler := handlers.NewGitHubHandler(db, cfg.GitHubAppID, cfg.GitHubPrivateKey, cfg.GitHubWebhookSecret)
+	ciHandler := handlers.NewCIHandler(db)
+	statsHandler := handlers.NewStatsHandler(db)
+	billingHandler := handlers.NewBillingHandler(db, cfg.StripeSecretKey, cfg.StripeWebhookSecret)
+	integrationsHandler := handlers.NewIntegrationsHandler(db, cfg.SlackClientID, cfg.SlackClientSecret, cfg.SlackRedirectURI)
+
+	// Initialize WebSocket hub
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	wsHandler := handlers.NewWebSocketHandler(wsHub)
+
+	// Initialize email service
+	emailService := email.NewService(cfg.PostmarkToken, db)
+
+	// Start background workers
+	worker.StartDigestWorker(db.DB, emailService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(db.DB, cfg)
+	orgMiddleware := middleware.NewOrgContextMiddleware(db.DB)
 
 	// Create Gin router
 	router := gin.New()
@@ -83,6 +112,9 @@ func main() {
 
 	// Health check endpoint
 	router.GET("/health", healthHandler.HealthCheck)
+
+	// Start background workers
+	// worker.StartDigestWorker(db.DB) // Uncomment to enable weekly digests
 
 	// Backward compatibility routes (mirror Next.js API structure)
 	api := router.Group("/api")
@@ -139,6 +171,84 @@ func main() {
 		public := api.Group("/u")
 		{
 			public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
+		}
+
+		// Organization routes (protected)
+		orgs := api.Group("/orgs")
+		orgs.Use(authMiddleware.RequireAuth())
+		{
+			orgs.POST("", orgHandler.CreateOrg)
+			orgs.GET("/me", orgHandler.GetUserOrgs)
+			orgs.GET("/:id", orgHandler.GetOrg)
+			orgs.PATCH("/:id", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), orgHandler.UpdateOrg)
+
+			// Members
+			orgs.GET("/:id/members", orgHandler.GetMembers)
+			orgs.POST("/:id/invite", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), orgHandler.InviteMember)
+			orgs.PATCH("/:id/members/:user_id", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), orgHandler.UpdateMemberRole)
+			orgs.DELETE("/:id/members/:user_id", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), orgHandler.RemoveMember)
+
+			// Policies
+			orgs.GET("/:id/policies", orgMiddleware.ResolveOrg(), policyHandler.GetPolicies)
+			orgs.POST("/:id/policies", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), policyHandler.CreatePolicy)
+			orgs.GET("/:id/policies/:policy_id", orgMiddleware.ResolveOrg(), policyHandler.GetPolicy)
+			orgs.PATCH("/:id/policies/:policy_id", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), policyHandler.UpdatePolicy)
+			orgs.DELETE("/:id/policies/:policy_id", orgMiddleware.ResolveOrg(), orgMiddleware.RequireAdmin(), policyHandler.DeletePolicy)
+
+			// Stats
+			orgs.GET("/:id/stats", orgMiddleware.ResolveOrg(), statsHandler.GetOrgStats)
+		}
+
+		// GitHub routes
+		github := api.Group("/github")
+		{
+			github.POST("/webhook", githubHandler.HandleWebhook) // Public, HMAC verified
+			github.GET("/install/callback", githubHandler.InstallCallback)
+		}
+
+		// CI routes
+		ci := api.Group("/ci")
+		{
+			ci.POST("/snapshots", ciHandler.CreateSnapshot) // Bearer token auth
+			ci.GET("/snapshots/:id", authMiddleware.RequireAuth(), ciHandler.GetSnapshot)
+		}
+
+		// Stats routes
+		stats := api.Group("/stats")
+		stats.Use(authMiddleware.RequireAuth())
+		{
+			stats.GET("/repos/:id", orgMiddleware.ResolveOrg(), statsHandler.GetRepoStats)
+			stats.GET("/projects/:id", statsHandler.GetProjectStats)
+		}
+
+		// Billing routes
+		billing := api.Group("/billing")
+		{
+			billing.POST("/webhook", billingHandler.HandleWebhook) // Public, Stripe signature verified
+			billing.POST("/checkout", authMiddleware.RequireAuth(), orgMiddleware.ResolveOrg(), billingHandler.CreateCheckoutSession)
+			billing.POST("/portal", authMiddleware.RequireAuth(), orgMiddleware.ResolveOrg(), billingHandler.CreatePortalSession)
+			billing.GET("/subscription", authMiddleware.RequireAuth(), orgMiddleware.ResolveOrg(), billingHandler.GetSubscription)
+		}
+
+		// Integrations routes
+		integrations := api.Group("/integrations")
+		integrations.Use(authMiddleware.RequireAuth(), orgMiddleware.ResolveOrg())
+		{
+			integrations.GET("", integrationsHandler.GetIntegrations)
+
+			// Slack
+			integrations.POST("/slack/connect", orgMiddleware.RequireAdmin(), integrationsHandler.ConnectSlack)
+			integrations.GET("/slack/callback", integrationsHandler.SlackCallback) // No auth, handled by state
+			integrations.DELETE("/slack/disconnect", orgMiddleware.RequireAdmin(), integrationsHandler.DisconnectSlack)
+			integrations.PATCH("/slack/channel", orgMiddleware.RequireAdmin(), integrationsHandler.UpdateSlackChannel)
+		}
+
+		// WebSocket routes
+		ws := api.Group("/ws")
+		ws.Use(authMiddleware.RequireAuth(), orgMiddleware.ResolveOrg())
+		{
+			ws.GET("/connect", wsHandler.HandleWebSocket)
+			ws.GET("/stats", wsHandler.GetStats)
 		}
 	}
 
