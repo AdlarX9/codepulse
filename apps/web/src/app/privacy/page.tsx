@@ -16,7 +16,7 @@ export default function PrivacyPage() {
 						</Link>
 					</div>
 					<div className='absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2'>
-						<Code2 className='h-8 w-8 text-primary' />
+						<img src='/logo.png' className='h-12 w-auto' />
 						<span className='text-2xl font-bold tracking-tight'>CodePulse</span>
 					</div>
 					<div className='flex-1' />

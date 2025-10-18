@@ -38,13 +38,7 @@ interface DashboardProps {
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6']
 
-export default function Dashboard({
-	result,
-	onReset,
-	onRescan,
-	onChooseFolder,
-	onOpenSettings
-}: DashboardProps) {
+export default function Dashboard({ result, onReset, onRescan, onChooseFolder, onOpenSettings }: DashboardProps) {
 	const [searchTerm, setSearchTerm] = useState('')
 	const [languageFilter, setLanguageFilter] = useState<string | null>(null)
 	const [showFileDetails, setShowFileDetails] = useState(false) // Collapsed by default
@@ -84,7 +78,7 @@ export default function Dashboard({
 						</p>
 					</div>
 				</div>
-				{(onChooseFolder || onRescan || onOpenSettings) && (
+				{(onChooseFolder || onRescan) && (
 					<div className='flex gap-2'>
 						{onChooseFolder && (
 							<Button variant='outline' size='sm' onClick={onChooseFolder}>

@@ -7,16 +7,94 @@ export interface User {
 	created_at?: string
 }
 
+async function readErrorPayload(res: Response): Promise<unknown> {
+	try {
+		const ct = res.headers.get('content-type') || ''
+		if (ct.includes('application/json')) {
+			return await res.json()
+		}
+		return await res.text()
+	} catch {
+		return null
+	}
+}
+
+async function logAndThrowApiError(res: Response, endpoint: string): Promise<never> {
+	const body = await readErrorPayload(res)
+	console.error('[API] HTTP error', {
+		endpoint,
+		status: res.status,
+		statusText: res.statusText,
+		body
+	})
+	const msg =
+		(typeof body === 'string' && body) ||
+		((body as any)?.error as string) ||
+		((body as any)?.message as string) ||
+		'Request failed'
+	throw new Error(`${res.status} ${res.statusText} - ${msg}`)
+}
+
+function logNetworkError(err: unknown, endpoint: string): void {
+	console.error('[API] Network error', { endpoint, error: err })
+}
+
 async function updateProfile(body: any): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
-	const res = await fetch(`${API_BASE}/me/profile`, {
-		method: 'PATCH',
-		headers,
-		body: JSON.stringify(body)
-	})
-	if (!res.ok) throw new Error('Failed to update profile')
-	return res.json()
+	const endpoint = `${API_BASE}/me/profile`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'PATCH',
+			headers,
+			body: JSON.stringify(body)
+		})
+		if (!res.ok) await logAndThrowApiError(res, 'PATCH /me/profile')
+		const data = await res.json()
+		console.log('Profile updated:', data)
+		return data
+	} catch (error) {
+		logNetworkError(error, 'PATCH /me/profile')
+		throw error
+	}
+}
+
+async function logout(): Promise<void> {
+	await clearToken()
+}
+
+async function deleteAccount(password: string): Promise<void> {
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
+	const endpoint = `${API_BASE}/me/account`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'DELETE',
+			headers,
+			body: JSON.stringify({ password })
+		})
+		if (!res.ok) await logAndThrowApiError(res, 'DELETE /me/account')
+		await clearToken()
+	} catch (error) {
+		logNetworkError(error, 'DELETE /me/account')
+		throw error
+	}
+}
+
+async function checkHandleAvailability(handle: string): Promise<{
+	available: boolean
+	reason: string
+}> {
+	const headers = await getAuthHeaders()
+	const endpoint = `${API_BASE}/me/profile/check-handle?handle=${encodeURIComponent(handle)}`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, 'GET /me/profile/check-handle')
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, 'GET /me/profile/check-handle')
+		throw error
+	}
 }
 
 export interface DeviceStartResponse {
@@ -29,9 +107,8 @@ export interface DevicePollResponse {
 }
 
 export const API_BASE: string =
-	(import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api'
-export const WEB_BASE: string =
-	(import.meta as any).env?.VITE_WEB_BASE_URL || 'http://localhost:3000'
+	(import.meta as any).env?.VITE_API_URL || 'http://localhost:8080/api'
+export const WEB_BASE: string = (import.meta as any).env?.VITE_WEB_URL || 'http://localhost:3000'
 
 async function getToken(): Promise<string | null> {
 	try {
@@ -68,60 +145,112 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 async function getCurrentUser(): Promise<User | null> {
 	const headers = await getAuthHeaders()
-	const res = await fetch(`${API_BASE}/auth/me`, { headers })
-	if (!res.ok) return null
-	const data = await res.json()
-	return data.user as User
+	const endpoint = `${API_BASE}/auth/me`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) {
+			// Log all API errors, but don't throw here to preserve existing behavior (return null on 401/etc.)
+			const body = await readErrorPayload(res)
+			console.error('[API] HTTP error', {
+				endpoint: 'GET /auth/me',
+				status: res.status,
+				statusText: res.statusText,
+				body
+			})
+			return null
+		}
+		const data = await res.json()
+		return data.user as User
+	} catch (error) {
+		logNetworkError(error, 'GET /auth/me')
+		return null
+	}
 }
 
 async function getProjects(): Promise<any[]> {
 	const headers = await getAuthHeaders()
-	const res = await fetch(`${API_BASE}/me/projects`, { headers })
-	if (!res.ok) throw new Error('Failed to fetch projects')
-	const data = await res.json()
-	return data.projects || []
+	const endpoint = `${API_BASE}/me/projects`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, 'GET /me/projects')
+		const data = await res.json()
+		return data.projects || []
+	} catch (error) {
+		logNetworkError(error, 'GET /me/projects')
+		throw error
+	}
 }
 
 async function getProject(id: string): Promise<any> {
 	const headers = await getAuthHeaders()
-	const res = await fetch(`${API_BASE}/me/projects/${id}`, { headers })
-	if (!res.ok) throw new Error('Project not found')
-	return res.json()
+	const endpoint = `${API_BASE}/me/projects/${id}`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${id}`)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `GET /me/projects/${id}`)
+		throw error
+	}
 }
 
 async function getProjectDetails(id: string): Promise<any> {
 	const headers = await getAuthHeaders()
-	const res = await fetch(`${API_BASE}/me/projects/${id}/details`, { headers })
-	if (!res.ok) throw new Error('Project not found')
-	return res.json()
+	const endpoint = `${API_BASE}/me/projects/${id}/details`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${id}/details`)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `GET /me/projects/${id}/details`)
+		throw error
+	}
 }
 
 async function getProfile(): Promise<any> {
 	const headers = await getAuthHeaders()
-	const res = await fetch(`${API_BASE}/me/profile`, { headers })
-	if (!res.ok) throw new Error('Failed to fetch profile')
-	return res.json()
+	const endpoint = `${API_BASE}/me/profile`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, 'GET /me/profile')
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, 'GET /me/profile')
+		throw error
+	}
 }
 
 async function updateProject(id: string, body: any): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
-	const res = await fetch(`${API_BASE}/me/projects/${id}`, {
-		method: 'PATCH',
-		headers,
-		body: JSON.stringify(body)
-	})
-	if (!res.ok) throw new Error('Failed to update project')
-	return res.json()
+	const endpoint = `${API_BASE}/me/projects/${id}`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'PATCH',
+			headers,
+			body: JSON.stringify(body)
+		})
+		if (!res.ok) await logAndThrowApiError(res, `PATCH /me/projects/${id}`)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `PATCH /me/projects/${id}`)
+		throw error
+	}
 }
 
 async function deleteProject(id: string): Promise<void> {
 	const headers = await getAuthHeaders()
-	const res = await fetch(`${API_BASE}/me/projects/${id}`, {
-		method: 'DELETE',
-		headers
-	})
-	if (!res.ok) throw new Error('Failed to delete project')
+	const endpoint = `${API_BASE}/me/projects/${id}`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'DELETE',
+			headers
+		})
+		if (!res.ok) await logAndThrowApiError(res, `DELETE /me/projects/${id}`)
+	} catch (error) {
+		logNetworkError(error, `DELETE /me/projects/${id}`)
+		throw error
+	}
 }
 
 async function createProject(projectData: {
@@ -133,13 +262,19 @@ async function createProject(projectData: {
 }): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
-	const res = await fetch(`${API_BASE}/me/projects`, {
-		method: 'POST',
-		headers,
-		body: JSON.stringify(projectData)
-	})
-	if (!res.ok) throw new Error('Failed to create project')
-	return res.json()
+	const endpoint = `${API_BASE}/me/projects`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(projectData)
+		})
+		if (!res.ok) await logAndThrowApiError(res, 'POST /me/projects')
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, 'POST /me/projects')
+		throw error
+	}
 }
 
 async function rescanProject(
@@ -169,13 +304,19 @@ async function rescanProject(
 ): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
-	const res = await fetch(`${API_BASE}/sync/scan`, {
-		method: 'POST',
-		headers,
-		body: JSON.stringify(scanData)
-	})
-	if (!res.ok) throw new Error('Failed to save scan snapshot')
-	return res.json()
+	const endpoint = `${API_BASE}/sync/scan`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(scanData)
+		})
+		if (!res.ok) await logAndThrowApiError(res, 'POST /sync/scan')
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, 'POST /sync/scan')
+		throw error
+	}
 }
 
 export const api = {
@@ -193,5 +334,8 @@ export const api = {
 	deleteProject,
 	rescanProject,
 	getProfile,
-	updateProfile
+	updateProfile,
+	checkHandleAvailability,
+	logout,
+	deleteAccount
 }

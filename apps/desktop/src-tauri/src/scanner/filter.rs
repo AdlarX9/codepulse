@@ -1,5 +1,5 @@
 use walkdir::{DirEntry};
-use crate::settings::UserSettings;
+use crate::scan_settings::ScanSettings;
 use crate::scanner::detect_language;
 
 /// Examples:
@@ -70,7 +70,7 @@ fn is_excluded_dir(entry: &DirEntry, excluded_dirs: &[String], excluded_patterns
     false
 }
 
-pub fn count_files(entry: &DirEntry, settings: UserSettings) -> bool {
+pub fn count_files(entry: &DirEntry, settings: ScanSettings) -> bool {
     if entry.path().is_dir() {
         // Directory is counted/traversed only if NOT excluded by name or pattern
         return !is_excluded_dir(entry, &settings.excluded_dirs, &settings.excluded_patterns);

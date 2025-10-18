@@ -151,7 +151,11 @@ func main() {
 
 			// Read/Update Profile
 			me.GET("/profile", authHandler.GetProfile)
+			me.GET("/profile/check-handle", authHandler.CheckHandleAvailability)
 			me.PATCH("/profile", authHandler.UpdateProfile)
+
+			// Account Management
+			me.DELETE("/account", authHandler.DeleteAccount)
 		}
 
 		// Public routes
@@ -162,9 +166,6 @@ func main() {
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/logout", authHandler.Logout)
 			auth.GET("/me", authMiddleware.RequireAuth(), authHandler.Me)
-
-			// Account Management
-			auth.DELETE("/account", authMiddleware.RequireAuth(), authHandler.DeleteAccount)
 		}
 
 		// Public project routes

@@ -7,7 +7,7 @@ use reqwest::Client;
 use tokio::time::sleep;
 
 use crate::scanner::ScanSnapshot;
-use crate::settings::UserSettings;
+use crate::user_settings::UserSettings;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Totals {
@@ -118,7 +118,7 @@ struct QueuedPayload {
     payload: SyncPayload,
 }
 
-pub async fn process_sync_queue(api_base_url: &str) -> Result<usize, String> {
+pub async fn process_sync_queue() -> Result<usize, String> {
     let dir = queue_dir()?;
     
     if !dir.exists() {
@@ -139,7 +139,7 @@ pub async fn process_sync_queue(api_base_url: &str) -> Result<usize, String> {
             continue;
         }
 
-        match process_queue_file(&client, api_base_url, &path).await {
+        match process_queue_file(&client, &path).await {
             Ok(true) => {
                 // Successfully synced, delete file
                 if let Err(e) = fs::remove_file(&path) {
@@ -164,14 +164,16 @@ pub async fn process_sync_queue(api_base_url: &str) -> Result<usize, String> {
     Ok(processed)
 }
 
-async fn process_queue_file(client: &Client, api_base_url: &str, file_path: &PathBuf) -> Result<bool, String> {
+async fn process_queue_file(client: &Client, file_path: &PathBuf) -> Result<bool, String> {
     let content = fs::read_to_string(file_path)
         .map_err(|e| format!("Failed to read queue file: {}", e))?;
     
     let payload: SyncPayload = serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse queue file: {}", e))?;
 
-    let url = format!("{}/api/sync/scan", api_base_url);
+    let api_base = std::env::var("VITE_API_URL")
+    .unwrap_or_else(|_| "http://localhost:8080/api".to_string());
+    let url = format!("{}/sync/scan", api_base);
     
     // Build request with optional Authorization header if token is present
     let mut req = client
@@ -203,7 +205,7 @@ async fn process_queue_file(client: &Client, api_base_url: &str, file_path: &Pat
     }
 }
 
-pub async fn start_sync_worker(api_base_url: String) {
+pub async fn start_sync_worker() {
     let mut interval = tokio::time::interval(Duration::from_secs(30)); // Check every 30 seconds
     let mut backoff = Duration::from_secs(30);
     const MAX_BACKOFF: Duration = Duration::from_secs(300); // Max 5 minutes
@@ -211,7 +213,7 @@ pub async fn start_sync_worker(api_base_url: String) {
     loop {
         interval.tick().await;
 
-        match process_sync_queue(&api_base_url).await {
+        match process_sync_queue().await {
             Ok(processed) => {
                 if processed > 0 {
                     println!("Synced {} queued snapshots", processed);

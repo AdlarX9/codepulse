@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use reqwest::Client;
-use crate::settings::{UserSettings, save_settings};
+use crate::user_settings::{UserSettings, save_user_settings};
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateInfo {
@@ -63,7 +63,7 @@ pub async fn check_for_updates(settings: &mut UserSettings) -> Result<UpdateChec
     settings.last_update_check = now;
     
     // Save updated settings
-    if let Err(e) = save_settings(settings) {
+    if let Err(e) = save_user_settings(settings) {
         eprintln!("Failed to save update check time: {}", e);
     }
 
@@ -124,9 +124,6 @@ pub async fn check_for_updates(settings: &mut UserSettings) -> Result<UpdateChec
 }
 
 fn should_check_for_updates(settings: &UserSettings) -> bool {
-    if !settings.auto_update {
-        return false;
-    }
 
     if settings.last_update_check.is_empty() {
         return true;
@@ -177,30 +174,23 @@ pub async fn start_update_checker(mut settings: UserSettings) {
     loop {
         interval.tick().await;
         
-        if settings.auto_update {
-            match check_for_updates(&mut settings).await {
-                Ok(update_check) => {
-                    if update_check.available {
-                        // In a real implementation, this would trigger the Tauri updater
-                        // or show a notification to the user
-                        println!("Update available: {} -> {}", 
-                            update_check.current_version,
-                            update_check.version.unwrap_or_default()
-                        );
-                        
-                        // Emit event to frontend
-                        // window.emit("update-available", &update_check).ok();
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Update check failed: {}", e);
+        match check_for_updates(&mut settings).await {
+            Ok(update_check) => {
+                if update_check.available {
+                    // In a real implementation, this would trigger the Tauri updater
+                    // or show a notification to the user
+                    println!("Update available: {} -> {}", 
+                        update_check.current_version,
+                        update_check.version.unwrap_or_default()
+                    );
+                    
+                    // Emit event to frontend
+                    // window.emit("update-available", &update_check).ok();
                 }
             }
-        }
-        
-        // Sleep for a longer interval if updates are disabled
-        if !settings.auto_update {
-            tokio::time::sleep(std::time::Duration::from_secs(24 * 60 * 60)).await;
+            Err(e) => {
+                eprintln!("Update check failed: {}", e);
+            }
         }
     }
 }

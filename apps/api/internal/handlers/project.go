@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"codepulse-api/internal/database"
 	"codepulse-api/internal/middleware"
@@ -48,9 +47,8 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	if req.Path != nil {
 		projectKeyHash = fmt.Sprintf("%x", sha256.Sum256([]byte(*req.Path)))
 	} else {
-		// Generate a unique hash for projects without path (e.g., using user ID and timestamp)
-		uniqueData := fmt.Sprintf("%s-%d", userID, time.Now().UnixNano())
-		projectKeyHash = fmt.Sprintf("%x", sha256.Sum256([]byte(uniqueData)))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Path is required"})
+		return
 	}
 
 	// Delete any existing project with the same user_id and project_key_hash to allow recreation

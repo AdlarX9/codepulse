@@ -1,5 +1,10 @@
--- Enable UUID extension
+-- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- needed for gen_random_uuid()
+
+-- =========================
+-- Core (users, profiles, projects, scans, etc.)
+-- =========================
 
 -- Create users table
 CREATE TABLE users (
@@ -33,7 +38,6 @@ CREATE TABLE projects (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
-    
     UNIQUE(user_id, project_key_hash)
 );
 
@@ -64,7 +68,6 @@ CREATE TABLE scan_langs (
     code INTEGER NOT NULL,
     comment INTEGER NOT NULL,
     blank INTEGER NOT NULL,
-    
     PRIMARY KEY (scan_id, language)
 );
 
@@ -81,7 +84,6 @@ CREATE TABLE github_links (
     stars_count INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
     UNIQUE(project_id)
 );
 
@@ -108,36 +110,188 @@ CREATE TABLE sessions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create indexes for better performance
+-- =========================
+-- Multi-tenant (organizations, memberships, subscriptions, repos, policies, integrations, audit)
+-- =========================
+
+-- Organizations table
+CREATE TABLE IF NOT EXISTS organizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Memberships table
+CREATE TABLE IF NOT EXISTS memberships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    UNIQUE(org_id, user_id)
+);
+
+-- Subscriptions table
+CREATE TABLE IF NOT EXISTS subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    plan VARCHAR(20) NOT NULL CHECK (plan IN ('free', 'pro', 'team', 'enterprise')),
+    seats INTEGER DEFAULT 1,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due', 'trialing')),
+    current_period_end TIMESTAMP WITH TIME ZONE,
+    stripe_customer_id VARCHAR(255),
+    stripe_subscription_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Repositories table
+CREATE TABLE IF NOT EXISTS repositories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    provider VARCHAR(20) DEFAULT 'github' CHECK (provider IN ('github', 'gitlab', 'bitbucket')),
+    external_id VARCHAR(255) NOT NULL,
+    full_name VARCHAR(500) NOT NULL,
+    visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private', 'public', 'internal')),
+    default_branch VARCHAR(255),
+    repo_data JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Quality Budgets (Policies) table
+CREATE TABLE IF NOT EXISTS quality_budgets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    scope VARCHAR(20) NOT NULL CHECK (scope IN ('org', 'repo', 'project')),
+    ref_id UUID,
+    name VARCHAR(255) NOT NULL,
+    thresholds JSONB NOT NULL,
+    mode VARCHAR(10) DEFAULT 'soft' CHECK (mode IN ('soft', 'hard')),
+    enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Integrations table
+CREATE TABLE IF NOT EXISTS integrations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    provider VARCHAR(20) NOT NULL CHECK (provider IN ('slack', 'github', 'email')),
+    config JSONB,
+    encrypted_data TEXT,
+    enabled BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Audit Logs table
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action VARCHAR(255) NOT NULL,
+    resource VARCHAR(255) NOT NULL,
+    details JSONB,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Link scans to repositories/PRs/commits (added columns)
+ALTER TABLE scans ADD COLUMN IF NOT EXISTS repository_id UUID REFERENCES repositories(id) ON DELETE SET NULL;
+ALTER TABLE scans ADD COLUMN IF NOT EXISTS commit_sha VARCHAR(40);
+ALTER TABLE scans ADD COLUMN IF NOT EXISTS pull_request INTEGER;
+
+-- =========================
+-- Indexes
+-- =========================
+
+-- users
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 
+-- profiles
 CREATE INDEX idx_profiles_handle ON profiles(handle);
 CREATE INDEX idx_profiles_visibility ON profiles(visibility);
 
+-- projects
 CREATE INDEX idx_projects_user_id ON projects(user_id);
 CREATE INDEX idx_projects_project_key_hash ON projects(project_key_hash);
 CREATE INDEX idx_projects_visibility ON projects(visibility);
 CREATE INDEX idx_projects_deleted_at ON projects(deleted_at);
 
+-- scans
 CREATE INDEX idx_scans_user_id ON scans(user_id);
 CREATE INDEX idx_scans_project_id ON scans(project_id);
 CREATE INDEX idx_scans_created_at ON scans(created_at);
+CREATE INDEX IF NOT EXISTS idx_scans_repository_id ON scans(repository_id);
+CREATE INDEX IF NOT EXISTS idx_scans_commit_sha ON scans(commit_sha);
+CREATE INDEX IF NOT EXISTS idx_scans_pull_request ON scans(pull_request);
 
+-- scan_langs
 CREATE INDEX idx_scan_langs_scan_id ON scan_langs(scan_id);
 CREATE INDEX idx_scan_langs_language ON scan_langs(language);
 
+-- github_links
 CREATE INDEX idx_github_links_user_id ON github_links(user_id);
 CREATE INDEX idx_github_links_project_id ON github_links(project_id);
 CREATE INDEX idx_github_links_repo_full_name ON github_links(repo_full_name);
 
+-- downloads
 CREATE INDEX idx_downloads_platform ON downloads(platform);
 CREATE INDEX idx_downloads_version ON downloads(version);
 CREATE INDEX idx_downloads_created_at ON downloads(created_at);
 
+-- sessions
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_token ON sessions(token);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+
+-- organizations
+CREATE INDEX idx_organizations_deleted_at ON organizations(deleted_at);
+CREATE INDEX idx_organizations_slug ON organizations(slug);
+
+-- memberships
+CREATE INDEX idx_memberships_org_id ON memberships(org_id);
+CREATE INDEX idx_memberships_user_id ON memberships(user_id);
+CREATE INDEX idx_memberships_deleted_at ON memberships(deleted_at);
+
+-- subscriptions
+CREATE INDEX idx_subscriptions_org_id ON subscriptions(org_id);
+CREATE INDEX idx_subscriptions_stripe_customer_id ON subscriptions(stripe_customer_id);
+CREATE INDEX idx_subscriptions_stripe_subscription_id ON subscriptions(stripe_subscription_id);
+CREATE INDEX idx_subscriptions_deleted_at ON subscriptions(deleted_at);
+
+-- repositories
+CREATE INDEX idx_repositories_org_id ON repositories(org_id);
+CREATE INDEX idx_repositories_external_id ON repositories(external_id);
+CREATE INDEX idx_repositories_deleted_at ON repositories(deleted_at);
+
+-- quality_budgets
+CREATE INDEX idx_quality_budgets_org_id ON quality_budgets(org_id);
+CREATE INDEX idx_quality_budgets_ref_id ON quality_budgets(ref_id);
+CREATE INDEX idx_quality_budgets_deleted_at ON quality_budgets(deleted_at);
+
+-- integrations
+CREATE INDEX idx_integrations_org_id ON integrations(org_id);
+CREATE INDEX idx_integrations_deleted_at ON integrations(deleted_at);
+
+-- audit_logs
+CREATE INDEX idx_audit_logs_org_id ON audit_logs(org_id);
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+
+-- =========================
+-- updated_at trigger function + triggers
+-- =========================
 
 -- Update updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -148,7 +302,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Create triggers for updated_at
+-- Create triggers for updated_at (core tables)
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use walkdir::{WalkDir};
 
 pub use language::detect_language;
-pub use crate::settings::UserSettings;
+pub use crate::scan_settings::ScanSettings;
 pub use filter::count_files;
 
 #[derive(Debug, Clone, Serialize)]
@@ -124,7 +124,7 @@ struct ProgressEvent {
 
 pub async fn scan_path(
     path: &str,
-    settings: UserSettings,
+    settings: ScanSettings,
     window: tauri::Window,
     cancel_flag: Arc<AtomicBool>,
 ) -> Result<ScanResult, String> {

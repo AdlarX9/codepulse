@@ -5,14 +5,14 @@ import Dashboard from './components/Dashboard'
 import WelcomePage from './pages/Welcome'
 import ProjectSettings from './pages/ProjectSettings'
 import ProfileManagement from './pages/ProfileManagement'
-import { ConsoleOverlay } from './components/ConsoleOverlay'
 import { api, type User as ApiUser } from './lib/api'
 import { orgApi } from './lib/api-org'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
-import type { ScanResult, UserSettings } from './types'
+import type { ScanResult, ScanSettings } from './types'
 import type { Organization } from './types/organization'
-import SettingsPage from './components/Settings'
+import ScanSettingsPage from './components/ScanSettings'
+import UserSettingsPage from './components/UserSettings'
 import AuthPage from './pages/Auth'
 import OrganizationPage from './pages/OrganizationPage'
 import AnalyticsPage from './pages/AnalyticsPage'
@@ -24,6 +24,7 @@ import {
 	SidebarItem,
 	SidebarSection
 } from './components/ui/Sidebar'
+import logo from './assets/icon.png'
 
 type User = ApiUser
 
@@ -36,7 +37,8 @@ function App() {
 		| 'project-details'
 		| 'profile'
 		| 'project-settings'
-		| 'settings'
+		| 'scan-settings'
+		| 'user-settings'
 		| 'analysis'
 		| 'auth'
 		| 'organization'
@@ -48,7 +50,8 @@ function App() {
 		| 'project-details'
 		| 'profile'
 		| 'project-settings'
-		| 'settings'
+		| 'scan-settings'
+		| 'user-settings'
 		| 'analysis'
 		| 'auth'
 		| 'organization'
@@ -89,7 +92,8 @@ function App() {
 			| 'project-details'
 			| 'profile'
 			| 'project-settings'
-			| 'settings'
+			| 'scan-settings'
+			| 'user-settings'
 			| 'analysis'
 			| 'auth'
 			| 'organization'
@@ -107,8 +111,11 @@ function App() {
 		if (!selected) return
 		setScanPath(selected)
 		// load settings and scan
-		const settings = await invoke<UserSettings>('get_settings')
-		const result = await invoke<ScanResult>('scan_directory', { path: selected, settings })
+		const settings = await invoke<ScanSettings>('get_scan_settings')
+		const result = await invoke<ScanResult>('scan_directory', {
+			path: selected,
+			scanSettings: settings
+		})
 		setScanResult(result)
 		changeView('analysis')
 	}
@@ -133,6 +140,9 @@ function App() {
 		} finally {
 			setCurrentUser(null)
 			setUserOrgs([])
+			setScanResult(null)
+			setScanPath('')
+			setSelectedProjectId(null)
 			changeView('welcome')
 		}
 	}
@@ -149,13 +159,12 @@ function App() {
 
 	return (
 		<div className='min-h-screen bg-background'>
-			<ConsoleOverlay />
 			<main>
 				{currentView === 'welcome' && (
 					<WelcomePage
 						onContinueWithAccount={() => changeView('auth')}
 						onContinueWithoutAccount={handleContinueWithoutAccount}
-						onOpenSettings={() => changeView('settings')}
+						onOpenSettings={() => changeView('scan-settings')}
 					/>
 				)}
 
@@ -169,15 +178,17 @@ function App() {
 							}}
 							onChooseFolder={selectAndScan}
 							onRescan={async () => {
-								if (!scanPath) return
-								const settings = await invoke<UserSettings>('get_settings')
+								if (!scanPath) {
+									return
+								}
+								const settings = await invoke<ScanSettings>('get_scan_settings')
 								const result = await invoke<ScanResult>('scan_directory', {
 									path: scanPath,
-									settings
+									scanSettings: settings
 								})
 								setScanResult(result)
 							}}
-							onOpenSettings={() => changeView('settings')}
+							onOpenSettings={() => changeView('scan-settings')}
 						/>
 					</div>
 				)}
@@ -210,9 +221,15 @@ function App() {
 					</div>
 				)}
 
-				{currentView === 'settings' && !currentUser && (
+				{currentView === 'scan-settings' && scanResult && (
 					<div className='container mx-auto p-6'>
-						<SettingsPage onBack={() => changeView('welcome')} />
+						<ScanSettingsPage onBack={() => changeView(previousView)} />
+					</div>
+				)}
+
+				{currentView === 'user-settings' && !currentUser && (
+					<div className='container mx-auto p-6'>
+						<UserSettingsPage onBack={() => changeView(previousView)} />
 					</div>
 				)}
 
@@ -220,13 +237,18 @@ function App() {
 					currentView !== 'welcome' &&
 					currentView !== 'auth' &&
 					currentView !== 'analysis' &&
-					currentUser && (
+					currentUser &&
+					!scanResult && (
 						<div className='flex h-screen'>
 							<Sidebar>
 								<SidebarHeader>
 									<div className='flex items-center gap-3'>
-										<div className='w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center'>
-											<span className='text-white font-bold text-sm'>CP</span>
+										<div className='w-12 h-12 rounded-lg flex items-center justify-center'>
+											<img
+												src={logo}
+												alt='Logo'
+												className='text-white font-bold text-sm'
+											/>
 										</div>
 										<div>
 											<div className='font-semibold text-sm'>CodePulse</div>
@@ -348,9 +370,29 @@ function App() {
 													/>
 												</svg>
 											}
-											label='Settings'
-											active={currentView === 'settings'}
-											onClick={() => changeView('settings')}
+											label='Scan Settings'
+											active={currentView === 'scan-settings'}
+											onClick={() => changeView('scan-settings')}
+										/>
+										<SidebarItem
+											icon={
+												<svg
+													className='w-5 h-5'
+													fill='none'
+													viewBox='0 0 24 24'
+													stroke='currentColor'
+												>
+													<path
+														strokeLinecap='round'
+														strokeLinejoin='round'
+														strokeWidth={2}
+														d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
+													/>
+												</svg>
+											}
+											label='User Settings'
+											active={currentView === 'user-settings'}
+											onClick={() => changeView('user-settings')}
 										/>
 									</SidebarSection>
 								</SidebarBody>
@@ -419,7 +461,10 @@ function App() {
 									/>
 								)}
 								{currentView === 'profile' && (
-									<ProfileManagement onBack={() => changeView('projects')} />
+									<ProfileManagement
+										onBack={() => changeView('projects')}
+										onLogout={handleLogout}
+									/>
 								)}
 								{currentView === 'project-settings' && selectedProjectId && (
 									<ProjectSettings
@@ -427,8 +472,11 @@ function App() {
 										onBack={() => changeView('project-details')}
 									/>
 								)}
-								{currentView === 'settings' && (
-									<SettingsPage onBack={() => changeView('projects')} />
+								{currentView === 'scan-settings' && (
+									<ScanSettingsPage onBack={() => changeView('projects')} />
+								)}
+								{currentView === 'user-settings' && (
+									<UserSettingsPage onBack={() => changeView('projects')} />
 								)}
 								{currentView === 'analytics' &&
 									(hasOrgs && userOrgs[0]?.id ? (

@@ -5,6 +5,7 @@ import { Card } from '../ui/Card'
 import { SimpleButton as Button } from '../ui/SimpleButton'
 import { Badge } from '../ui/Badge'
 import { shell } from '@tauri-apps/api'
+import { WEB_BASE } from '@/lib/api'
 
 interface BillingTabProps {
 	orgId: string
@@ -82,7 +83,7 @@ export default function BillingTab({ orgId, subscription }: BillingTabProps) {
 	async function handleUpgrade(planId: string) {
 		if (planId === 'enterprise') {
 			// Open contact sales
-			await shell.open('https://codepulse.dev/contact')
+			await shell.open(WEB_BASE + '/contact')
 			return
 		}
 

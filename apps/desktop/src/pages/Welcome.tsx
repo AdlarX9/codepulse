@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Code2, ArrowRight, User, FolderOpen, ShieldCheck, Sparkles, Settings } from 'lucide-react'
 import { Button } from '../components/ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card'
+import logo from '../assets/icon.png'
 
 interface WelcomePageProps {
 	onContinueWithAccount: () => void
@@ -49,8 +50,8 @@ export default function WelcomePage({
 			{/* Header */}
 			<header className='relative z-10 flex items-center justify-between max-w-5xl w-full mx-auto px-6 py-5'>
 				<div className='flex items-center gap-3 group'>
-					<div className='w-11 h-11 rounded-xl bg-primary flex items-center justify-center shadow-sm ring-1 ring-primary/30 group-hover:scale-105 transition-transform'>
-						<Code2 className='h-5 w-5 text-primary-foreground' />
+					<div className='w-11 h-11 rounded-xl bg-gradient-to-r from-violet-900 to-blue-700 flex items-center justify-center shadow-sm'>
+						<img src={logo} alt='Logo' />
 					</div>
 					<h1 className='text-2xl font-bold tracking-tight'>
 						<span className='bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent'>

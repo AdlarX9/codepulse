@@ -84,7 +84,14 @@ setup_project() {
 		cp apps/web/.env.example apps/web/.env.local
 		echo -e "${YELLOW}⚠️  Éditez apps/web/.env.local avec vos credentials${NC}"
 	fi
-		
+
+	# Setup desktop env if needed
+	if [ ! -f "apps/desktop/.env.local" ]; then
+		echo -e "${BLUE}⚙️  Configuration de l'environnement desktop...${NC}"
+		cp apps/desktop/.env.example apps/desktop/.env.local
+		echo -e "${YELLOW}⚠️  Éditez apps/desktop/.env.local avec vos credentials${NC}"
+	fi
+
 	echo -e "${GREEN}✅ Configuration terminée !${NC}"
 	echo ""
 	echo "Commandes disponibles :"

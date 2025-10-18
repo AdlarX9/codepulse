@@ -38,19 +38,19 @@ export interface ScanProgress {
 }
 
 export interface UserSettings {
+	device_id: string
+	local_salt: string
+	update_channel: string
+	last_update_check: string
+}
+
+export interface ScanSettings {
 	excluded_languages: string[]
 	allowed_languages: string[]
 	excluded_patterns: string[]
 	excluded_dirs: string[]
 	excluded_extensions: string[]
 	follow_symlinks: boolean
-	sync_enabled: boolean
-	device_id: string
-	local_salt: string
-	auto_update: boolean
-	update_channel: string
-	last_update_check: string
-	api_base_url: string
 }
 
 export interface UpdateCheck {

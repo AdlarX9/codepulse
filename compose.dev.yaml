@@ -12,7 +12,7 @@ services:
         ports:
             - '5432:5432'
         volumes:
-            - postgres_data_dev:/var/lib/postgresql/data
+            - ./postgres_data_dev:/var/lib/postgresql/data
             - ./apps/api/migrations:/docker-entrypoint-initdb.d
         healthcheck:
             test: ['CMD-SHELL', 'pg_isready -U codepulse -d codepulse_dev']
@@ -28,7 +28,7 @@ services:
             - '6379:6379'
         command: redis-server --appendonly yes
         volumes:
-            - redis_data_dev:/data
+            - ./redis_data_dev:/data
 
     # Go API with hot reload
     api:
@@ -85,10 +85,6 @@ services:
         depends_on:
             - api
         restart: unless-stopped
-
-volumes:
-    postgres_data_dev:
-    redis_data_dev:
 
 networks:
     default:

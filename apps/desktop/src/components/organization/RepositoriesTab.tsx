@@ -3,6 +3,7 @@ import { Card } from '../ui/Card'
 import { SimpleButton as Button } from '../ui/SimpleButton'
 import type { Subscription } from '../../types/organization'
 import { orgApi } from '../../lib/api-org'
+import { WEB_BASE } from '@/lib/api'
 
 let openExternal: (url: string) => Promise<void>
 try {
@@ -36,7 +37,7 @@ export default function RepositoriesTab({ orgId }: RepositoriesTabProps) {
 
 	async function handleInstallGithubApp() {
 		if (plan === 'free') return
-		await openExternal('https://github.com/apps/codepulse-quality/installations/new')
+		await openExternal(WEB_BASE + '/github-app')
 	}
 
 	async function handleUpgrade() {
@@ -105,7 +106,7 @@ export default function RepositoriesTab({ orgId }: RepositoriesTabProps) {
 							{plan === 'free' ? 'Upgrade to Install' : 'Install GitHub App'}
 						</Button>
 						<a
-							href='https://docs.codepulse.dev/github-integration'
+							href={WEB_BASE + '/docs/github-integration'}
 							target='_blank'
 							rel='noopener noreferrer'
 							className='text-sm text-blue-600 hover:text-blue-800'

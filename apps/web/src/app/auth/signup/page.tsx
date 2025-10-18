@@ -56,7 +56,7 @@ export default function SignUpPage() {
 						Back to Home
 					</Link>
 					<div className='flex items-center justify-center gap-2 mb-4'>
-						<Code2 className='h-8 w-8 text-blue-600' />
+						<img src='/logo.png' className='h-12 w-auto' />
 						<span className='text-2xl font-bold'>CodePulse</span>
 					</div>
 					<h2 className='text-3xl font-bold text-gray-900'>Create Account</h2>

@@ -2,7 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod scanner;
-mod settings;
+mod user_settings;
+mod scan_settings;
 mod sync;
 mod categories;
 mod updater;
@@ -10,7 +11,8 @@ mod auth;
 mod projects;
 
 use scanner::{ScanResult, to_snapshot};
-use settings::{UserSettings, load_settings, save_settings};
+use user_settings::{UserSettings, load_user_settings, save_user_settings};
+use scan_settings::{ScanSettings, load_scan_settings, save_scan_settings};
 use auth::{get_token, set_token, clear_token};
 use tauri::{Window, State};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -24,22 +26,21 @@ struct AppState {
 #[tauri::command]
 async fn scan_and_maybe_enqueue(
     path: &str,
-    settings: UserSettings,
+    scan_settings: ScanSettings,
     window: Window,
     state: State<'_, AppState>,
 ) -> Result<ScanResult, String> {
     // Reset cancel flag
     state.cancel_flag.store(false, Ordering::Relaxed);
 
-    let result = scanner::scan_path(&path, settings.clone(), window, state.cancel_flag.clone())
+    let result = scanner::scan_path(&path, scan_settings.clone(), window, state.cancel_flag.clone())
         .await
         .map_err(|e| e.to_string())?;
 
-    if settings.sync_enabled {
-        let snapshot = to_snapshot(&result);
-        if let Err(e) = crate::sync::enqueue_snapshot(path, &settings, &snapshot) {
-            eprintln!("enqueue_snapshot failed: {}", e);
-        }
+    let snapshot = to_snapshot(&result);
+    let user_settings = load_user_settings()?;
+    if let Err(e) = crate::sync::enqueue_snapshot(path, &user_settings, &snapshot) {
+        eprintln!("enqueue_snapshot failed: {}", e);
     }
 
     Ok(result)
@@ -48,14 +49,14 @@ async fn scan_and_maybe_enqueue(
 #[tauri::command]
 async fn scan_directory(
     path: &str,
-    settings: UserSettings,
+    scan_settings: ScanSettings,
     window: Window,
     state: State<'_, AppState>,
 ) -> Result<ScanResult, String> {
     // Reset cancel flag
     state.cancel_flag.store(false, Ordering::Relaxed);
     
-    scanner::scan_path(&path, settings, window, state.cancel_flag.clone())
+    scanner::scan_path(&path, scan_settings, window, state.cancel_flag.clone())
         .await
         .map_err(|e| e.to_string())
 }
@@ -67,18 +68,28 @@ async fn cancel_scan(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_settings() -> Result<UserSettings, String> {
-    load_settings()
+async fn get_user_settings() -> Result<UserSettings, String> {
+    load_user_settings()
 }
 
 #[tauri::command]
-async fn update_settings(settings: UserSettings) -> Result<(), String> {
-    save_settings(&settings)
+async fn update_user_settings(settings: UserSettings) -> Result<(), String> {
+    save_user_settings(&settings)
+}
+
+#[tauri::command]
+async fn get_scan_settings() -> Result<ScanSettings, String> {
+    load_scan_settings()
+}
+
+#[tauri::command]
+async fn update_scan_settings(settings: ScanSettings) -> Result<(), String> {
+    save_scan_settings(&settings)
 }
 
 #[tauri::command]
 async fn check_for_updates() -> Result<updater::UpdateCheck, String> {
-    let mut settings = load_settings()?;
+    let mut settings = load_user_settings()?;
     updater::check_for_updates(&mut settings).await
 }
 
@@ -118,15 +129,13 @@ async fn compute_project_key_hash(basePath: &str) -> Result<String, String> {
 }
 
 fn main() {
-    // Load settings for background tasks
-    let settings = load_settings().expect("Failed to load settings");
+    // Load user settings for background tasks
+    let user_settings = load_user_settings().expect("Failed to load user settings");
 
     // Start sync worker in background (will be spawned within Tauri runtime)
-    // TODO: Make API base URL configurable
-    let api_url = settings.api_base_url.clone();
 
     // Start update checker in background
-    let settings_clone = settings.clone();
+    let user_settings_clone = user_settings.clone();
 
     tauri::Builder::default()
         .manage(AppState {
@@ -137,14 +146,13 @@ fn main() {
             // let app_handle = app.handle(); // Unused for now
 
             // Sync worker
-            let sync_api_url = api_url.clone();
             tauri::async_runtime::spawn(async move {
-                crate::sync::start_sync_worker(sync_api_url).await;
+                crate::sync::start_sync_worker().await;
             });
 
             // Update checker
             tauri::async_runtime::spawn(async move {
-                crate::updater::start_update_checker(settings_clone).await;
+                crate::updater::start_update_checker(user_settings_clone).await;
             });
 
             Ok(())
@@ -153,8 +161,10 @@ fn main() {
             scan_directory,
             scan_and_maybe_enqueue,
             cancel_scan,
-            get_settings,
-            update_settings,
+            get_user_settings,
+            update_user_settings,
+            get_scan_settings,
+            update_scan_settings,
             check_for_updates,
             get_auth_token,
             set_auth_token,

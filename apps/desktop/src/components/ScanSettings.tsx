@@ -4,27 +4,21 @@ import { X, Plus, Trash2, Save } from 'lucide-react'
 import { Button } from './ui/Button'
 import { Card } from './ui/Card'
 import { Autocomplete } from './ui/Autocomplete'
-import type { UserSettings } from '../types'
+import type { ScanSettings } from '../types'
 import { ALL_LANGUAGES, COMMON_EXCLUDED_LANGUAGES } from '../constants/languages'
-interface SettingsProps {
+
+interface ScanSettingsProps {
 	onBack: () => void
 }
 
-export default function Settings({ onBack }: SettingsProps) {
-	const [settings, setSettings] = useState<UserSettings>({
+export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
+	const [settings, setSettings] = useState<ScanSettings>({
 		excluded_dirs: [],
 		excluded_extensions: [],
 		excluded_patterns: [],
 		follow_symlinks: false,
 		excluded_languages: [],
 		allowed_languages: [],
-		sync_enabled: false,
-		device_id: '',
-		local_salt: '',
-		auto_update: true,
-		update_channel: 'stable',
-		last_update_check: '',
-		api_base_url: 'http://localhost:8080'
 	})
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -42,10 +36,10 @@ export default function Settings({ onBack }: SettingsProps) {
 
 	async function loadSettings() {
 		try {
-			const loadedSettings = await invoke<UserSettings>('get_settings')
+			const loadedSettings = await invoke<ScanSettings>('get_scan_settings')
 			setSettings(loadedSettings)
 		} catch (error) {
-			console.error('Failed to load settings:', error)
+			console.error('Failed to load scan settings:', error)
 		} finally {
 			setLoading(false)
 		}
@@ -54,18 +48,18 @@ export default function Settings({ onBack }: SettingsProps) {
 	async function saveSettings() {
 		setSaving(true)
 		try {
-			await invoke('update_settings', { settings })
+			await invoke('update_scan_settings', { settings })
 			onBack()
 		} catch (error) {
-			console.error('Failed to save settings:', error)
-			alert(`Failed to save settings: ${error}`)
+			console.error('Failed to save scan settings:', error)
+			alert(`Failed to save scan settings: ${error}`)
 		} finally {
 			setSaving(false)
 		}
 	}
 
 	// ---------- helpers ----------
-	function addToList<K extends keyof UserSettings>(
+	function addToList<K extends keyof ScanSettings>(
 		key: K,
 		value: string,
 		normalizer?: (s: string) => string
@@ -74,15 +68,15 @@ export default function Settings({ onBack }: SettingsProps) {
 		if (!v) return
 		const current = (settings[key] as unknown as string[]) || []
 		if (current.includes(v)) return
-		setSettings({ ...settings, [key]: [...current, v] } as UserSettings)
+		setSettings({ ...settings, [key]: [...current, v] } as ScanSettings)
 	}
 
-	function removeFromList<K extends keyof UserSettings>(key: K, value: string) {
+	function removeFromList<K extends keyof ScanSettings>(key: K, value: string) {
 		const current = (settings[key] as unknown as string[]) || []
 		setSettings({
 			...settings,
 			[key]: current.filter((x: string) => x !== value)
-		} as UserSettings)
+		} as ScanSettings)
 	}
 
 	// normalize extensions: lowercased, without leading dot
@@ -91,7 +85,7 @@ export default function Settings({ onBack }: SettingsProps) {
 	if (loading) {
 		return (
 			<div className='min-h-screen bg-background flex items-center justify-center'>
-				<div className='text-muted-foreground'>Loading settings...</div>
+				<div className='text-muted-foreground'>Loading scan settings...</div>
 			</div>
 		)
 	}
@@ -100,7 +94,7 @@ export default function Settings({ onBack }: SettingsProps) {
 		<div className='min-h-screen bg-background p-6'>
 			<div className='max-w-5xl mx-auto'>
 				<div className='flex items-center justify-between mb-6'>
-					<h1 className='text-3xl font-bold'>Settings</h1>
+					<h1 className='text-3xl font-bold'>Scan Settings</h1>
 					<Button variant='ghost' size='sm' onClick={onBack}>
 						<X className='h-5 w-5' />
 					</Button>
@@ -444,128 +438,6 @@ export default function Settings({ onBack }: SettingsProps) {
 								Follow symlinks during analysis
 							</span>
 						</label>
-					</Card>
-
-					{/* Auto-Update Settings */}
-					<Card className='p-6'>
-						<h2 className='text-xl font-semibold mb-4'>Auto-Update</h2>
-						<p className='text-sm text-muted-foreground mb-4'>
-							Automatically check for and install updates to CodePulse.
-						</p>
-
-						<div className='space-y-4'>
-							<label className='flex items-center gap-3 cursor-pointer'>
-								<input
-									type='checkbox'
-									checked={settings.auto_update}
-									onChange={e =>
-										setSettings({ ...settings, auto_update: e.target.checked })
-									}
-									className='w-5 h-5'
-								/>
-								<span className='text-sm font-medium'>
-									Enable automatic updates
-								</span>
-							</label>
-
-							{settings.auto_update && (
-								<div>
-									<label className='block text-sm font-medium mb-2'>
-										Update Channel
-									</label>
-									<select
-										value={settings.update_channel}
-										onChange={e =>
-											setSettings({
-												...settings,
-												update_channel: e.target.value
-											})
-										}
-										className='w-full px-3 py-2 bg-background border border-input rounded-md'
-									>
-										<option value='stable'>Stable (Recommended)</option>
-										<option value='beta'>Beta (Early Access)</option>
-									</select>
-									<p className='text-xs text-muted-foreground mt-1'>
-										{settings.update_channel === 'beta'
-											? 'Get early access to new features (may be unstable)'
-											: 'Stable releases only (recommended for production use)'}
-									</p>
-								</div>
-							)}
-
-							{settings.last_update_check && (
-								<div className='text-xs text-muted-foreground'>
-									Last checked:{' '}
-									{new Date(
-										parseInt(settings.last_update_check) * 1000
-									).toLocaleDateString()}
-								</div>
-							)}
-						</div>
-					</Card>
-
-					{/* Sync (opt-in) */}
-					<Card className='p-6'>
-						<h2 className='text-xl font-semibold mb-4'>
-							Sync Aggregated Stats (Opt-in)
-						</h2>
-						<p className='text-sm text-muted-foreground mb-4'>
-							When enabled, the app can queue anonymous aggregated statistics (no file
-							paths, no contents) for synchronization. You can review queued files
-							locally.
-						</p>
-
-						<label className='flex items-center gap-3 cursor-pointer mb-3'>
-							<input
-								type='checkbox'
-								checked={settings.sync_enabled}
-								onChange={e =>
-									setSettings({ ...settings, sync_enabled: e.target.checked })
-								}
-								className='w-5 h-5'
-							/>
-							<span className='text-sm font-medium'>
-								Enable sync of aggregated stats
-							</span>
-						</label>
-
-						<div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-							<div>
-								<label className='text-sm font-medium mb-1 block'>Device ID</label>
-								<input
-									readOnly
-									value={settings.device_id}
-									className='w-full px-3 py-2 bg-muted border border-input rounded-md'
-								/>
-							</div>
-							<div>
-								<label className='text-sm font-medium mb-1 block'>Local Salt</label>
-								<input
-									readOnly
-									value={settings.local_salt}
-									className='w-full px-3 py-2 bg-muted border border-input rounded-md'
-								/>
-							</div>
-							<div className='sm:col-span-2'>
-								<label className='text-sm font-medium mb-1 block'>
-									API Base URL (Sync)
-								</label>
-								<input
-									type='text'
-									value={settings.api_base_url}
-									onChange={e =>
-										setSettings({ ...settings, api_base_url: e.target.value })
-									}
-									placeholder='http://localhost:8080'
-									className='w-full px-3 py-2 bg-background border border-input rounded-md'
-								/>
-								<p className='text-xs text-muted-foreground mt-1'>
-									Used by the background sync worker to post snapshots (e.g.,
-									http://localhost:8080). Restart the app to apply changes.
-								</p>
-							</div>
-						</div>
 					</Card>
 
 					{/* Actions */}

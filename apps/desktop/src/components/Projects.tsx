@@ -5,7 +5,7 @@ import { Plus, Folder, Calendar, Github, Settings, Trash2, BarChart3 } from 'luc
 import { api } from '../lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
-import type { ScanResult, UserSettings } from '../types'
+import type { ScanResult, ScanSettings, UserSettings } from '../types'
 import Dashboard from './Dashboard'
 
 interface Project {
@@ -13,6 +13,7 @@ interface Project {
 	name: string
 	path: string
 	description?: string
+	visibility?: string
 	createdAt: string
 	updatedAt: string
 	userId: string
@@ -44,6 +45,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 	const [selectedPath, setSelectedPath] = useState<string | null>(null)
 	const [projectName, setProjectName] = useState('')
 	const [projectDescription, setProjectDescription] = useState('')
+	const [projectVisibility, setProjectVisibility] = useState<'private' | 'public'>('private')
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 	const [scannedProjectName, setScannedProjectName] = useState<string>('')
 
@@ -62,8 +64,8 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 				return {
 					id: p.id,
 					name: p.name || 'Project',
-					path: '',
-					description: undefined,
+					path: p.path || '',
+					description: p.description || undefined,
 					createdAt: p.created_at,
 					updatedAt: p.updated_at,
 					userId: p.user_id,
@@ -77,7 +79,8 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 								totalComments: latest.comment,
 								createdAt: latest.created_at
 							}
-						: undefined
+						: undefined,
+					visibility: p.visibility
 				}
 			})
 			setProjects(mapped)
@@ -117,10 +120,15 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 		if (!selectedPath || !projectName.trim()) return
 
 		try {
+			// Use current user settings for the project settings payload
+			const scanSettings = await invoke<ScanSettings>('get_scan_settings')
+
 			const projectData = {
 				name: projectName.trim(),
 				description: projectDescription.trim() || 'Created from desktop app',
-				path: selectedPath
+				path: selectedPath,
+				visibility: projectVisibility,
+				settings: scanSettings
 			}
 
 			const result = await api.createProject(projectData)
@@ -146,6 +154,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 			setSelectedPath(null)
 			setProjectName('')
 			setProjectDescription('')
+			setProjectVisibility('private')
 		} catch (err) {
 			console.error('Error creating project:', err)
 		}
@@ -156,6 +165,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 		setSelectedPath(null)
 		setProjectName('')
 		setProjectDescription('')
+		setProjectVisibility('private')
 	}
 
 	async function handleScanProject(project: Project) {
@@ -174,13 +184,13 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 			}
 
 			// Get global settings and merge with project-level settings if any
-			const settings = await invoke<UserSettings>('get_settings')
+			const settings = await invoke<ScanSettings>('get_settings')
 			try {
 				const projectData = await api.getProject(project.id)
 				const p = projectData.project || projectData
 				const ps = (p.settings as any) || {}
 				// Overlay known keys if present
-				const overrideKeys: (keyof UserSettings)[] = [
+				const overrideKeys: (keyof ScanSettings)[] = [
 					'excluded_dirs',
 					'excluded_extensions',
 					'excluded_patterns',
@@ -202,6 +212,8 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 			})
 			setScanResult(result)
 			setScannedProjectName(project.name)
+
+			const userSettings = await invoke<UserSettings>('get_user_settings')
 
 			// Save scan snapshot to backend
 			if (result) {
@@ -228,7 +240,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 							blank: stats.blank
 						})
 					),
-					device_id: settings.device_id,
+					device_id: userSettings.device_id,
 					app_version: '1.0.0',
 					scanned_at: Math.floor(Date.now() / 1000).toString()
 				})
@@ -441,6 +453,25 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 									<div className='w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md text-sm text-gray-600'>
 										{selectedPath}
 									</div>
+								</div>
+
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Visibility
+									</label>
+									<select
+										value={projectVisibility}
+										onChange={e =>
+											setProjectVisibility(
+												(e.target.value as 'private' | 'public') ||
+													'private'
+											)
+										}
+										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+									>
+										<option value='private'>Private</option>
+										<option value='public'>Public</option>
+									</select>
 								</div>
 							</div>
 

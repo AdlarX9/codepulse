@@ -3,6 +3,7 @@
 # Create placeholder icons for development
 # This uses ImageMagick to create simple colored squares
 
+LOGO_NAME="FullLogo_Transparent.png"
 ICON_DIR="apps/desktop/src-tauri/icons"
 mkdir -p "$ICON_DIR"
 
@@ -19,10 +20,15 @@ if ! command -v convert &> /dev/null; then
 	fi
 fi
 
+echo "Copying icons into web and desktop assets..."
+cp "logos/$LOGO_NAME" "apps/web/public/favicon.ico"
+cp "logos/$LOGO_NAME" "apps/web/public/logo.png"
+cp "logos/$LOGO_NAME" "apps/desktop/src/assets/icon.png"
+
 echo "Creating placeholder icons..."
 
 # Generate required sizes
-convert "logos/FullLogo_Transparent.png" -resize 1024x1024 "$ICON_DIR/1024x1024.png"
+convert "logos/$LOGO_NAME" -resize 1024x1024 "$ICON_DIR/1024x1024.png"
 convert "$ICON_DIR/1024x1024.png" -resize 32x32 "$ICON_DIR/32x32.png"
 convert "$ICON_DIR/1024x1024.png" -resize 128x128 "$ICON_DIR/128x128.png"
 convert "$ICON_DIR/1024x1024.png" -resize 256x256 "$ICON_DIR/128x128@2x.png"

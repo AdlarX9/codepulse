@@ -132,7 +132,7 @@ export default function Home() {
 				<div className='container mx-auto px-4 py-8'>
 					<div className='flex flex-col md:flex-row items-center justify-between gap-4'>
 						<div className='flex items-center gap-2'>
-							<Code2 className='h-6 w-6 text-blue-600' />
+							<img src='/logo.png' className='h-10 w-auto' />
 							<span className='font-semibold'>CodePulse</span>
 						</div>
 						<div className='flex items-center gap-6 text-sm text-gray-600'>

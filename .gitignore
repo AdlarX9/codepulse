@@ -3,6 +3,8 @@ node_modules/
 .pnpm-store/
 pnpm-lock.yaml
 apps/desktop/src-tauri/Cargo.lock
+postgres_data_dev/
+redis_data_dev/
 
 # Build outputs
 dist/

@@ -40,15 +40,67 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"profile": profile})
 }
 
-// UpdateProfile handles PATCH /me/profile
-func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+// CheckHandleAvailability handles GET /me/profile/check-handle
+func (h *AuthHandler) CheckHandleAvailability(c *gin.Context) {
 	user, exists := middleware.GetCurrentUser(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
 	}
 
+	handle := c.Query("handle")
+	if handle == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Handle parameter is required"})
+		return
+	}
+
+	// Validate handle format (alphanumeric, underscore, hyphen, 3-50 chars)
+	if len(handle) < 3 || len(handle) > 50 {
+		c.JSON(http.StatusOK, gin.H{
+			"available": false,
+			"reason":    "Handle must be between 3 and 50 characters",
+		})
+		return
+	}
+
+	// Check if handle is already taken by another user
+	var existingProfile models.Profile
+	err := h.db.DB.Where("handle = ?", handle).First(&existingProfile).Error
+	if err == nil {
+		// Handle exists
+		if existingProfile.UserID == user.ID {
+			// It's the current user's handle
+			c.JSON(http.StatusOK, gin.H{
+				"available": true,
+				"reason":    "This is your current handle",
+			})
+		} else {
+			// Handle taken by another user
+			c.JSON(http.StatusOK, gin.H{
+				"available": false,
+				"reason":    "Handle already taken",
+			})
+		}
+		return
+	}
+
+	// Handle is available
+	c.JSON(http.StatusOK, gin.H{
+		"available": true,
+		"reason":    "Handle is available",
+	})
+}
+
+// UpdateProfile handles PATCH /me/profile
+func (h *AuthHandler) UpdateProfile(c *gin.Context) {
+	userCtx, exists := middleware.GetCurrentUser(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
 	var req struct {
+		Handle          *string         `json:"handle"`
 		DisplayName     *string         `json:"display_name"`
 		AvatarURL       *string         `json:"avatar_url"`
 		Bio             *string         `json:"bio"`
@@ -69,16 +121,42 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	// Start transaction for potential multiple updates
+	// Start transaction
 	tx := h.db.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 		}
 	}()
 
-	// Update profile fields
+	// Recharger l'utilisateur depuis la DB (avec mot de passe haché)
+	var dbUser models.User
+	if err := tx.Where("id = ?", userCtx.ID).First(&dbUser).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load user"})
+		return
+	}
+
+	// Update profile fields (si fournis)
 	profileUpdates := map[string]interface{}{}
+	
+	// Handle handle change (requires checking uniqueness)
+	if req.Handle != nil && *req.Handle != "" {
+		// Check if handle is already taken by another user
+		var existingProfile models.Profile
+		err := tx.Where("handle = ? AND user_id != ?", *req.Handle, dbUser.ID).First(&existingProfile).Error
+		if err == nil {
+			tx.Rollback()
+			c.JSON(http.StatusConflict, gin.H{"error": "Handle already taken"})
+			return
+		}
+		profileUpdates["handle"] = *req.Handle
+	}
+	
 	if req.DisplayName != nil {
 		profileUpdates["display_name"] = *req.DisplayName
 	}
@@ -95,62 +173,68 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		profileUpdates["visibility"] = *req.Visibility
 	}
 
-	// Update profile if there are profile fields to update
 	if len(profileUpdates) > 0 {
-		if err := tx.Model(&models.Profile{}).Where("user_id = ?", user.ID).Updates(profileUpdates).Error; err != nil {
+		if err := tx.Model(&models.Profile{}).
+			Where("user_id = ?", dbUser.ID).
+			Updates(profileUpdates).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 			return
 		}
 	}
 
-	// Update email if provided
-	if req.Email != nil {
-		// Verify current password if email is being changed
+	// Update email si fourni et différent
+	if req.Email != nil && *req.Email != "" && *req.Email != dbUser.Email {
+		// Vérifier le mot de passe courant
 		if req.CurrentPassword == nil {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Current password required to update email"})
 			return
 		}
-
-		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.CurrentPassword)); err != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(*req.CurrentPassword)); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password"})
 			return
 		}
 
-		// Check if new email is already taken
-		var existingUser models.User
-		if err := tx.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+		// Unicité de l'email
+		var count int64
+		if err := tx.Model(&models.User{}).Where("email = ?", *req.Email).Count(&count).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify email uniqueness"})
+			return
+		}
+		if count > 0 {
 			tx.Rollback()
 			c.JSON(http.StatusConflict, gin.H{"error": "Email already in use"})
 			return
 		}
 
-		// Update email
-		if err := tx.Model(user).Update("email", req.Email).Error; err != nil {
+		// Mise à jour email
+		if err := tx.Model(&models.User{}).
+			Where("id = ?", dbUser.ID).
+			Update("email", *req.Email).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update email"})
 			return
 		}
 	}
 
-	// Update password if provided
-	if req.Password != nil {
-		// Verify current password if password is being changed
+	// Update password si fourni
+	if req.Password != nil && *req.Password != "" {
+		// Vérifier le mot de passe courant
 		if req.CurrentPassword == nil {
 			tx.Rollback()
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Current password required to update password"})
 			return
 		}
-
-		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.CurrentPassword)); err != nil {
+		if err := bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(*req.CurrentPassword)); err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid current password"})
 			return
 		}
 
-		// Hash new password
+		// Hash du nouveau mot de passe
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(*req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			tx.Rollback()
@@ -158,8 +242,10 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 			return
 		}
 
-		// Update password
-		if err := tx.Model(user).Update("password", string(hashedPassword)).Error; err != nil {
+		// Mise à jour mot de passe
+		if err := tx.Model(&models.User{}).
+			Where("id = ?", dbUser.ID).
+			Update("password", string(hashedPassword)).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update password"})
 			return
@@ -174,7 +260,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	// Reload updated user and profile
 	var updatedUser models.User
-	if err := h.db.DB.Preload("Profile").Where("id = ?", user.ID).First(&updatedUser).Error; err != nil {
+	if err := h.db.DB.Preload("Profile").Where("id = ?", userCtx.ID).First(&updatedUser).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reload user data"})
 		return
 	}
@@ -370,19 +456,26 @@ func (h *AuthHandler) UpdatePassword(c *gin.Context) {
 	c.JSON(http.StatusGone, gin.H{"error": "This endpoint is deprecated. Use PATCH /me/profile instead."})
 }
 
-// DeleteAccount handles DELETE /auth/account
+// DeleteAccount handles DELETE /me/account
 func (h *AuthHandler) DeleteAccount(c *gin.Context) {
 	var req struct {
-		Password string `json:"password" binding:"required,min=8"`
+		Password string `json:"password" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password is required"})
 		return
 	}
 
-	user, exists := middleware.GetCurrentUser(c)
+	userCtx, exists := middleware.GetCurrentUser(c)
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	// Reload user from DB to get password hash
+	var user models.User
+	if err := h.db.DB.Where("id = ?", userCtx.ID).First(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load user"})
 		return
 	}
 
@@ -394,9 +487,13 @@ func (h *AuthHandler) DeleteAccount(c *gin.Context) {
 
 	// Start transaction for soft delete
 	tx := h.db.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start transaction"})
+		return
+	}
 
 	// Soft delete user (this will cascade to related records if configured)
-	if err := tx.Delete(user).Error; err != nil {
+	if err := tx.Delete(&user).Error; err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete account"})
 		return

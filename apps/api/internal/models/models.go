@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -156,6 +157,56 @@ func (t *JSONTime) UnmarshalJSON(data []byte) error {
 
 // JSONMap is a custom type for JSON data
 type JSONMap map[string]interface{}
+
+// Value implements driver.Valuer so GORM can write JSONMap to the DB
+func (m JSONMap) Value() (driver.Value, error) {
+    if m == nil {
+        return nil, nil
+    }
+    b, err := json.Marshal(m)
+    if err != nil {
+        return nil, err
+    }
+    // Return []byte so postgres driver treats it as JSONB
+    return b, nil
+}
+
+// Scan implements sql.Scanner so GORM can read JSONB into JSONMap
+func (m *JSONMap) Scan(value interface{}) error {
+    if m == nil {
+        return fmt.Errorf("JSONMap: Scan on nil pointer")
+    }
+    if value == nil {
+        *m = nil
+        return nil
+    }
+    switch v := value.(type) {
+    case []byte:
+        var tmp map[string]interface{}
+        if len(v) == 0 {
+            *m = JSONMap{}
+            return nil
+        }
+        if err := json.Unmarshal(v, &tmp); err != nil {
+            return err
+        }
+        *m = JSONMap(tmp)
+        return nil
+    case string:
+        var tmp map[string]interface{}
+        if v == "" {
+            *m = JSONMap{}
+            return nil
+        }
+        if err := json.Unmarshal([]byte(v), &tmp); err != nil {
+            return err
+        }
+        *m = JSONMap(tmp)
+        return nil
+    default:
+        return fmt.Errorf("JSONMap: unsupported Scan type %T", value)
+    }
+}
 
 // Session represents user sessions for JWT tokens
 type Session struct {

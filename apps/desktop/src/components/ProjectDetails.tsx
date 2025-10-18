@@ -18,7 +18,7 @@ import Dashboard from './Dashboard'
 import { api } from '../lib/api'
 import { invoke } from '@tauri-apps/api/tauri'
 import { open as openDialog } from '@tauri-apps/api/dialog'
-import type { ScanResult, UserSettings } from '@/types'
+import type { ScanResult, ScanSettings, UserSettings } from '@/types'
 
 // Types locaux définis ici
 interface Project {
@@ -120,12 +120,12 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 				boundPath = selected
 			}
 			// Merge settings
-			const settings = await invoke<UserSettings>('get_settings')
+			const settings = await invoke<ScanSettings>('get_scan_settings')
 			try {
 				const details = await api.getProject(projectId)
 				const p = details.project || details
 				const ps = (p.settings as any) || {}
-				const overrideKeys: (keyof UserSettings)[] = [
+				const overrideKeys: (keyof ScanSettings)[] = [
 					'excluded_dirs',
 					'excluded_extensions',
 					'excluded_patterns',
@@ -143,6 +143,8 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 			const project_key_hash = await invoke<string>('compute_project_key_hash', {
 				basePath: boundPath
 			})
+			const userSettings = await invoke<UserSettings>('get_user_settings')
+
 			await api.rescanProject(project.id, {
 				project_key_hash,
 				totals: {
@@ -163,7 +165,7 @@ export default function ProjectDetails({ projectId, onBack, onOpenSettings }: Pr
 						blank: (stats as any).blank
 					})
 				),
-				device_id: settings.device_id,
+				device_id: userSettings.device_id,
 				app_version: '1.0.0',
 				scanned_at: Math.floor(Date.now() / 1000).toString()
 			})
