@@ -123,7 +123,7 @@ fn main() {
 
     // Start sync worker in background (will be spawned within Tauri runtime)
     // TODO: Make API base URL configurable
-    let api_url = "https://codepulse.dev".to_string(); // or http://localhost:3000 for dev
+    let api_url = settings.api_base_url.clone();
 
     // Start update checker in background
     let settings_clone = settings.clone();

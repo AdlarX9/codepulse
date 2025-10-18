@@ -1,5 +1,29 @@
 # CodePulse - Complete User Guide
 
+# CodePulse - User Guide (Minimal)
+
+## Minimal Overview
+
+- **Objectif**: Comprendre et utiliser CodePulse en quelques étapes.
+- **Parcours**: Créer une organisation → inviter l’équipe → définir les politiques → connecter GitHub App → utiliser le CI Agent → analyser → gérer la facturation.
+- **Confidentialité**: Analyses locales, seules des métriques agrégées sont envoyées à l’API.
+
+## Quick Journey
+
+1. Créez une organisation et invitez vos membres.
+2. Définissez des politiques qualité (seuils, enforcement).
+3. Connectez l’App GitHub (PR checks) et Slack (digest/alertes).
+4. Activez le CI Agent dans vos pipelines (upload de snapshots).
+5. Suivez les métriques et tendances dans Analytics.
+6. Choisissez un plan adapté dans Billing.
+
+## Liens utiles
+
+- Quickstart: `docs/QUICKSTART.md`
+- Intégrations: `docs/integration-guide.md`
+- Plans & Quotas: `docs/plans-and-quotas.md`
+- CI Agent: `docs/ci-agent.md`
+
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
@@ -52,17 +76,20 @@
 The desktop app uses a sidebar navigation with the following sections:
 
 #### Main Section
+
 - **Projects**: View and manage all your projects
 - **Organization**: Manage teams, policies, and settings
 - **Analytics**: View detailed quality metrics and trends
 
 #### Settings Section
+
 - **Profile**: Update your personal information
 - **Settings**: Configure app preferences
 
 ### Quick Scan
 
 Use the **"Quick Scan"** button in the sidebar footer to:
+
 - Quickly scan a directory without creating a project
 - Get instant quality metrics
 - Export results
@@ -86,9 +113,9 @@ Use the **"Quick Scan"** button in the sidebar footer to:
 2. Click **"Invite Member"**
 3. Enter email address
 4. Select role:
-   - **Owner**: Full control
-   - **Admin**: Can manage settings and members
-   - **Member**: Can view and scan projects
+    - **Owner**: Full control
+    - **Admin**: Can manage settings and members
+    - **Member**: Can view and scan projects
 5. Click **"Send Invitation"**
 
 #### Managing Roles
@@ -118,12 +145,14 @@ Use the dropdown in the Organization header to switch between your organizations
 #### Creating Projects
 
 **Method 1: Manual Creation**
+
 1. Click **"Add Project"**
 2. Select folder containing your code
 3. Name your project
 4. Click **"Create"**
 
 **Method 2: GitHub Import** (Coming soon)
+
 - Connect GitHub
 - Select repositories
 - Auto-create projects
@@ -131,10 +160,12 @@ Use the dropdown in the Organization header to switch between your organizations
 #### Scanning Projects
 
 **Automatic Scans:**
+
 - Triggered on project creation
 - Can be scheduled (Pro plan+)
 
 **Manual Scans:**
+
 1. Open project details
 2. Click **"Scan Now"**
 3. Wait for completion
@@ -154,34 +185,41 @@ Access via the settings icon on each project:
 #### Key Metrics
 
 **Total Lines**
+
 - Sum of all lines in scanned files
 - Includes code, comments, and blank lines
 
 **Code Lines**
+
 - Actual executable code
 - Excludes comments and blank lines
 
 **Comment Lines**
+
 - Documentation and comments
 - Inline and block comments
 
 **Comment Ratio**
+
 - `(Comments / Code) × 100`
 - Industry standard: 15-20%
 - CodePulse recommendation: > 15%
 
 **Bloat Ratio**
+
 - `(Blank lines / Total lines) × 100`
 - Measures unnecessary whitespace
 - Recommendation: < 30%
 
 **Core vs Info**
+
 - **Core**: Essential code files
 - **Info**: Configuration, tests, docs
 
 #### Language Breakdown
 
 View detailed statistics for each programming language:
+
 - Files count
 - Line distribution
 - Comment ratio per language
@@ -206,26 +244,31 @@ Quality policies enforce code quality standards across your organization or spec
 **Name**: Descriptive name (e.g., "Production Quality")
 
 **Scope**:
+
 - **Organization-wide**: Applies to all repositories
 - **Repository-specific**: Applies to one repository
 
 **Thresholds**:
+
 - **Min Comment Ratio**: Minimum acceptable comment percentage
 - **Max Bloat Ratio**: Maximum acceptable blank line percentage
 - **Min Doc Coverage**: Minimum documentation coverage
 
 **Enforcement**:
+
 - **Enabled/Disabled**: Turn policy on or off
 - **Block on Fail**: (Team plan+) Prevent PR merges when failing
 
 ### Policy Evaluation
 
 Policies are evaluated:
+
 - On every scan
 - On pull requests (with GitHub App)
 - In CI/CD pipelines
 
 **Results**:
+
 - ✅ **Passed**: All thresholds met
 - ⚠️ **Warning**: Some thresholds not met (soft fail)
 - ❌ **Failed**: Critical thresholds not met (blocks if configured)
@@ -233,7 +276,7 @@ Policies are evaluated:
 ### Plan Limits
 
 | Plan       | Max Policies | PR Blocking |
-|------------|--------------|-------------|
+| ---------- | ------------ | ----------- |
 | Free       | 1            | No          |
 | Pro        | 5            | Soft        |
 | Team       | Unlimited    | Hard        |
@@ -252,6 +295,7 @@ Click **"Analytics"** in the sidebar to view organization-wide metrics.
 #### Time Period Selection
 
 Use the dropdown to select:
+
 - Last 7 days
 - Last 30 days
 - Last 90 days
@@ -260,52 +304,62 @@ Use the dropdown to select:
 #### KPI Cards
 
 **Total Code Lines**
+
 - Current code line count
 - Growth percentage from previous period
 - Indicates project scale
 
 **Comment Ratio**
+
 - Current commenting level
 - Quality indicator
 - Trend comparison
 
 **Repositories**
+
 - Active repository count
 - Connected GitHub repos
 
 **Policy Score**
+
 - Overall policy compliance
 - Pass/fail ratio
 
 #### Charts & Visualizations
 
 **Code Trends (Area Chart)**
+
 - Code growth over time
 - Comment growth
 - Quality score evolution
 
 **Language Distribution (Pie Chart)**
+
 - Breakdown by programming language
 - Percentage of each language
 - File counts
 
 **Quality Metrics (Bar Chart)**
+
 - Comment ratio
 - Bloat ratio
 - Documentation coverage
 
 **Policy Evaluations (Pie Chart)**
+
 - Passed checks
 - Failed checks
 - Warnings
 
 **Quality Timeline (Line Chart)**
+
 - Quality score trends
 - Historical performance
 
 #### Language Breakdown Table
 
 Detailed table showing:
+
 - Language name
 - File count
 - Code lines
@@ -332,21 +386,23 @@ Detailed table showing:
 3. Authorize the CodePulse GitHub App
 4. Select repositories to connect
 5. Grant required permissions:
-   - Read repository contents
-   - Read/write checks
-   - Read/write pull requests
+    - Read repository contents
+    - Read/write checks
+    - Read/write pull requests
 
 ### Features
 
 #### Automated PR Checks
 
 When you open a pull request:
+
 1. CodePulse scans the changed code
 2. Evaluates quality policies
 3. Posts check status to PR
 4. Shows pass/fail with details
 
 **Status Indicators**:
+
 - ✅ **Success**: All policies passed
 - ⚠️ **Warning**: Some policies failed (soft)
 - ❌ **Failure**: Blocking policies failed
@@ -354,6 +410,7 @@ When you open a pull request:
 #### Commit Status
 
 View quality status directly on commits:
+
 - Click the check icon
 - See detailed metrics
 - Compare to baseline
@@ -361,6 +418,7 @@ View quality status directly on commits:
 #### Webhook Events
 
 CodePulse listens for:
+
 - `pull_request` opened/updated
 - `push` to default branch
 - `check_suite` requested
@@ -382,12 +440,14 @@ CodePulse listens for:
 #### Weekly Digest
 
 Sent every Monday morning:
+
 - Summary of past week's activity
 - Key metrics and trends
 - Repository activity
 - Policy evaluation results
 
 **Example Digest**:
+
 ```
 📊 Weekly Quality Digest - Acme Inc
 
@@ -404,6 +464,7 @@ Policy Results: 23 passed, 2 failed
 #### Real-Time Alerts
 
 Instant notifications for:
+
 - **Policy Violations**: When code fails quality checks
 - **Low Quality PRs**: PRs with poor metrics
 - **Scan Failures**: When scans encounter errors
@@ -424,6 +485,7 @@ Instant notifications for:
 #### Free Plan
 
 **Price**: $0/month
+
 - 1 seat
 - 3 projects
 - 90-day scan history
@@ -434,6 +496,7 @@ Instant notifications for:
 #### Pro Plan
 
 **Price**: $29/user/month
+
 - 1-5 seats
 - Unlimited projects
 - 365-day scan history
@@ -446,6 +509,7 @@ Instant notifications for:
 #### Team Plan
 
 **Price**: $99/month (10 users) + $10/additional user
+
 - 10+ seats (scalable)
 - Unlimited projects
 - Infinite scan history
@@ -459,6 +523,7 @@ Instant notifications for:
 #### Enterprise Plan
 
 **Price**: Custom
+
 - Unlimited seats
 - Unlimited everything
 - Custom policies
@@ -480,6 +545,7 @@ Instant notifications for:
 #### Billing Portal
 
 Access Stripe's customer portal to:
+
 - Update payment method
 - View invoices
 - Download receipts
@@ -506,34 +572,38 @@ The CodePulse CI Agent is a standalone Rust binary that runs in your CI pipeline
 #### Installation
 
 **GitHub Actions**:
+
 ```yaml
 - name: CodePulse Scan
   run: |
-    docker run --rm \
-      -v ${{ github.workspace }}:/workspace \
-      ghcr.io/codepulse/ci-agent:latest \
-      --path /workspace \
-      --out scan.json
+      docker run --rm \
+        -v ${{ github.workspace }}:/workspace \
+        ghcr.io/codepulse/ci-agent:latest \
+        --path /workspace \
+        --out scan.json
 ```
 
 **GitLab CI**:
+
 ```yaml
 codepulse:
-  image: ghcr.io/codepulse/ci-agent:latest
-  script:
-    - ci-agent --path . --out scan.json
+    image: ghcr.io/codepulse/ci-agent:latest
+    script:
+        - ci-agent --path . --out scan.json
 ```
 
 **CircleCI**:
+
 ```yaml
 - run:
-    name: CodePulse Scan
-    command: ci-agent --path . --out scan.json
+      name: CodePulse Scan
+      command: ci-agent --path . --out scan.json
 ```
 
 #### Configuration
 
 **Command Options**:
+
 - `--path`: Directory to scan
 - `--out`: Output file path
 - `--head-sha`: Git commit SHA
@@ -552,15 +622,17 @@ curl -X POST https://api.codepulse.dev/api/ci/snapshots \
 #### Policy Enforcement
 
 The CI Agent can fail the build:
+
 ```yaml
 - name: Check Quality
   run: |
-    ci-agent --path . --out scan.json --enforce-policy
+      ci-agent --path . --out scan.json --enforce-policy
 ```
 
 ### Environment Variables
 
 Set in your CI system:
+
 - `CODEPULSE_TOKEN`: Organization API token
 - `CODEPULSE_ORG_ID`: Organization ID
 - `CODEPULSE_POLICY_ID`: Policy to enforce (optional)
@@ -576,17 +648,20 @@ CodePulse supports multiple export formats:
 #### CSV Export
 
 **Use Cases**:
+
 - Import into spreadsheets
 - Data analysis
 - Custom reporting
 
 **Contents**:
+
 - Scan metadata
 - All metrics
 - Language breakdown
 - Trend data
 
 **How to Export**:
+
 1. Open project or analytics
 2. Click **"Export"** button
 3. Select **"CSV"**
@@ -596,39 +671,43 @@ CodePulse supports multiple export formats:
 #### JSON Export
 
 **Use Cases**:
+
 - API integrations
 - Custom tools
 - Automation
 
 **Format**:
+
 ```json
 {
-  "project": {
-    "id": "uuid",
-    "name": "My Project"
-  },
-  "scans": [
-    {
-      "id": "uuid",
-      "created_at": "2024-01-15T10:30:00Z",
-      "total": 15420,
-      "code": 12340,
-      "comment": 1850,
-      "blank": 1230,
-      "comment_ratio": 0.15
-    }
-  ]
+	"project": {
+		"id": "uuid",
+		"name": "My Project"
+	},
+	"scans": [
+		{
+			"id": "uuid",
+			"created_at": "2024-01-15T10:30:00Z",
+			"total": 15420,
+			"code": 12340,
+			"comment": 1850,
+			"blank": 1230,
+			"comment_ratio": 0.15
+		}
+	]
 }
 ```
 
 #### PDF Report
 
 **Use Cases**:
+
 - Executive summaries
 - Stakeholder reports
 - Documentation
 
 **Contents**:
+
 - Executive summary
 - Quality metrics table
 - Language breakdown
@@ -636,6 +715,7 @@ CodePulse supports multiple export formats:
 - Recommendations
 
 **How to Generate**:
+
 1. Navigate to Analytics
 2. Click **"Export PDF"**
 3. Wait for generation
@@ -644,6 +724,7 @@ CodePulse supports multiple export formats:
 #### XML Export
 
 **Use Cases**:
+
 - Legacy system integration
 - Enterprise tools
 
@@ -658,11 +739,13 @@ CodePulse supports multiple export formats:
 **Recommended**: 15-20%
 
 **Too Low** (< 10%):
+
 - Code is hard to understand
 - Maintenance burden
 - Knowledge silos
 
 **Too High** (> 30%):
+
 - Excessive comments
 - May indicate complex code
 - Consider refactoring
@@ -672,6 +755,7 @@ CodePulse supports multiple export formats:
 **Recommended**: < 25%
 
 **How to Improve**:
+
 - Remove excessive blank lines
 - Use consistent formatting
 - Configure code formatter
@@ -679,6 +763,7 @@ CodePulse supports multiple export formats:
 #### Documentation
 
 **Best Practices**:
+
 - Document public APIs
 - Explain complex logic
 - Include usage examples
@@ -689,11 +774,13 @@ CodePulse supports multiple export formats:
 #### Monorepo vs Multi-repo
 
 **Monorepo**:
+
 - Track as single project
 - Organization-level metrics
 - Unified quality standards
 
 **Multi-repo**:
+
 - One project per repository
 - Individual tracking
 - Repository-specific policies
@@ -701,6 +788,7 @@ CodePulse supports multiple export formats:
 #### Scan Frequency
 
 **Recommended Schedule**:
+
 - **Development**: Every commit
 - **Staging**: Every PR
 - **Production**: Weekly
@@ -723,6 +811,7 @@ CodePulse supports multiple export formats:
 #### Exceptions
 
 Some code needs flexibility:
+
 - Generated code
 - Third-party code
 - Legacy systems
@@ -738,10 +827,12 @@ Some code needs flexibility:
 #### Scan Fails
 
 **Symptoms**:
+
 - Scan never completes
 - Error message appears
 
 **Solutions**:
+
 1. Check folder permissions
 2. Verify folder isn't too large (>10GB)
 3. Check for symbolic links
@@ -750,10 +841,12 @@ Some code needs flexibility:
 #### Wrong Language Detection
 
 **Symptoms**:
+
 - Files counted as wrong language
 - Missing languages
 
 **Solutions**:
+
 1. Check file extensions
 2. Update language settings
 3. Add language hints in project settings
@@ -761,10 +854,12 @@ Some code needs flexibility:
 #### GitHub App Not Working
 
 **Symptoms**:
+
 - No PR checks
 - Missing status updates
 
 **Solutions**:
+
 1. Verify GitHub App installation
 2. Check repository permissions
 3. Ensure webhooks are active
@@ -773,10 +868,12 @@ Some code needs flexibility:
 #### Slack Integration Silent
 
 **Symptoms**:
+
 - No digest messages
 - Missing alerts
 
 **Solutions**:
+
 1. Verify Slack connection
 2. Check channel permissions
 3. Confirm bot is in channel
@@ -787,11 +884,13 @@ Some code needs flexibility:
 #### Slow Scans
 
 **Causes**:
+
 - Large codebase (>100k files)
 - Network latency
 - Resource constraints
 
 **Solutions**:
+
 1. Exclude unnecessary directories
 2. Use `.gitignore` patterns
 3. Increase RAM allocation
@@ -800,6 +899,7 @@ Some code needs flexibility:
 #### High Memory Usage
 
 **Solutions**:
+
 1. Close other applications
 2. Reduce scan scope
 3. Scan in batches
@@ -832,15 +932,15 @@ Some code needs flexibility:
 
 ### Desktop App
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + N` | New project |
-| `Cmd/Ctrl + R` | Rescan current project |
-| `Cmd/Ctrl + ,` | Open settings |
-| `Cmd/Ctrl + Q` | Quit application |
-| `Cmd/Ctrl + W` | Close window |
-| `Cmd/Ctrl + E` | Export current view |
-| `Cmd/Ctrl + F` | Search projects |
+| Shortcut         | Action                  |
+| ---------------- | ----------------------- |
+| `Cmd/Ctrl + N`   | New project             |
+| `Cmd/Ctrl + R`   | Rescan current project  |
+| `Cmd/Ctrl + ,`   | Open settings           |
+| `Cmd/Ctrl + Q`   | Quit application        |
+| `Cmd/Ctrl + W`   | Close window            |
+| `Cmd/Ctrl + E`   | Export current view     |
+| `Cmd/Ctrl + F`   | Search projects         |
 | `Cmd/Ctrl + 1-5` | Switch sidebar sections |
 
 ---
@@ -850,12 +950,14 @@ Some code needs flexibility:
 ### Data Privacy
 
 **What CodePulse Scans**:
+
 - File counts
 - Line counts by language
 - Comment ratios
 - File extensions
 
 **What CodePulse NEVER Sees**:
+
 - Your source code
 - File contents
 - File names
@@ -865,6 +967,7 @@ Some code needs flexibility:
 ### CI Agent Privacy
 
 The CI Agent is designed with privacy-first principles:
+
 - Runs locally in your CI environment
 - Only sends aggregated metrics
 - No code transmission

@@ -2,6 +2,14 @@
 
 Complete guide for setting up all CodePulse integrations.
 
+## Minimal Overview
+
+- **GitHub App**: PR checks, webhooks (HMAC). Vars: `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET`.
+- **Stripe**: Plans, subscriptions, webhooks. Vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*`.
+- **Slack**: Weekly digest, alerts. Vars: `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, `SLACK_REDIRECT_URI`.
+- **CI/CD**: CI Agent docker usage + upload to API. Secrets: `CODEPULSE_TOKEN`, `CODEPULSE_ORG_ID`.
+- **Email**: Postmark or SES. Vars: `POSTMARK_TOKEN` or AWS SES creds, `EMAIL_FROM_ADDR`.
+
 ## Table of Contents
 
 1. [GitHub App Setup](#github-app-setup)

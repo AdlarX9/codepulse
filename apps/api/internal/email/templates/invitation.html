@@ -1,159 +1,173 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Invitation</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-            color: white;
-            padding: 30px 20px;
-            border-radius: 8px 8px 0 0;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 28px;
-        }
-        .content {
-            background: #fff;
-            padding: 30px;
-            border: 1px solid #e5e7eb;
-            border-top: none;
-        }
-        .invite-box {
-            background: #EFF6FF;
-            border: 2px solid #3B82F6;
-            border-radius: 8px;
-            padding: 25px;
-            text-align: center;
-            margin: 25px 0;
-        }
-        .org-info {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1E40AF;
-            margin-bottom: 10px;
-        }
-        .role-badge {
-            display: inline-block;
-            background: #3B82F6;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .button {
-            display: inline-block;
-            background: #3B82F6;
-            color: white;
-            padding: 14px 32px;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        .button:hover {
-            background: #2563EB;
-        }
-        .features {
-            margin: 25px 0;
-        }
-        .feature-item {
-            display: flex;
-            align-items: start;
-            margin: 15px 0;
-        }
-        .feature-icon {
-            color: #10B981;
-            font-size: 24px;
-            margin-right: 15px;
-        }
-        .footer {
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🎉 You're Invited!</h1>
-    </div>
-    
-    <div class="content">
-        <p>Hi there,</p>
-        
-        <p><strong>{{.InviterName}}</strong> has invited you to join their organization on CodePulse.</p>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Team Invitation</title>
+		<style>
+			body {
+				font-family:
+					-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial',
+					sans-serif;
+				line-height: 1.6;
+				color: #333;
+				max-width: 600px;
+				margin: 0 auto;
+				padding: 20px;
+			}
+			.header {
+				background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+				color: white;
+				padding: 30px 20px;
+				border-radius: 8px 8px 0 0;
+				text-align: center;
+			}
+			.header h1 {
+				margin: 0;
+				font-size: 28px;
+			}
+			.content {
+				background: #fff;
+				padding: 30px;
+				border: 1px solid #e5e7eb;
+				border-top: none;
+			}
+			.invite-box {
+				background: #eff6ff;
+				border: 2px solid #3b82f6;
+				border-radius: 8px;
+				padding: 25px;
+				text-align: center;
+				margin: 25px 0;
+			}
+			.org-info {
+				font-size: 18px;
+				font-weight: 600;
+				color: #1e40af;
+				margin-bottom: 10px;
+			}
+			.role-badge {
+				display: inline-block;
+				background: #3b82f6;
+				color: white;
+				padding: 6px 12px;
+				border-radius: 4px;
+				font-size: 14px;
+				font-weight: 600;
+				text-transform: uppercase;
+			}
+			.button {
+				display: inline-block;
+				background: #3b82f6;
+				color: white;
+				padding: 14px 32px;
+				text-decoration: none;
+				border-radius: 6px;
+				margin: 20px 0;
+				font-weight: 600;
+				font-size: 16px;
+			}
+			.button:hover {
+				background: #2563eb;
+			}
+			.features {
+				margin: 25px 0;
+			}
+			.feature-item {
+				display: flex;
+				align-items: start;
+				margin: 15px 0;
+			}
+			.feature-icon {
+				color: #10b981;
+				font-size: 24px;
+				margin-right: 15px;
+			}
+			.footer {
+				text-align: center;
+				color: #6b7280;
+				font-size: 12px;
+				margin-top: 30px;
+				padding-top: 20px;
+				border-top: 1px solid #e5e7eb;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="header">
+			<h1>🎉 You're Invited!</h1>
+		</div>
 
-        <div class="invite-box">
-            <div class="org-info">{{.OrgName}}</div>
-            <p style="margin: 10px 0;">You've been invited as:</p>
-            <span class="role-badge">{{.Role}}</span>
-        </div>
+		<div class="content">
+			<p>Hi there,</p>
 
-        <p>CodePulse helps teams monitor and improve code quality with automated scans, PR checks, and quality policies.</p>
+			<p
+				><strong>{{.InviterName}}</strong> has invited you to join their organization on
+				CodePulse.</p
+			>
 
-        <div class="features">
-            <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <div>
-                    <strong>Automated Quality Scans</strong><br>
-                    <span style="color: #6b7280; font-size: 14px;">Track code quality metrics across all repositories</span>
-                </div>
-            </div>
+			<div class="invite-box">
+				<div class="org-info">{{.OrgName}}</div>
+				<p style="margin: 10px 0">You've been invited as:</p>
+				<span class="role-badge">{{.Role}}</span>
+			</div>
 
-            <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <div>
-                    <strong>PR Quality Checks</strong><br>
-                    <span style="color: #6b7280; font-size: 14px;">Automatic checks on every pull request</span>
-                </div>
-            </div>
+			<p
+				>CodePulse helps teams monitor and improve code quality with automated scans, PR
+				checks, and quality policies.</p
+			>
 
-            <div class="feature-item">
-                <span class="feature-icon">✓</span>
-                <div>
-                    <strong>Team Collaboration</strong><br>
-                    <span style="color: #6b7280; font-size: 14px;">Work together to maintain quality standards</span>
-                </div>
-            </div>
-        </div>
+			<div class="features">
+				<div class="feature-item">
+					<span class="feature-icon">✓</span>
+					<div>
+						<strong>Automated Quality Scans</strong><br />
+						<span style="color: #6b7280; font-size: 14px"
+							>Track code quality metrics across all repositories</span
+						>
+					</div>
+				</div>
 
-        <center>
-            <a href="{{.AcceptURL}}" class="button">Accept Invitation</a>
-        </center>
+				<div class="feature-item">
+					<span class="feature-icon">✓</span>
+					<div>
+						<strong>PR Quality Checks</strong><br />
+						<span style="color: #6b7280; font-size: 14px"
+							>Automatic checks on every pull request</span
+						>
+					</div>
+				</div>
 
-        <p style="margin-top: 30px; font-size: 14px; color: #6b7280; text-align: center;">
-            This invitation will expire in 7 days.
-        </p>
+				<div class="feature-item">
+					<span class="feature-icon">✓</span>
+					<div>
+						<strong>Team Collaboration</strong><br />
+						<span style="color: #6b7280; font-size: 14px"
+							>Work together to maintain quality standards</span
+						>
+					</div>
+				</div>
+			</div>
 
-        <p style="margin-top: 20px; font-size: 13px; color: #9ca3af; text-align: center;">
-            If you weren't expecting this invitation, you can safely ignore this email.
-        </p>
-    </div>
+			<center>
+				<a href="{{.AcceptURL}}" class="button">Accept Invitation</a>
+			</center>
 
-    <div class="footer">
-        <p>CodePulse - Code Quality Monitoring</p>
-        <p>
-            <a href="https://codepulse.dev" style="color: #6b7280;">Visit Website</a> •
-            <a href="https://docs.codepulse.dev" style="color: #6b7280;">Documentation</a>
-        </p>
-    </div>
-</body>
+			<p style="margin-top: 30px; font-size: 14px; color: #6b7280; text-align: center">
+				This invitation will expire in 7 days.
+			</p>
+
+			<p style="margin-top: 20px; font-size: 13px; color: #9ca3af; text-align: center">
+				If you weren't expecting this invitation, you can safely ignore this email.
+			</p>
+		</div>
+
+		<div class="footer">
+			<p>CodePulse - Code Quality Monitoring</p>
+			<p>
+				<a href="https://codepulse.dev" style="color: #6b7280">Visit Website</a> •
+				<a href="https://docs.codepulse.dev" style="color: #6b7280">Documentation</a>
+			</p>
+		</div>
+	</body>
 </html>

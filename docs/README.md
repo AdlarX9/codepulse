@@ -2,76 +2,32 @@
 
 Bienvenue dans la documentation de CodePulse ! Cette documentation est organisée pour vous aider à comprendre, installer et utiliser le projet efficacement.
 
-## 🎯 Guide de Navigation
+## 🎯 Navigation (Essentiels)
 
-### 🚀 Démarrage Rapide
+- **[QUICKSTART](QUICKSTART.md)** — Installation et prise en main en quelques minutes
+- **[USER_GUIDE](USER_GUIDE.md)** — Utilisation de l’app (parcours org → team → policies → GitHub → CI → analytics → billing)
+- **[Architecture](architecture.md)** — Vue d’ensemble technique et flux de données
+- **[Integration Guide](integration-guide.md)** — Connexions GitHub App, Stripe, Slack, Email (variables requises)
+- **[Plans & Quotas](plans-and-quotas.md)** — Offres, limites et comportements d’enforcement
+- **[CI Agent](ci-agent.md)** — Scanner CI/CD (Docker, options, snippet GitHub Actions)
 
-- **[README principal](../../../README.md)** - Vue d'ensemble et lancement rapide
-- **[quick-start.md](quick-start.md)** - Guide de démarrage en 5 minutes
+## 🏗️ Vue d’ensemble (SaaS)
 
-### 🏗️ Architecture & Développement
+- **Backend**: Go + Gin + PostgreSQL
+- **Desktop**: Tauri (Rust) + React + TypeScript
+- **CI Agent**: Rust (binaire autonome)
+- **Intégrations**: GitHub App, Stripe, Slack
+- **Infra**: Docker, Nginx, GitHub Actions
 
-- **[architecture.md](architecture.md)** - Architecture technique détaillée
-- **[development.md](development.md)** - Guide de développement
-- **[api-reference.md](api-reference.md)** - Documentation complète de l'API
+## 📝 Notes de version / Statut
 
-### 📦 Déploiement & Production
+- **[PHASE2_COMPLETE](PHASE2_COMPLETE.md)** — Synthèse des fonctionnalités livrées (production-ready)
+- **[IMPLEMENTATION_STATUS](IMPLEMENTATION_STATUS.md)** — État d’implémentation et prochaines étapes
 
-- **[deployment.md](deployment.md)** - Guide de déploiement
-- **[migration.md](migration.md)** - Migration des données
+## 🤝 Contribution
 
-### 🤝 Contribution
-
-- **[contributing.md](../CONTRIBUTING.md)** - Guide de contribution
-
----
-
-## 📋 Sommaire Détaillé
-
-### Démarrage
-
-- **Prérequis** : Node.js 20+, pnpm, Rust 1.70+, dépendances système
-- **Installation** : Clone, dépendances, configuration initiale
-- **Lancement** : Apps desktop et web, modes développement/production
-
-### Architecture
-
-- **Vue d'ensemble** : Monorepo avec apps desktop/web et packages partagés
-- **Technologies** : Tauri, Rust, Next.js, React, TypeScript, Supabase
-- **Structure** : Organisation des dossiers et responsabilités
-
-### Développement
-
-- **Configuration** : Variables d'environnement, base de données
-- **Build** : Process de compilation pour desktop et web
-- **Tests** : Stratégies de test et outils utilisés
-
-### API
-
-- **Points d'entrée** : Endpoints disponibles et leur utilisation
-- **Authentification** : Système d'auth admin et sécurité
-- **Intégrations** : GitHub webhooks, exports de données
-
-### Déploiement
-
-- **Environnements** : Développement, staging, production
-- **CI/CD** : Pipelines GitHub Actions automatisés
-- **Monitoring** : Logs, métriques et alerting
-
-## 🔍 Recherche dans la Documentation
-
-Pour trouver rapidement une information :
-
-1. Consultez d'abord le README principal pour une vue d'ensemble
-2. Utilisez la navigation ci-dessus selon votre besoin
-3. Chaque guide contient des liens vers les sections pertinentes
-
-## 📞 Besoin d'Aide ?
-
-- 🐛 [Signaler un bug](https://github.com/AdlarX9/code-pulse/issues)
-- 💡 [Demander une fonctionnalité](https://github.com/AdlarX9/code-pulse/discussions)
-- 📖 [Lire la documentation complète](https://github.com/AdlarX9/code-pulse/tree/main/docs)
+- **[CONTRIBUTING](../CONTRIBUTING.md)** — Comment contribuer
 
 ---
 
-_Cette documentation est maintenue à jour avec le code source. Dernière mise à jour : Octobre 2025_
+_Dernière mise à jour : Octobre 2025_

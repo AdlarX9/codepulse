@@ -65,31 +65,31 @@ func main() {
 		}
 	}
 
+	// Initialize email service
+	emailService := email.NewService(cfg.PostmarkToken, db)
+
+	// Start background workers
+	worker.StartDigestWorker(db.DB, emailService)
+
 	// Initialize handlers
-	healthHandler := handlers.NewHealthHandler(db)
+	healthHandler := handlers.NewHealthHandler(db, cfg.AppVersion)
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	projectHandler := handlers.NewProjectHandler(db)
 	scanHandler := handlers.NewScanHandler(db)
 	exportHandler := handlers.NewExportHandler(db)
 	ogHandler := handlers.NewOGHandler(db)
-	orgHandler := handlers.NewOrgHandler(db)
+	orgHandler := handlers.NewOrgHandler(db, emailService)
 	policyHandler := handlers.NewPolicyHandler(db)
 	githubHandler := handlers.NewGitHubHandler(db, cfg.GitHubAppID, cfg.GitHubPrivateKey, cfg.GitHubWebhookSecret)
-	ciHandler := handlers.NewCIHandler(db)
+	ciHandler := handlers.NewCIHandler(db, cfg.JWTSecret)
 	statsHandler := handlers.NewStatsHandler(db)
-	billingHandler := handlers.NewBillingHandler(db, cfg.StripeSecretKey, cfg.StripeWebhookSecret)
+	billingHandler := handlers.NewBillingHandler(db, cfg.StripeSecretKey, cfg.StripeWebhookSecret, cfg.StripePricePro, cfg.StripePriceTeam, cfg.StripePriceEnterprise, emailService)
 	integrationsHandler := handlers.NewIntegrationsHandler(db, cfg.SlackClientID, cfg.SlackClientSecret, cfg.SlackRedirectURI)
 
 	// Initialize WebSocket hub
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 	wsHandler := handlers.NewWebSocketHandler(wsHub)
-
-	// Initialize email service
-	emailService := email.NewService(cfg.PostmarkToken, db)
-
-	// Start background workers
-	worker.StartDigestWorker(db.DB, emailService)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(db.DB, cfg)

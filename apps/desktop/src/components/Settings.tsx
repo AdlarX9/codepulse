@@ -23,7 +23,8 @@ export default function Settings({ onBack }: SettingsProps) {
 		local_salt: '',
 		auto_update: true,
 		update_channel: 'stable',
-		last_update_check: ''
+		last_update_check: '',
+		api_base_url: 'http://localhost:8080'
 	})
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -545,6 +546,24 @@ export default function Settings({ onBack }: SettingsProps) {
 									value={settings.local_salt}
 									className='w-full px-3 py-2 bg-muted border border-input rounded-md'
 								/>
+							</div>
+							<div className='sm:col-span-2'>
+								<label className='text-sm font-medium mb-1 block'>
+									API Base URL (Sync)
+								</label>
+								<input
+									type='text'
+									value={settings.api_base_url}
+									onChange={e =>
+										setSettings({ ...settings, api_base_url: e.target.value })
+									}
+									placeholder='http://localhost:8080'
+									className='w-full px-3 py-2 bg-background border border-input rounded-md'
+								/>
+								<p className='text-xs text-muted-foreground mt-1'>
+									Used by the background sync worker to post snapshots (e.g.,
+									http://localhost:8080). Restart the app to apply changes.
+								</p>
 							</div>
 						</div>
 					</Card>

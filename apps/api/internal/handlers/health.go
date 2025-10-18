@@ -10,11 +10,12 @@ import (
 )
 
 type HealthHandler struct {
-	db *database.Database
+	db      *database.Database
+	version string
 }
 
-func NewHealthHandler(db *database.Database) *HealthHandler {
-	return &HealthHandler{db: db}
+func NewHealthHandler(db *database.Database, version string) *HealthHandler {
+	return &HealthHandler{db: db, version: version}
 }
 
 type HealthResponse struct {
@@ -29,7 +30,7 @@ func (h *HealthHandler) HealthCheck(c *gin.Context) {
 		Status:    "healthy",
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Services:  make(map[string]string),
-		Version:   "1.0.0", // TODO: get from build info
+		Version:   h.version,
 	}
 
 	// Check PostgreSQL

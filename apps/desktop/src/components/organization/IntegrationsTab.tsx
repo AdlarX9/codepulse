@@ -1,10 +1,22 @@
 import { useState, useEffect } from 'react'
 import { orgApi } from '../../lib/api-org'
-import type { Integration } from '../../types/organization'
+import type { Integration, Subscription } from '../../types/organization'
 import { Card } from '../ui/Card'
 import { SimpleButton as Button } from '../ui/SimpleButton'
 import { Badge } from '../ui/Badge'
-import { shell } from '@tauri-apps/api'
+
+// Prefer the dedicated shell API; fallback to window.open if not available (e.g., non-Tauri env)
+let openExternal: (url: string) => Promise<void>
+try {
+	// Tauri v1
+	// eslint-disable-next-line @typescript-eslint/no-var-requires
+	const mod = require('@tauri-apps/api/shell') as { open: (url: string) => Promise<void> }
+	openExternal = mod.open
+} catch {
+	openExternal = async (url: string) => {
+		window.open(url, '_blank', 'noopener,noreferrer')
+	}
+}
 
 interface IntegrationsTabProps {
 	orgId: string
@@ -13,29 +25,57 @@ interface IntegrationsTabProps {
 export default function IntegrationsTab({ orgId }: IntegrationsTabProps) {
 	const [integrations, setIntegrations] = useState<Integration[]>([])
 	const [loading, setLoading] = useState(true)
+	const [error, setError] = useState<string | null>(null)
+	const [subscription, setSubscription] = useState<Subscription | null>(null)
+	const plan = subscription?.plan || 'free'
 
 	useEffect(() => {
-		loadIntegrations()
+		void loadIntegrations()
+		void loadSubscription()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [orgId])
 
 	async function loadIntegrations() {
 		try {
 			setLoading(true)
+			setError(null)
 			const data = await orgApi.getIntegrations(orgId)
-			setIntegrations(data)
-		} catch (error) {
-			console.error('Failed to load integrations:', error)
+
+			// Robust shape handling: accept either an array or an object with an "integrations" array
+			const list: Integration[] = Array.isArray(data)
+				? data
+				: Array.isArray((data as any)?.integrations)
+					? (data as any).integrations
+					: []
+
+			setIntegrations(list)
+		} catch (err) {
+			console.error('Failed to load integrations:', err)
+			setError(err instanceof Error ? err.message : 'Failed to load integrations')
+			// Ensure state stays an array to avoid .find/.map crashes
+			setIntegrations([])
 		} finally {
 			setLoading(false)
+		}
+	}
+
+	async function loadSubscription() {
+		try {
+			const sub = await orgApi.getSubscription(orgId)
+			setSubscription(sub)
+		} catch (err) {
+			console.error('Failed to load subscription:', err)
+			setSubscription(null)
 		}
 	}
 
 	async function handleConnectSlack() {
 		try {
 			const { auth_url } = await orgApi.connectSlack(orgId)
-			await shell.open(auth_url)
-		} catch (error) {
-			console.error('Failed to connect Slack:', error)
+			if (!auth_url) throw new Error('No auth_url returned')
+			await openExternal(auth_url)
+		} catch (err) {
+			console.error('Failed to connect Slack:', err)
 			alert('Failed to start Slack connection')
 		}
 	}
@@ -46,8 +86,8 @@ export default function IntegrationsTab({ orgId }: IntegrationsTabProps) {
 		try {
 			await orgApi.disconnectSlack(orgId)
 			await loadIntegrations()
-		} catch (error) {
-			console.error('Failed to disconnect Slack:', error)
+		} catch (err) {
+			console.error('Failed to disconnect Slack:', err)
 			alert('Failed to disconnect Slack')
 		}
 	}
@@ -60,6 +100,32 @@ export default function IntegrationsTab({ orgId }: IntegrationsTabProps) {
 
 	return (
 		<div className='space-y-6'>
+			{error && (
+				<Card>
+					<div className='p-6'>
+						<div className='flex items-center gap-3 text-amber-600 mb-2'>
+							<svg
+								className='w-5 h-5'
+								fill='none'
+								viewBox='0 0 24 24'
+								stroke='currentColor'
+							>
+								<path
+									strokeLinecap='round'
+									strokeLinejoin='round'
+									strokeWidth={2}
+									d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z'
+								/>
+							</svg>
+							<span className='font-semibold'>Unable to load integrations</span>
+						</div>
+						<p className='text-sm text-gray-600'>
+							{error}. You can still configure integrations below.
+						</p>
+					</div>
+				</Card>
+			)}
+
 			{/* Slack Integration */}
 			<Card>
 				<div className='p-6'>
@@ -140,6 +206,31 @@ export default function IntegrationsTab({ orgId }: IntegrationsTabProps) {
 								<Button variant='secondary' onClick={handleDisconnectSlack}>
 									Disconnect Slack
 								</Button>
+							) : plan === 'free' ? (
+								<div className='flex items-center gap-3'>
+									<Button variant='secondary' disabled>
+										Connect to Slack (Pro+)
+									</Button>
+									<Button
+										onClick={async () => {
+											try {
+												const { checkout_url } =
+													await orgApi.createCheckoutSession(orgId, {
+														plan: 'pro',
+														seats: 1,
+														success_url: window.location.href,
+														cancel_url: window.location.href
+													})
+												await openExternal(checkout_url)
+											} catch (e) {
+												console.error('Upgrade failed:', e)
+												alert('Failed to start upgrade')
+											}
+										}}
+									>
+										Upgrade
+									</Button>
+								</div>
 							) : (
 								<Button onClick={handleConnectSlack}>Connect to Slack</Button>
 							)}
@@ -230,80 +321,6 @@ export default function IntegrationsTab({ orgId }: IntegrationsTabProps) {
 								See the <strong>Repositories</strong> tab to manage connected
 								repositories.
 							</p>
-						</div>
-					</div>
-				</div>
-			</Card>
-
-			{/* Coming Soon */}
-			<Card>
-				<div className='p-6'>
-					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Coming Soon</h3>
-					<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-						<div className='border border-gray-200 rounded-lg p-4 opacity-60'>
-							<div className='flex items-center gap-3 mb-2'>
-								<div className='w-8 h-8 bg-blue-100 rounded flex items-center justify-center'>
-									<svg
-										className='w-5 h-5 text-blue-600'
-										fill='none'
-										viewBox='0 0 24 24'
-										stroke='currentColor'
-									>
-										<path
-											strokeLinecap='round'
-											strokeLinejoin='round'
-											strokeWidth={2}
-											d='M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'
-										/>
-									</svg>
-								</div>
-								<h4 className='font-medium text-gray-900'>Email Digest</h4>
-							</div>
-							<p className='text-sm text-gray-600'>Weekly reports via email</p>
-						</div>
-
-						<div className='border border-gray-200 rounded-lg p-4 opacity-60'>
-							<div className='flex items-center gap-3 mb-2'>
-								<div className='w-8 h-8 bg-purple-100 rounded flex items-center justify-center'>
-									<svg
-										className='w-5 h-5 text-purple-600'
-										fill='none'
-										viewBox='0 0 24 24'
-										stroke='currentColor'
-									>
-										<path
-											strokeLinecap='round'
-											strokeLinejoin='round'
-											strokeWidth={2}
-											d='M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
-										/>
-									</svg>
-								</div>
-								<h4 className='font-medium text-gray-900'>Discord</h4>
-							</div>
-							<p className='text-sm text-gray-600'>Notifications in Discord</p>
-						</div>
-
-						<div className='border border-gray-200 rounded-lg p-4 opacity-60'>
-							<div className='flex items-center gap-3 mb-2'>
-								<div className='w-8 h-8 bg-orange-100 rounded flex items-center justify-center'>
-									<svg
-										className='w-5 h-5 text-orange-600'
-										fill='none'
-										viewBox='0 0 24 24'
-										stroke='currentColor'
-									>
-										<path
-											strokeLinecap='round'
-											strokeLinejoin='round'
-											strokeWidth={2}
-											d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
-										/>
-									</svg>
-								</div>
-								<h4 className='font-medium text-gray-900'>Webhooks</h4>
-							</div>
-							<p className='text-sm text-gray-600'>Custom webhook endpoints</p>
 						</div>
 					</div>
 				</div>

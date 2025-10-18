@@ -85,7 +85,7 @@
 
 - ✅ `docs/integration-guide.md` - Complete setup guide
 - ✅ `docs/plans-and-quotas.md` - Pricing & features
-- ✅ `ci-agent/README.md` - CI agent usage
+- ✅ `docs/ci-agent.md` - CI agent usage
 - ✅ `apps/api/DEPENDENCIES.md` - Go modules needed
 
 ## 🔧 Next Steps

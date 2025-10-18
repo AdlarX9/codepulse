@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"codepulse-api/internal/database"
+	"codepulse-api/internal/email"
 	"codepulse-api/internal/models"
 	"encoding/json"
 	"io"
@@ -17,15 +18,23 @@ import (
 )
 
 type BillingHandler struct {
-	db            *database.Database
-	webhookSecret string
+	db              *database.Database
+	webhookSecret   string
+	pricePro        string
+	priceTeam       string
+	priceEnterprise string
+	emailService    *email.Service
 }
 
-func NewBillingHandler(db *database.Database, stripeSecretKey, webhookSecret string) *BillingHandler {
+func NewBillingHandler(db *database.Database, stripeSecretKey, webhookSecret, pricePro, priceTeam, priceEnterprise string, emailService *email.Service) *BillingHandler {
 	stripe.Key = stripeSecretKey
 	return &BillingHandler{
-		db:            db,
-		webhookSecret: webhookSecret,
+		db:              db,
+		webhookSecret:   webhookSecret,
+		pricePro:        pricePro,
+		priceTeam:       priceTeam,
+		priceEnterprise: priceEnterprise,
+		emailService:    emailService,
 	}
 }
 
@@ -75,7 +84,7 @@ func (h *BillingHandler) CreateCheckoutSession(c *gin.Context) {
 		customerID = cust.ID
 	}
 
-	// Get price ID based on plan (these should be env vars)
+	// Get price ID based on plan (from env-configured values)
 	priceID := h.getPriceID(req.Plan)
 
 	// Create checkout session
@@ -256,8 +265,45 @@ func (h *BillingHandler) handleSubscriptionDeleted(data json.RawMessage) {
 
 // handlePaymentSucceeded logs successful payment
 func (h *BillingHandler) handlePaymentSucceeded(data json.RawMessage) {
-	// Log for analytics/audit
-	// TODO: Create payment record or update metrics
+	var invoice stripe.Invoice
+	if err := json.Unmarshal(data, &invoice); err != nil {
+		return
+	}
+	if invoice.Subscription == nil || invoice.Customer == nil {
+		return
+	}
+	var sub models.Subscription
+	if err := h.db.DB.Where("stripe_subscription_id = ?", invoice.Subscription.ID).First(&sub).Error; err != nil {
+		return
+	}
+	orgID := sub.OrgID
+	// Find an org user for attribution (owner preferred)
+	userID := ""
+	var owner models.Membership
+	if err := h.db.DB.Where("org_id = ? AND role = ?", orgID, "owner").First(&owner).Error; err == nil {
+		userID = owner.UserID
+	} else {
+		var any models.Membership
+		if err := h.db.DB.Where("org_id = ?", orgID).First(&any).Error; err == nil {
+			userID = any.UserID
+		}
+	}
+	if userID == "" { // cannot log without user due to FK
+		return
+	}
+	details := models.JSONMap{
+		"invoice_id":  invoice.ID,
+		"amount_paid": invoice.AmountPaid,
+		"currency":    invoice.Currency,
+		"status":      invoice.Status,
+	}
+	h.db.DB.Create(&models.AuditLog{
+		OrgID:    &orgID,
+		UserID:   userID,
+		Action:   "billing.invoice.paid",
+		Resource: "stripe_invoice",
+		Details:  &details,
+	})
 }
 
 // handlePaymentFailed handles failed payment
@@ -279,20 +325,28 @@ func (h *BillingHandler) handlePaymentFailed(data json.RawMessage) {
 	sub.Status = "past_due"
 	h.db.DB.Save(&sub)
 
-	// TODO: Send email notification to org owner
+	// Send email notification to org owner (best effort)
+	if h.emailService != nil {
+		var membership models.Membership
+		if err := h.db.DB.Where("org_id = ? AND role = ?", sub.OrgID, "owner").Preload("User").First(&membership).Error; err == nil {
+			if membership.User != nil && membership.User.Email != "" {
+				subject := "Payment Failed - Action Required"
+				body := "<p>Your latest payment failed for your CodePulse subscription. Please update your payment method in the billing portal to avoid interruption of service.</p>"
+				_ = h.emailService.SendBillingNotice(membership.User.Email, subject, body)
+			}
+		}
+	}
 }
 
 // getPriceID returns the Stripe price ID for a plan
 func (h *BillingHandler) getPriceID(plan string) string {
-	// These should come from environment variables
-	// STRIPE_PRICE_PRO, STRIPE_PRICE_TEAM, STRIPE_PRICE_ENTERPRISE
 	switch plan {
 	case "pro":
-		return "price_pro_placeholder"
+		return h.pricePro
 	case "team":
-		return "price_team_placeholder"
+		return h.priceTeam
 	case "enterprise":
-		return "price_enterprise_placeholder"
+		return h.priceEnterprise
 	default:
 		return ""
 	}

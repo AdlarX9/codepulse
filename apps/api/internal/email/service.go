@@ -11,6 +11,17 @@ type Service struct {
 	db     *database.Database
 }
 
+// SendBillingNotice sends a generic billing notice email
+func (s *Service) SendBillingNotice(toEmail, subject, htmlBody string) error {
+    return s.client.SendEmail(EmailRequest{
+        From:     "CodePulse <noreply@codepulse.dev>",
+        To:       toEmail,
+        Subject:  subject,
+        HTMLBody: htmlBody,
+        Tag:      "billing",
+    })
+}
+
 func NewService(postmarkToken string, db *database.Database) *Service {
 	return &Service{
 		client: NewClient(postmarkToken),

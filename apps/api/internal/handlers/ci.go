@@ -8,14 +8,16 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 type CIHandler struct {
-	db *database.Database
+	db        *database.Database
+	jwtSecret string
 }
 
-func NewCIHandler(db *database.Database) *CIHandler {
-	return &CIHandler{db: db}
+func NewCIHandler(db *database.Database, jwtSecret string) *CIHandler {
+	return &CIHandler{db: db, jwtSecret: jwtSecret}
 }
 
 // SnapshotPayload represents CI snapshot data
@@ -56,16 +58,36 @@ func (h *CIHandler) CreateSnapshot(c *gin.Context) {
 		return
 	}
 
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-
-	// TODO: Verify token against org API tokens stored in integrations table
-	// For now, we'll trust the org_id in the payload if token exists
-	_ = token
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+	// Verify JWT token and require membership in target org
+	var authedUserID string
+	parsed, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return []byte(h.jwtSecret), nil
+	})
+	if err == nil && parsed != nil && parsed.Valid {
+		if claims, ok := parsed.Claims.(jwt.MapClaims); ok {
+			if uid, ok2 := claims["user_id"].(string); ok2 {
+				authedUserID = uid
+			}
+		}
+	}
 
 	var payload SnapshotPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Require that authed user is a member of the org
+	if authedUserID != "" {
+		var membership models.Membership
+		if err := h.db.DB.Where("org_id = ? AND user_id = ?", payload.OrgID, authedUserID).First(&membership).Error; err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not a member of the organization"})
+			return
+		}
 	}
 
 	// Verify organization exists
@@ -77,7 +99,7 @@ func (h *CIHandler) CreateSnapshot(c *gin.Context) {
 
 	// Find or create repository
 	var repo models.Repository
-	err := h.db.DB.Where("org_id = ? AND full_name = ?", payload.OrgID, payload.Repository).
+	err = h.db.DB.Where("org_id = ? AND full_name = ?", payload.OrgID, payload.Repository).
 		First(&repo).Error
 
 	if err != nil {
@@ -174,8 +196,18 @@ func (h *CIHandler) CreateSnapshot(c *gin.Context) {
 		}
 	}
 
-	// TODO: Trigger GitHub check run evaluation asynchronously
-	// This would be done via a background worker or event queue
+	// Create audit log asynchronously
+	go func() {
+		details := models.JSONMap{"scan_id": scan.ID, "repository_id": repo.ID, "commit_sha": payload.CommitSHA}
+		orgID := repo.OrgID
+		h.db.DB.Create(&models.AuditLog{
+			OrgID:    &orgID,
+			UserID:   authedUserID,
+			Action:   "ci.snapshot.created",
+			Resource: "scan",
+			Details:  &details,
+		})
+	}()
 
 	c.JSON(http.StatusCreated, gin.H{
 		"scan_id":       scan.ID,

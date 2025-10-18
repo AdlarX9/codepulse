@@ -50,6 +50,7 @@ export interface UserSettings {
 	auto_update: boolean
 	update_channel: string
 	last_update_check: string
+	api_base_url: string
 }
 
 export interface UpdateCheck {

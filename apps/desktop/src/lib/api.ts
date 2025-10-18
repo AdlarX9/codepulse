@@ -143,7 +143,7 @@ async function createProject(projectData: {
 }
 
 async function rescanProject(
-	projectId: string,
+	_projectId: string,
 	scanData: {
 		project_key_hash: string
 		totals: {
@@ -169,7 +169,7 @@ async function rescanProject(
 ): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
-	const res = await fetch(`${API_BASE}/me/projects/${projectId}/snapshot`, {
+	const res = await fetch(`${API_BASE}/sync/scan`, {
 		method: 'POST',
 		headers,
 		body: JSON.stringify(scanData)

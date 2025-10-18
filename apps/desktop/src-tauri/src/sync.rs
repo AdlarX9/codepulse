@@ -173,13 +173,17 @@ async fn process_queue_file(client: &Client, api_base_url: &str, file_path: &Pat
 
     let url = format!("{}/api/sync/scan", api_base_url);
     
-    match client
+    // Build request with optional Authorization header if token is present
+    let mut req = client
         .post(&url)
         .json(&payload)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-    {
+        .timeout(Duration::from_secs(30));
+
+    if let Ok(Some(token)) = crate::auth::get_token() {
+        req = req.bearer_auth(token);
+    }
+
+    match req.send().await {
         Ok(response) => {
             if response.status().is_success() {
                 Ok(true) // Successfully synced

@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"codepulse-api/internal/database"
+	"codepulse-api/internal/email"
 	"codepulse-api/internal/models"
+	"log"
 	"net/http"
 	"strings"
 
@@ -11,11 +13,12 @@ import (
 )
 
 type OrgHandler struct {
-	db *database.Database
+	db           *database.Database
+	emailService *email.Service
 }
 
-func NewOrgHandler(db *database.Database) *OrgHandler {
-	return &OrgHandler{db: db}
+func NewOrgHandler(db *database.Database, emailService *email.Service) *OrgHandler {
+	return &OrgHandler{db: db, emailService: emailService}
 }
 
 // CreateOrg creates a new organization
@@ -79,7 +82,7 @@ func (h *OrgHandler) CreateOrg(c *gin.Context) {
 
 	if err := h.db.DB.Create(&subscription).Error; err != nil {
 		// Log error but don't fail the request
-		// TODO: Add proper logging
+		log.Printf("failed creating default subscription for org %s: %v", org.ID, err)
 	}
 
 	c.JSON(http.StatusCreated, org)
@@ -238,7 +241,26 @@ func (h *OrgHandler) InviteMember(c *gin.Context) {
 		return
 	}
 
-	// TODO: Send invitation email
+	// Send invitation email (best effort)
+	if h.emailService != nil {
+		// Fetch org name
+		var org models.Organization
+		_ = h.db.DB.Where("id = ?", orgID).First(&org).Error
+
+		inviterName := user.Email
+		if u, ok := c.Get("user"); ok {
+			if current, ok2 := u.(*models.User); ok2 && current.Email != "" {
+				inviterName = current.Email
+			}
+		}
+
+		_ = h.emailService.SendInvitation(user.Email, email.InvitationData{
+			InviterName: inviterName,
+			OrgName:     org.Name,
+			Role:        req.Role,
+			AcceptURL:   "https://app.codepulse.dev/orgs/" + orgID + "/team",
+		})
+	}
 
 	c.JSON(http.StatusCreated, membership)
 }

@@ -15,9 +15,10 @@ import IntegrationsTab from '../components/organization/IntegrationsTab'
 
 interface OrganizationPageProps {
 	onBack: () => void
+	onOrganizationChange?: () => void
 }
 
-export default function OrganizationPage({ onBack }: OrganizationPageProps) {
+export default function OrganizationPage({ onBack, onOrganizationChange }: OrganizationPageProps) {
 	const [orgs, setOrgs] = useState<Organization[]>([])
 	const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
 	const [loading, setLoading] = useState(true)
@@ -54,6 +55,8 @@ export default function OrganizationPage({ onBack }: OrganizationPageProps) {
 			setSelectedOrg(newOrg)
 			setShowCreateModal(false)
 			setNewOrgName('')
+			// Notify parent component to refresh organizations
+			onOrganizationChange?.()
 		} catch (error) {
 			console.error('Failed to create organization:', error)
 			alert('Failed to create organization')

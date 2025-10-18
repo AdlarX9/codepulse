@@ -35,6 +35,10 @@ pub struct UserSettings {
     pub update_channel: String, // "stable" or "beta"
     #[serde(default = "default_last_update_check")]
     pub last_update_check: String,
+
+    // API base URL for sync worker (e.g., http://localhost:8080)
+    #[serde(default = "default_api_base_url")]
+    pub api_base_url: String,
 }
 
 fn ensure_ids(settings: &mut UserSettings) -> Result<bool, String> {
@@ -128,6 +132,7 @@ fn default_local_salt() -> String { String::new() }
 fn default_auto_update() -> bool { true }
 fn default_update_channel() -> String { "stable".to_string() }
 fn default_last_update_check() -> String { String::new() }
+fn default_api_base_url() -> String { "http://localhost:8080".to_string() }
 
 impl Default for UserSettings {
     fn default() -> Self {
@@ -144,6 +149,7 @@ impl Default for UserSettings {
             auto_update: default_auto_update(),
             update_channel: default_update_channel(),
             last_update_check: default_last_update_check(),
+            api_base_url: default_api_base_url(),
         }
     }
 }

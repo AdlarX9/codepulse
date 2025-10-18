@@ -30,6 +30,10 @@ type Config struct {
 	// CORS
 	AllowedOrigins []string
 
+	// App
+	AppVersion    string
+	EncryptionKey string
+
 	// GitHub App
 	GitHubAppID         string
 	GitHubPrivateKey    []byte
@@ -60,8 +64,10 @@ func Load() (*Config, error) {
 	}
 
 	config := &Config{
-		Environment: getEnv("ENV", "development"),
-		Port:        getEnv("PORT", "8080"),
+		Environment:   getEnv("ENV", "development"),
+		Port:          getEnv("PORT", "8080"),
+		AppVersion:    getEnv("APP_VERSION", "dev"),
+		EncryptionKey: getEnv("ENCRYPTION_KEY", ""),
 
 		// Database
 		DBHost:     getEnv("DB_HOST", "localhost"),

@@ -4,10 +4,18 @@ import (
 	"codepulse-api/internal/models"
 	"codepulse-api/internal/slack"
 	"codepulse-api/internal/email"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
-	"log"
-	"time"
+	"errors"
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -70,8 +78,12 @@ func (w *DigestWorker) generateOrgDigest(org *models.Organization) error {
 		First(&integration).Error
 
 	if err != nil {
-		// No Slack integration, skip
-		return nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// No Slack integration configured for this org, skip silently
+			return nil
+		}
+		// Real error, log it
+		return fmt.Errorf("failed to query integration: %w", err)
 	}
 
 	// Extract Slack token and channel from config
@@ -91,7 +103,7 @@ func (w *DigestWorker) generateOrgDigest(org *models.Organization) error {
 	stats := w.calculateOrgStats(org.ID, 7)
 
 	// Send Slack message
-	slackClient := slack.NewClient(token)
+	slackClient := slack.NewClient(DecryptToken(token))
 	msg := slack.FormatDigestMessage(channel, stats)
 
 	if err := slackClient.SendMessage(msg); err != nil {
@@ -114,7 +126,7 @@ func (w *DigestWorker) generateOrgDigest(org *models.Organization) error {
 			PolicyFailed:  0,
 			PolicyTotal:   0,
 			DashboardURL:  fmt.Sprintf("https://app.codepulse.dev/orgs/%s", org.ID),
-			UnsubscribeURL: fmt.Sprintf("https://app.codepulse.dev/settings/notifications"),
+			UnsubscribeURL: "https://app.codepulse.dev/settings/notifications",
 		}
 		
 		if err := w.emailService.SendWeeklyDigest(org.ID, emailData); err != nil {
@@ -190,7 +202,10 @@ func (w *DigestWorker) SendAlert(orgID, title, message, severity string) error {
 		First(&integration).Error
 
 	if err != nil {
-		return err
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("no slack integration found for org %s", orgID)
+		}
+		return fmt.Errorf("failed to query integration: %w", err)
 	}
 
 	if integration.Config == nil {
@@ -205,7 +220,7 @@ func (w *DigestWorker) SendAlert(orgID, title, message, severity string) error {
 		return nil
 	}
 
-	slackClient := slack.NewClient(token)
+	slackClient := slack.NewClient(DecryptToken(token))
 	msg := slack.FormatAlertMessage(channel, title, message, severity)
 
 	return slackClient.SendMessage(msg)
@@ -234,7 +249,7 @@ type SlackIntegrationConfig struct {
 // SaveSlackIntegration saves or updates a Slack integration
 func SaveSlackIntegration(db *gorm.DB, orgID string, config *SlackIntegrationConfig) error {
 	configMap := map[string]interface{}{
-		"access_token": config.AccessToken,
+		"access_token": EncryptToken(config.AccessToken),
 		"channel":      config.Channel,
 		"team_id":      config.TeamID,
 		"team_name":    config.TeamName,
@@ -270,17 +285,59 @@ func DisableSlackIntegration(db *gorm.DB, orgID string) error {
 		Update("enabled", false).Error
 }
 
-// EncryptToken encrypts a token for storage (placeholder)
+// EncryptToken encrypts a token for storage
 func EncryptToken(token string) string {
-	// TODO: Implement proper encryption using AES-256 or similar
-	// For now, return as-is (NOT SECURE FOR PRODUCTION)
-	return token
+	keyStr := os.Getenv("ENCRYPTION_KEY")
+	if keyStr == "" {
+		return token
+	}
+	key := sha256.Sum256([]byte(keyStr))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return token
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return token
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return token
+	}
+	ciphertext := gcm.Seal(nil, nonce, []byte(token), nil)
+	out := append(nonce, ciphertext...)
+	return base64.StdEncoding.EncodeToString(out)
 }
 
-// DecryptToken decrypts a stored token (placeholder)
+// DecryptToken decrypts a stored token
 func DecryptToken(encrypted string) string {
-	// TODO: Implement proper decryption
-	return encrypted
+	keyStr := os.Getenv("ENCRYPTION_KEY")
+	if keyStr == "" {
+		return encrypted
+	}
+	raw, err := base64.StdEncoding.DecodeString(encrypted)
+	if err != nil {
+		return encrypted
+	}
+	key := sha256.Sum256([]byte(keyStr))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return encrypted
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return encrypted
+	}
+	nonceSize := gcm.NonceSize()
+	if len(raw) < nonceSize {
+		return encrypted
+	}
+	nonce, ciphertext := raw[:nonceSize], raw[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return encrypted
+	}
+	return string(plaintext)
 }
 
 // MarshalConfig marshals config to JSON

@@ -22,29 +22,57 @@ import {
 	Area
 } from 'recharts'
 
+const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+
 interface AnalyticsPageProps {
 	orgId: string
 	onBack: () => void
 }
 
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+interface TrendData {
+	date: string
+	code: number
+	comments: number
+	quality: number
+}
+
+interface LanguageData {
+	name: string
+	value: number
+	files: number
+}
+
+interface QualityMetric {
+	name: string
+	value: number
+}
+
+interface PolicyStat {
+	name: string
+	value: number
+	color: string
+}
 
 export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 	const [stats, setStats] = useState<Stats | null>(null)
-	const [loading, setLoading] = useState(true)
-	const [timeWindow, setTimeWindow] = useState('30d')
+	const [loading, setLoading] = useState<boolean>(true)
+	const [error, setError] = useState<string | null>(null)
+	const [timeWindow, setTimeWindow] = useState<string>('30d')
 
 	useEffect(() => {
 		loadStats()
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [orgId, timeWindow])
 
-	async function loadStats() {
+	async function loadStats(): Promise<void> {
 		try {
 			setLoading(true)
+			setError(null)
 			const data = await orgApi.getOrgStats(orgId, timeWindow)
-			setStats(data)
-		} catch (error) {
-			console.error('Failed to load stats:', error)
+			setStats(data || null)
+		} catch (err: unknown) {
+			console.error('Failed to load stats:', err)
+			setError(err instanceof Error ? err.message : 'Failed to load analytics')
 		} finally {
 			setLoading(false)
 		}
@@ -58,39 +86,95 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 		)
 	}
 
-	if (!stats) {
+	if (error || !stats) {
 		return (
-			<div className='flex items-center justify-center h-screen'>
-				<div className='text-gray-600'>No analytics data available</div>
+			<div className='flex flex-col items-center justify-center h-screen gap-4'>
+				<div className='text-center'>
+					<div className='text-red-600 text-lg font-semibold mb-2'>
+						{error || 'No analytics data available'}
+					</div>
+					<p className='text-gray-600 mb-4'>
+						Make sure your organization has repositories with scans.
+					</p>
+				</div>
+				<button
+					onClick={onBack}
+					className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+				>
+					Back to Projects
+				</button>
 			</div>
 		)
 	}
 
-	// Prepare chart data
-	const trendData = stats.trends?.map(t => ({
-		date: new Date(t.date).toLocaleDateString(),
-		code: t.totals.code,
-		comments: t.totals.comment,
-		quality: t.metrics.comment_ratio * 100
-	})) || []
+	// Safe helpers
+	const safeNumber = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? n : 0)
+	const safeRatioPct = (num: unknown, den: unknown): number => {
+		const d = safeNumber(den)
+		if (d <= 0) return 0
+		return (safeNumber(num) / d) * 100
+	}
 
-	const languageData = Object.entries(stats.languages || {}).map(([name, data]) => ({
+	// Prepare chart data
+	const trendData: TrendData[] =
+		(stats.trends || []).map(t => ({
+			date: t?.date ? new Date(t.date).toLocaleDateString() : '',
+			code: safeNumber(t?.totals?.code),
+			comments: safeNumber(t?.totals?.comment),
+			quality: safeNumber((t?.metrics?.comment_ratio || 0) * 100)
+		})) || []
+
+	const languageEntries = Object.entries(stats.languages || {}) as Array<
+		[string, { files: number; total: number; code: number; comment: number; blank: number }]
+	>
+	const languageTotalCode = Math.max(
+		1,
+		safeNumber(
+			stats?.totals?.code ||
+				languageEntries.reduce((acc, [, v]) => acc + safeNumber(v?.code), 0)
+		)
+	)
+	const languageData: LanguageData[] = languageEntries.map(([name, data]) => ({
 		name,
-		value: data.code,
-		files: data.files
+		value: safeNumber(data?.code),
+		files: safeNumber(data?.files)
 	}))
 
-	const qualityMetrics = [
-		{ name: 'Comment Ratio', value: (stats.metrics.comment_ratio * 100).toFixed(1) },
-		{ name: 'Bloat Ratio', value: (stats.metrics.bloat_ratio * 100).toFixed(1) },
-		{ name: 'Doc Coverage', value: (stats.metrics.doc_coverage * 100).toFixed(1) }
+	const commentRatioPct = safeNumber((stats?.metrics?.comment_ratio || 0) * 100)
+	const bloatRatioPct = safeNumber((stats?.metrics?.bloat_ratio || 0) * 100)
+	const docCoveragePct = safeNumber((stats?.metrics?.doc_coverage || 0) * 100)
+
+	// Keep numbers (not strings) for Recharts
+	const qualityMetrics: QualityMetric[] = [
+		{ name: 'Comment Ratio', value: Math.round(commentRatioPct * 10) / 10 },
+		{ name: 'Bloat Ratio', value: Math.round(bloatRatioPct * 10) / 10 },
+		{ name: 'Doc Coverage', value: Math.round(docCoveragePct * 10) / 10 }
 	]
 
-	const policyStats = [
-		{ name: 'Passed', value: stats.policy_evaluations?.passed || 0, color: '#10B981' },
-		{ name: 'Failed', value: stats.policy_evaluations?.failed || 0, color: '#EF4444' },
-		{ name: 'Warnings', value: stats.policy_evaluations?.warnings || 0, color: '#F59E0B' }
+	const policyStats: PolicyStat[] = [
+		{
+			name: 'Passed',
+			value: safeNumber(stats?.policy_evaluations?.passed) || 0,
+			color: '#10B981'
+		},
+		{
+			name: 'Failed',
+			value: safeNumber(stats?.policy_evaluations?.failed) || 0,
+			color: '#EF4444'
+		},
+		{
+			name: 'Warnings',
+			value: safeNumber(stats?.policy_evaluations?.warnings) || 0,
+			color: '#F59E0B'
+		}
 	]
+
+	const repositoriesCount = safeNumber(stats?.repository_count) || 0
+	const policyScorePct = safeNumber(stats?.policy_score) || 0
+	const totalCodeLines = safeNumber(stats?.totals?.code) || 0
+	const growthCodePct = Math.round(safeNumber((stats?.growth?.code || 0) * 100) * 10) / 10
+	const passedCount = safeNumber(stats?.policy_evaluations?.passed) || 0
+	const failedCount = safeNumber(stats?.policy_evaluations?.failed) || 0
 
 	return (
 		<div className='min-h-screen bg-gray-50'>
@@ -115,7 +199,9 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 								</svg>
 							</button>
 							<div>
-								<h1 className='text-2xl font-bold text-gray-900'>Analytics Dashboard</h1>
+								<h1 className='text-2xl font-bold text-gray-900'>
+									Analytics Dashboard
+								</h1>
 								<p className='text-sm text-gray-600'>Quality insights and trends</p>
 							</div>
 						</div>
@@ -138,42 +224,34 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 					<Card className='p-6'>
 						<div className='text-sm text-gray-600 mb-1'>Total Code Lines</div>
 						<div className='text-3xl font-bold text-gray-900'>
-							{stats.totals.code.toLocaleString()}
+							{totalCodeLines.toLocaleString()}
 						</div>
 						<div className='text-sm text-green-600 mt-2'>
-							↑ {((stats.growth?.code || 0) * 100).toFixed(1)}% from last period
+							↑ {growthCodePct.toFixed(1)}% from last period
 						</div>
 					</Card>
 
 					<Card className='p-6'>
 						<div className='text-sm text-gray-600 mb-1'>Comment Ratio</div>
 						<div className='text-3xl font-bold text-gray-900'>
-							{(stats.metrics.comment_ratio * 100).toFixed(1)}%
+							{commentRatioPct.toFixed(1)}%
 						</div>
-						<Badge
-							variant={
-								stats.metrics.comment_ratio >= 0.15 ? 'success' : 'warning'
-							}
-						>
-							{stats.metrics.comment_ratio >= 0.15 ? 'Good' : 'Needs Improvement'}
+						<Badge variant={commentRatioPct >= 15 ? 'success' : 'warning'}>
+							{commentRatioPct >= 15 ? 'Good' : 'Needs Improvement'}
 						</Badge>
 					</Card>
 
 					<Card className='p-6'>
 						<div className='text-sm text-gray-600 mb-1'>Repositories</div>
-						<div className='text-3xl font-bold text-gray-900'>
-							{stats.repository_count || 0}
-						</div>
+						<div className='text-3xl font-bold text-gray-900'>{repositoriesCount}</div>
 						<div className='text-sm text-gray-600 mt-2'>Active repositories</div>
 					</Card>
 
 					<Card className='p-6'>
 						<div className='text-sm text-gray-600 mb-1'>Policy Score</div>
-						<div className='text-3xl font-bold text-gray-900'>
-							{stats.policy_score || 0}%
-						</div>
+						<div className='text-3xl font-bold text-gray-900'>{policyScorePct}%</div>
 						<div className='text-sm text-gray-600 mt-2'>
-							{stats.policy_evaluations?.passed || 0} / {(stats.policy_evaluations?.passed || 0) + (stats.policy_evaluations?.failed || 0)} passed
+							{passedCount} / {passedCount + failedCount} passed
 						</div>
 					</Card>
 				</div>
@@ -222,7 +300,10 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 									cx='50%'
 									cy='50%'
 									labelLine={false}
-									label={(entry: any) => `${entry.name} (${((entry.value / stats.totals.code) * 100).toFixed(1)}%)`}
+									label={({ name, value }: { name: string; value: number }) => {
+										const pct = safeRatioPct(value, languageTotalCode)
+										return `${name} (${pct.toFixed(1)}%)`
+									}}
 									outerRadius={80}
 									fill='#8884d8'
 									dataKey='value'
@@ -270,7 +351,9 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 									cx='50%'
 									cy='50%'
 									labelLine={false}
-									label={entry => `${entry.name}: ${entry.value}`}
+									label={(entry: { name: string; value: number }) =>
+										`${entry.name}: ${entry.value}`
+									}
 									outerRadius={80}
 									fill='#8884d8'
 									dataKey='value'
@@ -310,9 +393,7 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 
 				{/* Language Details Table */}
 				<Card className='p-6'>
-					<h3 className='text-lg font-semibold text-gray-900 mb-4'>
-						Language Breakdown
-					</h3>
+					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Language Breakdown</h3>
 					<div className='overflow-x-auto'>
 						<table className='min-w-full divide-y divide-gray-200'>
 							<thead className='bg-gray-50'>
@@ -335,33 +416,35 @@ export default function AnalyticsPage({ orgId, onBack }: AnalyticsPageProps) {
 								</tr>
 							</thead>
 							<tbody className='bg-white divide-y divide-gray-200'>
-								{Object.entries(stats.languages || {}).map(([lang, data]) => (
-									<tr key={lang}>
-										<td className='px-6 py-4 whitespace-nowrap font-medium text-gray-900'>
-											{lang}
-										</td>
-										<td className='px-6 py-4 whitespace-nowrap text-gray-600'>
-											{data.files}
-										</td>
-										<td className='px-6 py-4 whitespace-nowrap text-gray-600'>
-											{data.code.toLocaleString()}
-										</td>
-										<td className='px-6 py-4 whitespace-nowrap text-gray-600'>
-											{data.comment.toLocaleString()}
-										</td>
-										<td className='px-6 py-4 whitespace-nowrap'>
-											<Badge
-												variant={
-													data.comment / data.code >= 0.15
-														? 'success'
-														: 'warning'
-												}
-											>
-												{((data.comment / data.code) * 100).toFixed(1)}%
-											</Badge>
-										</td>
-									</tr>
-								))}
+								{Object.entries(stats.languages || {}).map(([lang, data]) => {
+									const files = safeNumber(data?.files)
+									const code = safeNumber(data?.code)
+									const comment = safeNumber(data?.comment)
+									const ratio = code > 0 ? (comment / code) * 100 : 0
+									return (
+										<tr key={lang}>
+											<td className='px-6 py-4 whitespace-nowrap font-medium text-gray-900'>
+												{lang}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-gray-600'>
+												{files}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-gray-600'>
+												{code.toLocaleString()}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap text-gray-600'>
+												{comment.toLocaleString()}
+											</td>
+											<td className='px-6 py-4 whitespace-nowrap'>
+												<Badge
+													variant={ratio >= 15 ? 'success' : 'warning'}
+												>
+													{ratio.toFixed(1)}%
+												</Badge>
+											</td>
+										</tr>
+									)
+								})}
 							</tbody>
 						</table>
 					</div>

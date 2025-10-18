@@ -1,164 +1,170 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weekly Quality Digest</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-            color: white;
-            padding: 30px 20px;
-            border-radius: 8px 8px 0 0;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 28px;
-        }
-        .content {
-            background: #fff;
-            padding: 30px;
-            border: 1px solid #e5e7eb;
-            border-top: none;
-        }
-        .metric-card {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 15px 0;
-        }
-        .metric-title {
-            font-size: 14px;
-            color: #6b7280;
-            margin-bottom: 5px;
-        }
-        .metric-value {
-            font-size: 32px;
-            font-weight: bold;
-            color: #111827;
-        }
-        .metric-change {
-            font-size: 14px;
-            margin-top: 5px;
-        }
-        .metric-change.positive {
-            color: #10B981;
-        }
-        .metric-change.negative {
-            color: #EF4444;
-        }
-        .repo-list {
-            list-style: none;
-            padding: 0;
-        }
-        .repo-item {
-            padding: 15px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-        .repo-item:last-child {
-            border-bottom: none;
-        }
-        .repo-name {
-            font-weight: 600;
-            color: #111827;
-        }
-        .repo-stats {
-            font-size: 14px;
-            color: #6b7280;
-            margin-top: 5px;
-        }
-        .button {
-            display: inline-block;
-            background: #3B82F6;
-            color: white;
-            padding: 12px 24px;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 20px 0;
-        }
-        .footer {
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>📊 Weekly Quality Digest</h1>
-        <p style="margin: 10px 0 0 0; opacity: 0.9;">{{.OrgName}}</p>
-    </div>
-    
-    <div class="content">
-        <p>Hi there,</p>
-        <p>Here's your weekly code quality summary for {{.OrgName}}.</p>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Weekly Quality Digest</title>
+		<style>
+			body {
+				font-family:
+					-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial',
+					sans-serif;
+				line-height: 1.6;
+				color: #333;
+				max-width: 600px;
+				margin: 0 auto;
+				padding: 20px;
+			}
+			.header {
+				background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+				color: white;
+				padding: 30px 20px;
+				border-radius: 8px 8px 0 0;
+				text-align: center;
+			}
+			.header h1 {
+				margin: 0;
+				font-size: 28px;
+			}
+			.content {
+				background: #fff;
+				padding: 30px;
+				border: 1px solid #e5e7eb;
+				border-top: none;
+			}
+			.metric-card {
+				background: #f9fafb;
+				border: 1px solid #e5e7eb;
+				border-radius: 8px;
+				padding: 20px;
+				margin: 15px 0;
+			}
+			.metric-title {
+				font-size: 14px;
+				color: #6b7280;
+				margin-bottom: 5px;
+			}
+			.metric-value {
+				font-size: 32px;
+				font-weight: bold;
+				color: #111827;
+			}
+			.metric-change {
+				font-size: 14px;
+				margin-top: 5px;
+			}
+			.metric-change.positive {
+				color: #10b981;
+			}
+			.metric-change.negative {
+				color: #ef4444;
+			}
+			.repo-list {
+				list-style: none;
+				padding: 0;
+			}
+			.repo-item {
+				padding: 15px;
+				border-bottom: 1px solid #e5e7eb;
+			}
+			.repo-item:last-child {
+				border-bottom: none;
+			}
+			.repo-name {
+				font-weight: 600;
+				color: #111827;
+			}
+			.repo-stats {
+				font-size: 14px;
+				color: #6b7280;
+				margin-top: 5px;
+			}
+			.button {
+				display: inline-block;
+				background: #3b82f6;
+				color: white;
+				padding: 12px 24px;
+				text-decoration: none;
+				border-radius: 6px;
+				margin: 20px 0;
+			}
+			.footer {
+				text-align: center;
+				color: #6b7280;
+				font-size: 12px;
+				margin-top: 30px;
+				padding-top: 20px;
+				border-top: 1px solid #e5e7eb;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="header">
+			<h1>📊 Weekly Quality Digest</h1>
+			<p style="margin: 10px 0 0 0; opacity: 0.9">{{.OrgName}}</p>
+		</div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0;">
-            <div class="metric-card">
-                <div class="metric-title">Total Code Lines</div>
-                <div class="metric-value">{{.TotalCode}}</div>
-                <div class="metric-change {{if gt .CodeChange 0}}positive{{else}}negative{{end}}">
-                    {{if gt .CodeChange 0}}↑{{else}}↓{{end}} {{.CodeChange}}% this week
-                </div>
-            </div>
+		<div class="content">
+			<p>Hi there,</p>
+			<p>Here's your weekly code quality summary for {{.OrgName}}.</p>
 
-            <div class="metric-card">
-                <div class="metric-title">Comment Ratio</div>
-                <div class="metric-value">{{.CommentRatio}}%</div>
-                <div class="metric-change {{if gt .CommentChange 0}}positive{{else}}negative{{end}}">
-                    {{if gt .CommentChange 0}}↑{{else}}↓{{end}} {{.CommentChange}}% this week
-                </div>
-            </div>
-        </div>
+			<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0">
+				<div class="metric-card">
+					<div class="metric-title">Total Code Lines</div>
+					<div class="metric-value">{{.TotalCode}}</div>
+					<div
+						class="metric-change {{if gt .CodeChange 0}}positive{{else}}negative{{end}}"
+					>
+						{{if gt .CodeChange 0}}↑{{else}}↓{{end}} {{.CodeChange}}% this week
+					</div>
+				</div>
 
-        <h2 style="margin-top: 30px;">Repository Activity</h2>
-        <ul class="repo-list">
-            {{range .Repositories}}
-            <li class="repo-item">
-                <div class="repo-name">{{.Name}}</div>
-                <div class="repo-stats">
-                    {{.Commits}} commits • {{.PRs}} PRs • {{.CommentRatio}}% comment ratio
-                </div>
-            </li>
-            {{end}}
-        </ul>
+				<div class="metric-card">
+					<div class="metric-title">Comment Ratio</div>
+					<div class="metric-value">{{.CommentRatio}}%</div>
+					<div
+						class="metric-change {{if gt .CommentChange 0}}positive{{else}}negative{{end}}"
+					>
+						{{if gt .CommentChange 0}}↑{{else}}↓{{end}} {{.CommentChange}}% this week
+					</div>
+				</div>
+			</div>
 
-        <h2 style="margin-top: 30px;">Quality Policies</h2>
-        <p>
-            <strong>{{.PolicyPassed}}</strong> of {{.PolicyTotal}} checks passed this week.
-            {{if gt .PolicyFailed 0}}
-            <span style="color: #EF4444;">{{.PolicyFailed}} policies failed.</span>
-            {{end}}
-        </p>
+			<h2 style="margin-top: 30px">Repository Activity</h2>
+			<ul class="repo-list">
+				{{range .Repositories}}
+				<li class="repo-item">
+					<div class="repo-name">{{.Name}}</div>
+					<div class="repo-stats">
+						{{.Commits}} commits • {{.PRs}} PRs • {{.CommentRatio}}% comment ratio
+					</div>
+				</li>
+				{{end}}
+			</ul>
 
-        <center>
-            <a href="{{.DashboardURL}}" class="button">View Full Dashboard</a>
-        </center>
+			<h2 style="margin-top: 30px">Quality Policies</h2>
+			<p>
+				<strong>{{.PolicyPassed}}</strong> of {{.PolicyTotal}} checks passed this week. {{if
+				gt .PolicyFailed 0}}
+				<span style="color: #ef4444">{{.PolicyFailed}} policies failed.</span>
+				{{end}}
+			</p>
 
-        <p style="margin-top: 30px; font-size: 14px; color: #6b7280;">
-            Keep up the great work! 💪
-        </p>
-    </div>
+			<center>
+				<a href="{{.DashboardURL}}" class="button">View Full Dashboard</a>
+			</center>
 
-    <div class="footer">
-        <p>CodePulse - Code Quality Monitoring</p>
-        <p>
-            <a href="{{.UnsubscribeURL}}" style="color: #6b7280;">Unsubscribe</a> •
-            <a href="https://codepulse.dev" style="color: #6b7280;">Visit Website</a>
-        </p>
-    </div>
-</body>
+			<p style="margin-top: 30px; font-size: 14px; color: #6b7280">
+				Keep up the great work! 💪
+			</p>
+		</div>
+
+		<div class="footer">
+			<p>CodePulse - Code Quality Monitoring</p>
+			<p>
+				<a href="{{.UnsubscribeURL}}" style="color: #6b7280">Unsubscribe</a> •
+				<a href="https://codepulse.dev" style="color: #6b7280">Visit Website</a>
+			</p>
+		</div>
+	</body>
 </html>

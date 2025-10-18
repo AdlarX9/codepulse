@@ -75,7 +75,7 @@ services:
         command: ['pnpm', 'dev', '-p', '3000', '-H', '0.0.0.0']
         volumes:
             - ./apps/web:/app/apps/web
-            - /app/node_modules
+            - /app/apps/web/node_modules
             - /app/apps/web/.next
         environment:
             - NODE_ENV=development

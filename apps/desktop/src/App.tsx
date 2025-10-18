@@ -7,9 +7,11 @@ import ProjectSettings from './pages/ProjectSettings'
 import ProfileManagement from './pages/ProfileManagement'
 import { ConsoleOverlay } from './components/ConsoleOverlay'
 import { api, type User as ApiUser } from './lib/api'
+import { orgApi } from './lib/api-org'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
 import type { ScanResult, UserSettings } from './types'
+import type { Organization } from './types/organization'
 import SettingsPage from './components/Settings'
 import AuthPage from './pages/Auth'
 import OrganizationPage from './pages/OrganizationPage'
@@ -27,6 +29,7 @@ type User = ApiUser
 
 function App() {
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
+	const [userOrgs, setUserOrgs] = useState<Organization[]>([])
 	const [currentView, setCurrentView] = useState<
 		| 'welcome'
 		| 'projects'
@@ -61,6 +64,14 @@ function App() {
 			const user = await api.getCurrentUser()
 			if (user) {
 				setCurrentUser(user)
+				// Load user organizations
+				try {
+					const orgs = await orgApi.getUserOrgs()
+					setUserOrgs(orgs ?? [])
+				} catch (error) {
+					console.error('Failed to load organizations:', error)
+					setUserOrgs([]) // safety fallback
+				}
 				setCurrentView('projects')
 			} else {
 				setCurrentView('welcome')
@@ -68,6 +79,8 @@ function App() {
 		}
 		init()
 	}, [])
+
+	const hasOrgs = Array.isArray(userOrgs) && userOrgs.length > 0
 
 	function changeView(
 		view:
@@ -119,7 +132,18 @@ function App() {
 			await api.clearToken()
 		} finally {
 			setCurrentUser(null)
+			setUserOrgs([])
 			changeView('welcome')
+		}
+	}
+
+	async function refreshOrganizations() {
+		try {
+			const orgs = await orgApi.getUserOrgs()
+			setUserOrgs(orgs ?? [])
+		} catch (error) {
+			console.error('Failed to refresh organizations:', error)
+			setUserOrgs([]) // safety fallback
 		}
 	}
 
@@ -258,26 +282,28 @@ function App() {
 											active={currentView === 'organization'}
 											onClick={() => changeView('organization')}
 										/>
-										<SidebarItem
-											icon={
-												<svg
-													className='w-5 h-5'
-													fill='none'
-													viewBox='0 0 24 24'
-													stroke='currentColor'
-												>
-													<path
-														strokeLinecap='round'
-														strokeLinejoin='round'
-														strokeWidth={2}
-														d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
-													/>
-												</svg>
-											}
-											label='Analytics'
-											active={currentView === 'analytics'}
-											onClick={() => changeView('analytics')}
-										/>
+										{hasOrgs && (
+											<SidebarItem
+												icon={
+													<svg
+														className='w-5 h-5'
+														fill='none'
+														viewBox='0 0 24 24'
+														stroke='currentColor'
+													>
+														<path
+															strokeLinecap='round'
+															strokeLinejoin='round'
+															strokeWidth={2}
+															d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
+														/>
+													</svg>
+												}
+												label='Analytics'
+												active={currentView === 'analytics'}
+												onClick={() => changeView('analytics')}
+											/>
+										)}
 									</SidebarSection>
 									<SidebarSection title='Settings'>
 										<SidebarItem
@@ -371,7 +397,10 @@ function App() {
 							</Sidebar>
 							<div className='flex-1 overflow-y-auto'>
 								{currentView === 'organization' && (
-									<OrganizationPage onBack={() => changeView('projects')} />
+									<OrganizationPage
+										onBack={() => changeView('projects')}
+										onOrganizationChange={refreshOrganizations}
+									/>
 								)}
 								{currentView === 'projects' && (
 									<Projects
@@ -401,9 +430,18 @@ function App() {
 								{currentView === 'settings' && (
 									<SettingsPage onBack={() => changeView('projects')} />
 								)}
-								{currentView === 'analytics' && currentUser && (
-									<AnalyticsPage orgId={currentUser.id} onBack={() => changeView('projects')} />
-								)}
+								{currentView === 'analytics' &&
+									(hasOrgs && userOrgs[0]?.id ? (
+										<AnalyticsPage
+											orgId={userOrgs[0].id}
+											onBack={() => changeView('projects')}
+										/>
+									) : (
+										<div className='p-6 text-sm text-muted-foreground'>
+											No organization found. Please create or join an
+											organization first.
+										</div>
+									))}
 							</div>
 						</div>
 					)}

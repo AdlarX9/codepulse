@@ -10,11 +10,12 @@ import type {
 
 const API_BASE = api.API_BASE
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+async function getAuthHeaders(orgId?: string): Promise<Record<string, string>> {
 	const token = await api.getToken()
-	return token
-		? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-		: { 'Content-Type': 'application/json' }
+	const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+	if (token) headers['Authorization'] = `Bearer ${token}`
+	if (orgId) headers['X-Codepulse-Org'] = orgId
+	return headers
 }
 
 // Organizations
@@ -26,7 +27,7 @@ export async function getUserOrgs(): Promise<Organization[]> {
 }
 
 export async function getOrg(id: string): Promise<Organization> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(id)
 	const res = await fetch(`${API_BASE}/orgs/${id}`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch organization')
 	return res.json()
@@ -44,7 +45,7 @@ export async function createOrg(data: { name: string }): Promise<Organization> {
 }
 
 export async function updateOrg(id: string, data: { name: string }): Promise<Organization> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(id)
 	const res = await fetch(`${API_BASE}/orgs/${id}`, {
 		method: 'PATCH',
 		headers,
@@ -56,7 +57,7 @@ export async function updateOrg(id: string, data: { name: string }): Promise<Org
 
 // Members
 export async function getOrgMembers(orgId: string): Promise<OrgMember[]> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/members`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch members')
 	const data = await res.json()
@@ -64,7 +65,7 @@ export async function getOrgMembers(orgId: string): Promise<OrgMember[]> {
 }
 
 export async function inviteMember(orgId: string, email: string, role: string): Promise<void> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/invite`, {
 		method: 'POST',
 		headers,
@@ -74,7 +75,7 @@ export async function inviteMember(orgId: string, email: string, role: string): 
 }
 
 export async function updateMemberRole(orgId: string, userId: string, role: string): Promise<void> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/members/${userId}`, {
 		method: 'PATCH',
 		headers,
@@ -84,7 +85,7 @@ export async function updateMemberRole(orgId: string, userId: string, role: stri
 }
 
 export async function removeMember(orgId: string, userId: string): Promise<void> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/members/${userId}`, {
 		method: 'DELETE',
 		headers
@@ -94,7 +95,7 @@ export async function removeMember(orgId: string, userId: string): Promise<void>
 
 // Policies
 export async function getPolicies(orgId: string): Promise<Policy[]> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/policies`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch policies')
 	const data = await res.json()
@@ -102,7 +103,7 @@ export async function getPolicies(orgId: string): Promise<Policy[]> {
 }
 
 export async function createPolicy(orgId: string, policy: Partial<Policy>): Promise<Policy> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/policies`, {
 		method: 'POST',
 		headers,
@@ -117,7 +118,7 @@ export async function updatePolicy(
 	policyId: string,
 	policy: Partial<Policy>
 ): Promise<Policy> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/policies/${policyId}`, {
 		method: 'PATCH',
 		headers,
@@ -128,7 +129,7 @@ export async function updatePolicy(
 }
 
 export async function deletePolicy(orgId: string, policyId: string): Promise<void> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/policies/${policyId}`, {
 		method: 'DELETE',
 		headers
@@ -138,7 +139,7 @@ export async function deletePolicy(orgId: string, policyId: string): Promise<voi
 
 // Stats
 export async function getOrgStats(orgId: string, window: string = '30d'): Promise<Stats> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/orgs/${orgId}/stats?window=${window}`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch stats')
 	return res.json()
@@ -153,7 +154,7 @@ export async function getProjectStats(projectId: string, window: string = '30d')
 
 // Billing
 export async function createCheckoutSession(
-	_: string,
+	orgId: string,
 	data: {
 		plan: string
 		seats: number
@@ -161,7 +162,7 @@ export async function createCheckoutSession(
 		cancel_url: string
 	}
 ): Promise<{ checkout_url: string }> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/billing/checkout`, {
 		method: 'POST',
 		headers,
@@ -172,10 +173,10 @@ export async function createCheckoutSession(
 }
 
 export async function createPortalSession(
-	_: string,
+	orgId: string,
 	returnUrl: string
 ): Promise<{ portal_url: string }> {
-	const headers = await getAuthHeaders()
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/billing/portal`, {
 		method: 'POST',
 		headers,
@@ -185,23 +186,23 @@ export async function createPortalSession(
 	return res.json()
 }
 
-export async function getSubscription(_: string): Promise<Subscription> {
-	const headers = await getAuthHeaders()
+export async function getSubscription(orgId: string): Promise<Subscription> {
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/billing/subscription`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch subscription')
 	return res.json()
 }
 
 // Integrations
-export async function getIntegrations(_: string): Promise<Integration[]> {
-	const headers = await getAuthHeaders()
+export async function getIntegrations(orgId: string): Promise<Integration[]> {
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/integrations`, { headers })
 	if (!res.ok) throw new Error('Failed to fetch integrations')
 	return res.json()
 }
 
-export async function connectSlack(_: string): Promise<{ auth_url: string }> {
-	const headers = await getAuthHeaders()
+export async function connectSlack(orgId: string): Promise<{ auth_url: string }> {
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/integrations/slack/connect`, {
 		method: 'POST',
 		headers
@@ -210,8 +211,8 @@ export async function connectSlack(_: string): Promise<{ auth_url: string }> {
 	return res.json()
 }
 
-export async function disconnectSlack(_: string): Promise<void> {
-	const headers = await getAuthHeaders()
+export async function disconnectSlack(orgId: string): Promise<void> {
+	const headers = await getAuthHeaders(orgId)
 	const res = await fetch(`${API_BASE}/integrations/slack/disconnect`, {
 		method: 'DELETE',
 		headers

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"codepulse-api/internal/database"
+	"codepulse-api/internal/models"
 	"codepulse-api/internal/slack"
 	"codepulse-api/internal/worker"
 	"net/http"
@@ -140,7 +141,7 @@ func (h *IntegrationsHandler) GetIntegrations(c *gin.Context) {
 
 // UpdateSlackChannel updates the Slack channel for notifications
 func (h *IntegrationsHandler) UpdateSlackChannel(c *gin.Context) {
-	// orgID, _ := c.Get("org_id")
+	orgID, _ := c.Get("org_id")
 
 	var req struct {
 		Channel string `json:"channel" binding:"required"`
@@ -151,8 +152,29 @@ func (h *IntegrationsHandler) UpdateSlackChannel(c *gin.Context) {
 		return
 	}
 
-	// TODO: Update channel in integration config
-	// This would require fetching the integration, updating the config, and saving
+	// Update channel in integration config
+	var integration models.Integration
+	if err := h.db.DB.Where("org_id = ? AND provider = ?", orgID, "slack").First(&integration).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Slack integration not found"})
+		return
+	}
+
+	newCfg := map[string]interface{}{}
+	if integration.Config != nil {
+		for k, v := range *integration.Config {
+			newCfg[k] = v
+		}
+	}
+	newCfg["channel"] = req.Channel
+	jsonMap := models.JSONMap(newCfg)
+
+	if err := h.db.DB.Model(&integration).Updates(map[string]interface{}{
+		"config":  jsonMap,
+		"enabled": true,
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update channel"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Channel updated successfully",

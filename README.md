@@ -19,7 +19,7 @@ _Before you go any further, check out our detailed documentation [here](docs/REA
 
 ## 🚀 Quick Start
 
-**New to CodePulse?** Check out the [Getting Started Guide](docs/quick-start.md) for a step-by-step walkthrough.
+**New to CodePulse?** Check out the [Getting Started Guide](docs/QUICKSTART.md) for a step-by-step walkthrough.
 
 ```bash
 # Clone and setup

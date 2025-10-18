@@ -2,6 +2,26 @@
 
 Architecture technique détaillée de CodePulse.
 
+## Minimal Overview
+
+- Backend: Go + Gin + PostgreSQL
+- Desktop: Tauri (Rust) + React + TypeScript
+- CI Agent: Rust (standalone)
+- Integrations: GitHub App, Stripe, Slack
+- Infra: Docker, Nginx, GitHub Actions
+
+## Key Data Flows
+
+- Scan: Desktop/CI Agent → API (aggregated metrics) → PostgreSQL → Analytics UI
+- PR checks: GitHub webhook → API → Policy evaluation → PR status
+- Notifications: Worker → Slack/Email (digests, alerts)
+
+## Privacy
+
+- Aucun code source transmis
+- Métriques agrégées uniquement
+- Données chiffrées au repos, TLS en transit
+
 ## Vue d'Ensemble
 
 CodePulse est une application d'analyse de code **privacy-first** construite comme un monorepo moderne avec une séparation claire entre l'application desktop (Tauri/Rust) et l'application web (Next.js/React).
@@ -287,7 +307,7 @@ Login → Basic  Supabase  PostgreSQL  JSON    Recharts
 
 ---
 
-📖 **Voir aussi** : [Guide de développement](development.md) • [API Reference](api-reference.md)
+📖 **Voir aussi** : [Integration Guide](integration-guide.md) • [Plans & Quotas](plans-and-quotas.md)
 
 ### Infrastructure
 
