@@ -43,20 +43,12 @@ func (h *StatsHandler) GetOrgStats(c *gin.Context) {
 		return
 	}
 
-	repoIDs := make([]string, len(repos))
-	for i, r := range repos {
-		repoIDs[i] = r.ID
-	}
-
-	// Aggregate scans
+	// Aggregate scans (organization-wide)
 	var scans []models.Scan
-	query := h.db.DB.Where("created_at >= ?", since)
-
-	if len(repoIDs) > 0 {
-		query = query.Where("repository_id IN ?", repoIDs)
-	}
-
-	if err := query.Order("created_at ASC").Find(&scans).Error; err != nil {
+	if err := h.db.DB.Where("created_at >= ?", since).
+		Order("created_at ASC").
+		Preload("ScanLangs").
+		Find(&scans).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch scans"})
 		return
 	}
@@ -97,9 +89,9 @@ func (h *StatsHandler) GetRepoStats(c *gin.Context) {
 		since = now.AddDate(0, 0, -30)
 	}
 
-	// Get scans
+	// Get scans for time window (repository-scoped stats no longer supported; falling back to window only)
 	var scans []models.Scan
-	if err := h.db.DB.Where("repository_id = ? AND created_at >= ?", repoID, since).
+	if err := h.db.DB.Where("created_at >= ?", since).
 		Order("created_at ASC").
 		Preload("ScanLangs").
 		Find(&scans).Error; err != nil {
@@ -190,31 +182,42 @@ func (h *StatsHandler) calculateAggregateStats(scans []models.Scan) map[string]i
 	trend := []map[string]interface{}{}
 
 	for _, scan := range scans {
-		totalCommentRatio += scan.CommentRatio
-		totalLines += scan.Total
-		totalCode += scan.Code
-		totalComment += scan.Comment
-		totalCore += scan.CoreCodeLines
-		totalInfo += scan.InfoLines
+		total := scan.GetTotal()
+		code := scan.GetCode()
+		comment := scan.GetComment()
+		core := scan.GetCoreCodeLines()
+		info := scan.GetInfoLines()
+
+		ratio := 0.0
+		if code > 0 {
+			ratio = float64(comment) / float64(code)
+		}
+
+		totalCommentRatio += ratio
+		totalLines += total
+		totalCode += code
+		totalComment += comment
+		totalCore += core
+		totalInfo += info
 
 		bloatRatio := 0.0
-		if scan.Code > 0 {
-			bloatRatio = float64(scan.InfoLines) / float64(scan.Code)
+		if code > 0 {
+			bloatRatio = float64(info) / float64(code)
 		}
 		totalBloatRatio += bloatRatio
 
 		docCoverage := 0.0
-		if scan.CoreCodeLines > 0 {
-			docCoverage = float64(scan.Comment) / float64(scan.CoreCodeLines)
+		if core > 0 {
+			docCoverage = float64(comment) / float64(core)
 		}
 		totalDocCoverage += docCoverage
 
 		// Add to trend
 		trend = append(trend, map[string]interface{}{
 			"date":          scan.CreatedAt.Format("2006-01-02"),
-			"code":          scan.Code,
-			"comment":       scan.Comment,
-			"comment_ratio": scan.CommentRatio,
+			"code":          code,
+			"comment":       comment,
+			"comment_ratio": ratio,
 			"bloat_ratio":   bloatRatio,
 			"doc_coverage":  docCoverage,
 		})
@@ -250,9 +253,10 @@ func (h *StatsHandler) getLanguageBreakdown(scans []models.Scan) map[string]inte
 					"blank":   0,
 				}
 			}
+			code := lang.Total - lang.Comment - lang.Blank
 			langStats[lang.Language]["files"] += lang.Files
 			langStats[lang.Language]["total"] += lang.Total
-			langStats[lang.Language]["code"] += lang.Code
+			langStats[lang.Language]["code"] += code
 			langStats[lang.Language]["comment"] += lang.Comment
 			langStats[lang.Language]["blank"] += lang.Blank
 		}

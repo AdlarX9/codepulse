@@ -40,33 +40,40 @@ type ScanMetrics struct {
 
 // ComputeMetrics calculates quality metrics from a scan
 func ComputeMetrics(scan *models.Scan) *ScanMetrics {
+	total := scan.GetTotal()
+	code := scan.GetCode()
+	comment := scan.GetComment()
+	blank := scan.GetBlank()
+	core := scan.GetCoreCodeLines()
+	info := scan.GetInfoLines()
+
 	metrics := &ScanMetrics{
-		TotalLines:    scan.Total,
-		CodeLines:     scan.Code,
-		CommentLines:  scan.Comment,
-		BlankLines:    scan.Blank,
-		CoreCodeLines: scan.CoreCodeLines,
-		InfoLines:     scan.InfoLines,
+		TotalLines:    total,
+		CodeLines:     code,
+		CommentLines:  comment,
+		BlankLines:    blank,
+		CoreCodeLines: core,
+		InfoLines:     info,
 	}
 
 	// Comment ratio
-	if scan.Code > 0 {
-		metrics.CommentRatio = float64(scan.Comment) / float64(scan.Code)
+	if code > 0 {
+		metrics.CommentRatio = float64(comment) / float64(code)
 	}
 
 	// Bloat ratio (info lines / total code)
-	if scan.Code > 0 {
-		metrics.BloatRatio = float64(scan.InfoLines) / float64(scan.Code)
+	if code > 0 {
+		metrics.BloatRatio = float64(info) / float64(code)
 	}
 
 	// Doc coverage (comment / core code)
-	if scan.CoreCodeLines > 0 {
-		metrics.DocCoverage = float64(scan.Comment) / float64(scan.CoreCodeLines)
+	if core > 0 {
+		metrics.DocCoverage = float64(comment) / float64(core)
 	}
 
 	// Core to info ratio
-	if scan.InfoLines > 0 {
-		metrics.CoreToInfoRatio = float64(scan.CoreCodeLines) / float64(scan.InfoLines)
+	if info > 0 {
+		metrics.CoreToInfoRatio = float64(core) / float64(info)
 	}
 
 	return metrics

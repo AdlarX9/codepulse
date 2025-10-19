@@ -15,12 +15,55 @@
 			"all": false,
 			"shell": {
 				"all": false,
-				"open": true
+				"open": true,
+				"execute": true,
+				"scope": [
+					{ "name": "google-chrome", "cmd": "/usr/bin/google-chrome" },
+					{ "name": "chromium", "cmd": "/usr/bin/chromium" },
+					{ "name": "chromium-browser", "cmd": "/usr/bin/chromium-browser" },
+					{ "name": "brave-browser", "cmd": "/usr/bin/brave-browser" },
+
+					{
+						"name": "chrome-mac",
+						"cmd": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+					},
+					{
+						"name": "edge-mac",
+						"cmd": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+					},
+
+					{
+						"name": "chrome-win",
+						"cmd": "C:/Program Files/Google/Chrome/Application/chrome.exe"
+					},
+					{
+						"name": "chrome-win-x86",
+						"cmd": "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
+					},
+					{
+						"name": "edge-win",
+						"cmd": "C:/Program Files/Microsoft/Edge/Application/msedge.exe"
+					},
+					{
+						"name": "edge-win-x86",
+						"cmd": "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+					},
+
+					{ "name": "wkhtmltopdf-mac", "cmd": "/opt/homebrew/bin/wkhtmltopdf" },
+					{ "name": "wkhtmltopdf-local", "cmd": "/usr/local/bin/wkhtmltopdf" },
+					{ "name": "wkhtmltopdf-linux", "cmd": "/usr/bin/wkhtmltopdf" },
+					{
+						"name": "wkhtmltopdf-win",
+						"cmd": "C:/Program Files/wkhtmltopdf/bin/wkhtmltopdf.exe"
+					}
+				]
 			},
 			"fs": {
 				"all": false,
 				"readFile": true,
 				"readDir": true,
+				"writeFile": true,
+				"createDir": true,
 				"scope": ["$APPDATA/**", "$HOME/**"]
 			},
 			"dialog": {
@@ -29,6 +72,9 @@
 				"save": true
 			},
 			"path": {
+				"all": true
+			},
+			"os": {
 				"all": true
 			}
 		},

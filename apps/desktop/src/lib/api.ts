@@ -278,7 +278,7 @@ async function createProject(projectData: {
 }
 
 async function rescanProject(
-	_projectId: string,
+	projectId: string,
 	scanData: {
 		project_key_hash: string
 		totals: {
@@ -289,6 +289,8 @@ async function rescanProject(
 			core_code_lines: number
 			info_lines: number
 		}
+		median_lines?: number
+		gap_lines?: number
 		per_language: Array<{
 			language: string
 			files: number
@@ -296,6 +298,8 @@ async function rescanProject(
 			code: number
 			comment: number
 			blank: number
+			median_lines?: number
+			gap_lines?: number
 		}>
 		device_id: string
 		app_version?: string
@@ -304,19 +308,38 @@ async function rescanProject(
 ): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
-	const endpoint = `${API_BASE}/sync/scan`
+	// Use project-scoped snapshot endpoint to ensure scan attaches to the existing project
+	const endpoint = `${API_BASE}/me/projects/${projectId}/snapshot`
 	try {
 		const res = await fetch(endpoint, {
 			method: 'POST',
 			headers,
 			body: JSON.stringify(scanData)
 		})
-		if (!res.ok) await logAndThrowApiError(res, 'POST /sync/scan')
+		if (!res.ok) await logAndThrowApiError(res, 'POST /me/projects/:id/snapshot')
 		return res.json()
 	} catch (error) {
-		logNetworkError(error, 'POST /sync/scan')
+		logNetworkError(error, 'POST /me/projects/:id/snapshot')
 		throw error
 	}
+}
+
+async function exportProject(projectId: string, format: 'csv' | 'pdf' | 'html'): Promise<Blob> {
+    const headers = await getAuthHeaders()
+    const backendFormat = format === 'html' ? 'pdf' : format
+    const endpoint = `${API_BASE}/export?project_id=${encodeURIComponent(projectId)}&format=${encodeURIComponent(backendFormat)}`
+    try {
+        const accept = format === 'csv' ? 'text/csv' : format === 'html' ? 'text/html' : 'application/pdf'
+        const res = await fetch(endpoint, {
+            method: 'GET',
+            headers: { ...headers, Accept: accept }
+        })
+        if (!res.ok) await logAndThrowApiError(res, 'GET /api/export')
+        return res.blob()
+    } catch (error) {
+        logNetworkError(error, 'GET /api/export')
+        throw error
+    }
 }
 
 export const api = {
@@ -337,5 +360,6 @@ export const api = {
 	updateProfile,
 	checkHandleAvailability,
 	logout,
-	deleteAccount
+	deleteAccount,
+	exportProject
 }

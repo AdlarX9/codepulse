@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Button } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { ArrowLeft, Save } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { api } from '../lib/api'
+import { ScanSettingsForm } from '../components/ScanSettings'
+import type { ScanSettings } from '../types'
 
 interface ProjectSettingsProps {
 	projectId: string
@@ -14,7 +15,14 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 	const [saving, setSaving] = useState(false)
 	const [error, setError] = useState<string>('')
 	const [message, setMessage] = useState<string>('')
-	const [jsonText, setJsonText] = useState<string>('{}')
+	const [settings, setSettings] = useState<ScanSettings>({
+		excluded_dirs: [],
+		excluded_extensions: [],
+		excluded_patterns: [],
+		follow_symlinks: false,
+		excluded_languages: [],
+		allowed_languages: [],
+	})
 
 	useEffect(() => {
 		load()
@@ -27,7 +35,14 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 			setError('')
 			const data = await api.getProject(projectId)
 			const p = data.project || data
-			setJsonText(JSON.stringify(p.settings || {}, null, 2))
+			setSettings({
+				excluded_dirs: p.settings?.excluded_dirs || [],
+				excluded_extensions: p.settings?.excluded_extensions || [],
+				excluded_patterns: p.settings?.excluded_patterns || [],
+				follow_symlinks: !!p.settings?.follow_symlinks,
+				excluded_languages: p.settings?.excluded_languages || [],
+				allowed_languages: p.settings?.allowed_languages || [],
+			})
 		} catch (e) {
 			setError('Failed to load project settings')
 		} finally {
@@ -35,19 +50,15 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 		}
 	}
 
-	async function save() {
+	async function save(next: ScanSettings) {
 		setSaving(true)
 		setError('')
 		setMessage('')
 		try {
-			let settings: any = {}
-			try {
-				settings = JSON.parse(jsonText || '{}')
-			} catch {
-				throw new Error('Invalid JSON')
-			}
-			await api.updateProject(projectId, { settings })
+			await api.updateProject(projectId, { settings: next })
 			setMessage('Settings saved')
+			setSettings(next)
+			onBack()
 		} catch (e: any) {
 			setError(e?.message || 'Failed to save settings')
 		} finally {
@@ -72,28 +83,13 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 			{error && <div className='mb-4 text-red-600'>{error}</div>}
 			{message && <div className='mb-4 text-green-600'>{message}</div>}
 
-			<Card className='p-6 space-y-4'>
-				<div>
-					<label className='block text-sm font-medium mb-2'>Custom Settings (JSON)</label>
-					<textarea
-						className='w-full border rounded px-3 py-2 font-mono text-sm'
-						rows={16}
-						value={jsonText}
-						onChange={e => setJsonText(e.target.value)}
-					/>
-					<p className='text-xs text-muted-foreground mt-2'>
-						These settings are stored in the database and can be used to customize scans
-						or integrations.
-					</p>
-				</div>
-
-				<div className='flex justify-end'>
-					<Button onClick={save} disabled={saving}>
-						<Save className='h-4 w-4 mr-2' />
-						{saving ? 'Saving...' : 'Save'}
-					</Button>
-				</div>
-			</Card>
+			<ScanSettingsForm
+				initial={settings}
+				onSave={save}
+				onCancel={onBack}
+				saving={saving}
+				title='Project Scan Settings'
+			/>
 		</div>
 	)
 }

@@ -1,34 +1,22 @@
 import { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
-import { Plus, Folder, Calendar, Github, Settings, Trash2, BarChart3 } from 'lucide-react'
+import { Plus, Folder, Calendar, Settings, Trash2, BarChart3 } from 'lucide-react'
 import { api } from '../lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
-import type { ScanResult, ScanSettings, UserSettings } from '../types'
+import type { ScanResult, ScanSettings, UserSettings, ApiScanLang } from '../types'
 import Dashboard from './Dashboard'
 
 interface Project {
 	id: string
 	name: string
-	path: string
 	description?: string
-	visibility?: string
 	createdAt: string
-	updatedAt: string
-	userId: string
-	githubLink?: {
-		repoFullName: string
-		repoData?: any
-		starsCount?: number
-	}
+	settings: ScanSettings
 	latestScan?: {
-		id: string
 		totalFiles: number
 		totalLines: number
-		totalCode: number
-		totalComments: number
-		createdAt: string
 	}
 }
 
@@ -59,28 +47,24 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 			setError(null)
 
 			const data = await api.getProjects()
-			const mapped: Project[] = (data || []).map((p: any) => {
-				const latest = Array.isArray(p.scans) && p.scans.length > 0 ? p.scans[0] : null
+			const details = await Promise.all(data.map((p: any) => api.getProjectDetails(p.id)))
+			const mapped: Project[] = (details || []).map((p: any) => {
+				const hasScans = p?.stats?.has_scans
+				const langs: ApiScanLang[] = (p?.stats?.language_stats as ApiScanLang[]) || []
+				const totalLines = langs.reduce((sum, l: ApiScanLang) => sum + (l.total ?? 0), 0)
+				const totalFiles = langs.reduce((sum, l: ApiScanLang) => sum + (l.files ?? 0), 0)
 				return {
-					id: p.id,
-					name: p.name || 'Project',
-					path: p.path || '',
-					description: p.description || undefined,
-					createdAt: p.created_at,
-					updatedAt: p.updated_at,
-					userId: p.user_id,
-					githubLink: undefined,
-					latestScan: latest
+					id: p.project.id,
+					name: p.project.name || 'Project',
+					description: p.project.description || undefined,
+					createdAt: p.project.created_at,
+					settings: p.project.settings || {},
+					latestScan: hasScans
 						? {
-								id: latest.id,
-								totalFiles: latest.total,
-								totalLines: latest.total,
-								totalCode: latest.code,
-								totalComments: latest.comment,
-								createdAt: latest.created_at
+								totalFiles,
+								totalLines
 							}
-						: undefined,
-					visibility: p.visibility
+						: undefined
 				}
 			})
 			setProjects(mapped)
@@ -183,8 +167,6 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 				boundPath = selected
 			}
 
-			// Get global settings and merge with project-level settings if any
-			const settings = await invoke<ScanSettings>('get_settings')
 			try {
 				const projectData = await api.getProject(project.id)
 				const p = projectData.project || projectData
@@ -200,7 +182,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 				]
 				for (const k of overrideKeys) {
 					if (ps && ps[k] !== undefined) {
-						;(settings as any)[k] = ps[k]
+						;(project.settings as any)[k] = ps[k]
 					}
 				}
 			} catch {}
@@ -208,7 +190,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 			// Perform scan using Tauri backend
 			const result = await invoke<ScanResult>('scan_directory', {
 				path: boundPath,
-				settings
+				scanSettings: project.settings
 			})
 			setScanResult(result)
 			setScannedProjectName(project.name)
@@ -230,14 +212,16 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 						core_code_lines: result.total_code,
 						info_lines: result.total_comments + result.total_blank
 					},
+					median_lines: result.median,
+					gap_lines: result.std_dev,
 					per_language: Object.entries(result.languages || {}).map(
 						([language, stats]: [string, any]) => ({
 							language,
-							files: stats.files,
-							total: stats.total,
-							code: stats.code,
-							comment: stats.comment,
-							blank: stats.blank
+							files: (stats as any).files,
+							total: (stats as any).total,
+							code: (stats as any).code,
+							comment: (stats as any).comment,
+							blank: (stats as any).blank
 						})
 					),
 					device_id: userSettings.device_id,
@@ -258,7 +242,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 	}
 
 	function formatNumber(num: number) {
-		return num.toLocaleString()
+		return num?.toLocaleString()
 	}
 
 	if (loading) {
@@ -357,27 +341,13 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 							</CardHeader>
 							<CardContent className='pt-0'>
 								<div className='space-y-3'>
-									{/* GitHub Link */}
-									{project.githubLink && (
-										<div className='flex items-center gap-2 text-sm text-muted-foreground'>
-											<Github className='h-4 w-4' />
-											<span>{project.githubLink.repoFullName}</span>
-											{project.githubLink.starsCount && (
-												<span className='text-yellow-600'>
-													★ {formatNumber(project.githubLink.starsCount)}
-												</span>
-											)}
-										</div>
-									)}
-
 									{/* Latest Scan */}
 									{project.latestScan && (
 										<div className='flex items-center gap-2 text-sm text-muted-foreground'>
 											<BarChart3 className='h-4 w-4' />
 											<span>
-												{formatNumber(project.latestScan.totalCode)} code
-												lines, {formatNumber(project.latestScan.totalLines)}{' '}
-												total lines
+												{formatNumber(project.latestScan.totalFiles)} files,{' '}
+												{formatNumber(project.latestScan.totalLines)} lines
 											</span>
 										</div>
 									)}

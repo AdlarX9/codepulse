@@ -60,3 +60,38 @@ export interface UpdateCheck {
 	notes?: string
 	url?: string
 }
+
+// API Types for backend integration
+export interface ApiScanLang {
+	language: string
+	files: number
+	total: number
+	comment: number
+	blank: number
+	median_lines: number
+	gap_lines: number
+}
+
+export interface ApiScan {
+	id: string
+	project_id: string
+	device_id?: string
+	version_tag?: string
+	median_lines: number
+	gap_lines: number
+	created_at: string
+	updated_at: string
+	scan_langs?: ApiScanLang[]
+}
+
+export interface ApiProject {
+	id: string
+	user_id: string
+	project_key_hash?: string
+	name?: string
+	description?: string
+	visibility: 'private' | 'public'
+	settings?: Record<string, any>
+	created_at: string
+	updated_at: string
+}

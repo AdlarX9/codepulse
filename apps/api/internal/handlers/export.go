@@ -133,16 +133,26 @@ func (h *ExportHandler) exportCSV(c *gin.Context, project models.Project, scans 
 
 	// Write data
 	for _, scan := range scans {
+		total := scan.GetTotal()
+		code := scan.GetCode()
+		comment := scan.GetComment()
+		blank := scan.GetBlank()
+		core := scan.GetCoreCodeLines()
+		info := scan.GetInfoLines()
+		ratio := 0.0
+		if code > 0 {
+			ratio = float64(comment) / float64(code)
+		}
 		record := []string{
 			scan.ID,
 			scan.CreatedAt.Format(time.RFC3339),
-			strconv.Itoa(scan.Total),
-			strconv.Itoa(scan.Code),
-			strconv.Itoa(scan.Comment),
-			strconv.Itoa(scan.Blank),
-			strconv.Itoa(scan.CoreCodeLines),
-			strconv.Itoa(scan.InfoLines),
-			fmt.Sprintf("%.2f", scan.CommentRatio),
+			strconv.Itoa(total),
+			strconv.Itoa(code),
+			strconv.Itoa(comment),
+			strconv.Itoa(blank),
+			strconv.Itoa(core),
+			strconv.Itoa(info),
+			fmt.Sprintf("%.2f", ratio),
 			getStringPtr(scan.DeviceID),
 			getStringPtr(scan.VersionTag),
 		}
@@ -185,6 +195,16 @@ func (h *ExportHandler) exportXML(c *gin.Context, project models.Project, scans 
   <scans>`, project.ID, getStringPtr(project.Name), time.Now().Format(time.RFC3339))
 
 	for _, scan := range scans {
+		total := scan.GetTotal()
+		code := scan.GetCode()
+		comment := scan.GetComment()
+		blank := scan.GetBlank()
+		core := scan.GetCoreCodeLines()
+		info := scan.GetInfoLines()
+		ratio := 0.0
+		if code > 0 {
+			ratio = float64(comment) / float64(code)
+		}
 		xmlData += fmt.Sprintf(`
     <scan>
       <id>%s</id>
@@ -201,19 +221,20 @@ func (h *ExportHandler) exportXML(c *gin.Context, project models.Project, scans 
     </scan>`,
 			scan.ID,
 			scan.CreatedAt.Format(time.RFC3339),
-			scan.Total,
-			scan.Code,
-			scan.Comment,
-			scan.Blank,
-			scan.CoreCodeLines,
-			scan.InfoLines,
-			scan.CommentRatio,
+			total,
+			code,
+			comment,
+			blank,
+			core,
+			info,
+			ratio,
 			getStringPtr(scan.DeviceID),
 			getStringPtr(scan.VersionTag),
 		)
 
 		if includeLanguages {
 			for _, lang := range scan.ScanLangs {
+				lcode := lang.Total - lang.Comment - lang.Blank
 				xmlData += fmt.Sprintf(`
     <scan_lang>
       <language>%s</language>
@@ -222,7 +243,7 @@ func (h *ExportHandler) exportXML(c *gin.Context, project models.Project, scans 
       <code>%d</code>
       <comment>%d</comment>
       <blank>%d</blank>
-    </scan_lang>`, lang.Language, lang.Files, lang.Total, lang.Code, lang.Comment, lang.Blank)
+    </scan_lang>`, lang.Language, lang.Files, lang.Total, lcode, lang.Comment, lang.Blank)
 			}
 		}
 	}
@@ -240,16 +261,26 @@ func (h *ExportHandler) formatScansForJSON(scans []models.Scan, includeLanguages
 	result := make([]gin.H, len(scans))
 
 	for i, scan := range scans {
+		total := scan.GetTotal()
+		code := scan.GetCode()
+		comment := scan.GetComment()
+		blank := scan.GetBlank()
+		core := scan.GetCoreCodeLines()
+		info := scan.GetInfoLines()
+		ratio := 0.0
+		if code > 0 {
+			ratio = float64(comment) / float64(code)
+		}
 		scanData := gin.H{
 			"id":              scan.ID,
 			"created_at":      scan.CreatedAt.Format(time.RFC3339),
-			"total":           scan.Total,
-			"code":            scan.Code,
-			"comment":         scan.Comment,
-			"blank":           scan.Blank,
-			"core_code_lines": scan.CoreCodeLines,
-			"info_lines":      scan.InfoLines,
-			"comment_ratio":   scan.CommentRatio,
+			"total":           total,
+			"code":            code,
+			"comment":         comment,
+			"blank":           blank,
+			"core_code_lines": core,
+			"info_lines":      info,
+			"comment_ratio":   ratio,
 			"device_id":       scan.DeviceID,
 			"version_tag":     scan.VersionTag,
 		}
@@ -257,11 +288,15 @@ func (h *ExportHandler) formatScansForJSON(scans []models.Scan, includeLanguages
 		if includeLanguages {
 			langs := make([]gin.H, len(scan.ScanLangs))
 			for j, lang := range scan.ScanLangs {
+				lcode := lang.Total - lang.Comment - lang.Blank
 				langs[j] = gin.H{
 					"language":   lang.Language,
 					"lines":      lang.Total,
 					"files":      lang.Files,
-					"percentage": float64(lang.Total) / float64(scan.Total) * 100,
+					"percentage": func() float64 { t := total; if t == 0 { return 0 } ; return float64(lang.Total) / float64(t) * 100 }(),
+					"code":       lcode,
+					"comment":    lang.Comment,
+					"blank":      lang.Blank,
 				}
 			}
 			scanData["scan_langs"] = langs
@@ -286,9 +321,9 @@ func (h *ExportHandler) exportPDF(c *gin.Context, project models.Project, scans 
 	scanCount := len(scans)
 
 	for _, scan := range scans {
-		totalCode += scan.Code
-		totalComment += scan.Comment
-		totalLines += scan.Total
+		totalCode += scan.GetCode()
+		totalComment += scan.GetComment()
+		totalLines += scan.GetTotal()
 	}
 
 	avgCommentRatio := 0.0
@@ -310,13 +345,16 @@ func (h *ExportHandler) exportPDF(c *gin.Context, project models.Project, scans 
 	// Aggregate language data from latest scan
 	if len(scans) > 0 {
 		latestScan := scans[0]
+		t := latestScan.GetTotal()
 		for _, lang := range latestScan.ScanLangs {
+			lcode := lang.Total - lang.Comment - lang.Blank
 			languages[lang.Language] = map[string]interface{}{
 				"files":   float64(lang.Files),
 				"total":   float64(lang.Total),
-				"code":    float64(lang.Code),
+				"code":    float64(lcode),
 				"comment": float64(lang.Comment),
 				"blank":   float64(lang.Blank),
+				"percentage": func() float64 { if t == 0 { return 0 } ; return float64(lang.Total) / float64(t) * 100 }(),
 			}
 		}
 	}

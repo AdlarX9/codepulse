@@ -11,7 +11,15 @@ interface ScanSettingsProps {
 	onBack: () => void
 }
 
-export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
+type ScanSettingsFormProps = {
+	initial: ScanSettings
+	onSave: (settings: ScanSettings) => Promise<void> | void
+	onCancel?: () => void
+	saving?: boolean
+	title?: string
+}
+
+export function ScanSettingsForm({ initial, onSave, onCancel, saving, title }: ScanSettingsFormProps) {
 	const [settings, setSettings] = useState<ScanSettings>({
 		excluded_dirs: [],
 		excluded_extensions: [],
@@ -20,8 +28,7 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 		excluded_languages: [],
 		allowed_languages: [],
 	})
-	const [loading, setLoading] = useState(true)
-	const [saving, setSaving] = useState(false)
+	const [isSaving, setIsSaving] = useState(false)
 
 	// inputs
 	const [newExcludedLanguage, setNewExcludedLanguage] = useState('')
@@ -31,30 +38,22 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 	const [newExt, setNewExt] = useState('')
 
 	useEffect(() => {
-		loadSettings()
-	}, [])
-
-	async function loadSettings() {
-		try {
-			const loadedSettings = await invoke<ScanSettings>('get_scan_settings')
-			setSettings(loadedSettings)
-		} catch (error) {
-			console.error('Failed to load scan settings:', error)
-		} finally {
-			setLoading(false)
-		}
-	}
+		setSettings(initial || {
+			excluded_dirs: [],
+			excluded_extensions: [],
+			excluded_patterns: [],
+			follow_symlinks: false,
+			excluded_languages: [],
+			allowed_languages: [],
+		})
+	}, [initial])
 
 	async function saveSettings() {
-		setSaving(true)
+		setIsSaving(true)
 		try {
-			await invoke('update_scan_settings', { settings })
-			onBack()
-		} catch (error) {
-			console.error('Failed to save scan settings:', error)
-			alert(`Failed to save scan settings: ${error}`)
+			await onSave(settings)
 		} finally {
-			setSaving(false)
+			setIsSaving(false)
 		}
 	}
 
@@ -82,22 +81,16 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 	// normalize extensions: lowercased, without leading dot
 	const normalizeExt = (s: string) => s.trim().toLowerCase().replace(/^\./, '')
 
-	if (loading) {
-		return (
-			<div className='min-h-screen bg-background flex items-center justify-center'>
-				<div className='text-muted-foreground'>Loading scan settings...</div>
-			</div>
-		)
-	}
-
 	return (
 		<div className='min-h-screen bg-background p-6'>
 			<div className='max-w-5xl mx-auto'>
 				<div className='flex items-center justify-between mb-6'>
-					<h1 className='text-3xl font-bold'>Scan Settings</h1>
-					<Button variant='ghost' size='sm' onClick={onBack}>
-						<X className='h-5 w-5' />
-					</Button>
+					<h1 className='text-3xl font-bold'>{title || 'Scan Settings'}</h1>
+					{onCancel && (
+						<Button variant='ghost' size='sm' onClick={onCancel}>
+							<X className='h-5 w-5' />
+						</Button>
+					)}
 				</div>
 
 				<div className='space-y-6'>
@@ -442,16 +435,71 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 
 					{/* Actions */}
 					<div className='flex justify-end gap-3'>
-						<Button variant='outline' onClick={onBack}>
-							Cancel
-						</Button>
-						<Button onClick={saveSettings} disabled={saving}>
+						{onCancel && (
+							<Button variant='outline' onClick={onCancel}>
+								Cancel
+							</Button>
+						)}
+						<Button onClick={saveSettings} disabled={saving || isSaving}>
 							<Save className='h-4 w-4 mr-2' />
-							{saving ? 'Saving...' : 'Save Settings'}
+							{saving || isSaving ? 'Saving...' : 'Save Settings'}
 						</Button>
 					</div>
 				</div>
 			</div>
 		</div>
+	)
+}
+
+export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
+	const [settings, setSettings] = useState<ScanSettings>({
+		excluded_dirs: [],
+		excluded_extensions: [],
+		excluded_patterns: [],
+		follow_symlinks: false,
+		excluded_languages: [],
+		allowed_languages: [],
+	})
+	const [loading, setLoading] = useState(true)
+	const [saving, setSaving] = useState(false)
+
+	useEffect(() => {
+		loadSettings()
+	}, [])
+
+	async function loadSettings() {
+		try {
+			const loadedSettings = await invoke<ScanSettings>('get_scan_settings')
+			setSettings(loadedSettings)
+		} catch (error) {
+			console.error('Failed to load scan settings:', error)
+		} finally {
+			setLoading(false)
+		}
+	}
+
+	async function saveUserSettings(s: ScanSettings) {
+		setSaving(true)
+		try {
+			await invoke('update_scan_settings', { settings: s })
+			onBack()
+		} catch (error) {
+			console.error('Failed to save scan settings:', error)
+			alert(`Failed to save scan settings: ${error}`)
+		} finally {
+			setSaving(false)
+		}
+	}
+
+	if (loading) {
+		return (
+			<div className='min-h-screen bg-background flex items-center justify-center'>
+				<div className='text-muted-foreground'>Loading scan settings...</div>
+			</div>
+		)
+	}
+
+	return (
+		<ScanSettingsForm initial={settings} onSave={saveUserSettings} onCancel={onBack} saving={saving} title='Scan Settings' />
 	)
 }

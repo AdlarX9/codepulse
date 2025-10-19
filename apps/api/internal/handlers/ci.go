@@ -144,29 +144,14 @@ func (h *CIHandler) CreateSnapshot(c *gin.Context) {
 		}
 	}
 
-	// Calculate comment ratio
-	commentRatio := 0.0
-	if payload.Totals.Code > 0 {
-		commentRatio = float64(payload.Totals.Comment) / float64(payload.Totals.Code)
-	}
-
 	// Parse scanned_at timestamp
 	scannedAtInt, _ := strconv.ParseInt(payload.ScannedAt, 10, 64)
 
-	// Create scan
+	// Create scan (aggregate metrics are computed from ScanLangs now)
 	scan := models.Scan{
-		UserID:        project.UserID,
-		ProjectID:     project.ID,
-		RepositoryID:  &repo.ID,
-		CommitSHA:     &payload.CommitSHA,
-		PullRequest:   payload.PullRequest,
-		Total:         payload.Totals.Total,
-		Code:          payload.Totals.Code,
-		Comment:       payload.Totals.Comment,
-		Blank:         payload.Totals.Blank,
-		CommentRatio:  commentRatio,
-		CoreCodeLines: payload.Totals.CoreCodeLines,
-		InfoLines:     payload.Totals.InfoLines,
+		ProjectID: project.ID,
+		MedianLines: 0,
+		GapLines:    0,
 	}
 
 	if scannedAtInt > 0 {
@@ -182,13 +167,14 @@ func (h *CIHandler) CreateSnapshot(c *gin.Context) {
 	// Create scan languages
 	for _, lang := range payload.PerLanguage {
 		scanLang := models.ScanLang{
-			ScanID:   scan.ID,
-			Language: lang.Language,
-			Files:    lang.Files,
-			Total:    lang.Total,
-			Code:     lang.Code,
-			Comment:  lang.Comment,
-			Blank:    lang.Blank,
+			ScanID:      scan.ID,
+			Language:    lang.Language,
+			Files:       lang.Files,
+			Total:       lang.Total,
+			Comment:     lang.Comment,
+			Blank:       lang.Blank,
+			MedianLines: 0,
+			GapLines:    0,
 		}
 		if err := h.db.DB.Create(&scanLang).Error; err != nil {
 			// Log but don't fail
@@ -223,7 +209,6 @@ func (h *CIHandler) GetSnapshot(c *gin.Context) {
 	var scan models.Scan
 	if err := h.db.DB.Where("id = ?", scanID).
 		Preload("ScanLangs").
-		Preload("Repository").
 		First(&scan).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Scan not found"})
 		return

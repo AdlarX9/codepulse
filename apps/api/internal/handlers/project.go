@@ -59,6 +59,7 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		UserID:         userID,
 		ProjectKeyHash: &projectKeyHash,
 		Name:           req.Name,
+		Description:    req.Description,
 		Visibility:     "private", // Default to private
 		Settings:       req.Settings,
 	}
@@ -84,9 +85,10 @@ func NewProjectHandler(db *database.Database) *ProjectHandler {
 }
 
 type UpdateProjectRequest struct {
-	Name       *string         `json:"name"`
-	Visibility *string         `json:"visibility"`
-	Settings   *models.JSONMap `json:"settings"`
+	Name        *string         `json:"name"`
+	Description *string         `json:"description"`
+	Visibility  *string         `json:"visibility"`
+	Settings    *models.JSONMap `json:"settings"`
 }
 
 // GetProjects handles GET /me/projects
@@ -165,6 +167,9 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 	updates := make(map[string]interface{})
 	if req.Name != nil {
 		updates["name"] = *req.Name
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
 	}
 	if req.Visibility != nil {
 		updates["visibility"] = *req.Visibility
@@ -277,7 +282,7 @@ func (h *ProjectHandler) GetProjectDetails(c *gin.Context) {
 	var languageStats []models.ScanLang
 	if latestScanExists {
 		h.db.DB.Where("scan_id = ?", latestScan.ID).
-			Order("code DESC").
+			Order("total DESC").
 			Find(&languageStats)
 	}
 

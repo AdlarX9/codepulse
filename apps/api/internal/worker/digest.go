@@ -147,18 +147,18 @@ func (w *DigestWorker) calculateOrgStats(orgID string, days int) map[string]inte
 	var repos []models.Repository
 	w.db.Where("org_id = ?", orgID).Find(&repos)
 
-	repoIDs := make([]string, len(repos))
-	for i, r := range repos {
-		repoIDs[i] = r.ID
-	}
-
-	// Get scans
+	// Get scans in window (organization scoping by repository is no longer supported here)
 	var scans []models.Scan
-	query := w.db.Where("created_at >= ?", since)
-	if len(repoIDs) > 0 {
-		query = query.Where("repository_id IN ?", repoIDs)
+	if err := w.db.Where("created_at >= ?", since).Find(&scans).Error; err != nil {
+		return map[string]interface{}{
+			"repository_count": len(repos),
+			"scan_count":       0,
+			"avg_comment_ratio": 0.0,
+			"avg_doc_coverage":  0.0,
+			"total_code":        0,
+			"total_comment":     0,
+		}
 	}
-	query.Find(&scans)
 
 	// Calculate metrics
 	totalCommentRatio := 0.0
@@ -167,12 +167,21 @@ func (w *DigestWorker) calculateOrgStats(orgID string, days int) map[string]inte
 	totalComment := 0
 
 	for _, scan := range scans {
-		totalCommentRatio += scan.CommentRatio
-		totalCode += scan.Code
-		totalComment += scan.Comment
+		code := scan.GetCode()
+		comment := scan.GetComment()
+		core := scan.GetCoreCodeLines()
 
-		if scan.CoreCodeLines > 0 {
-			docCoverage := float64(scan.Comment) / float64(scan.CoreCodeLines)
+		totalCode += code
+		totalComment += comment
+
+		ratio := 0.0
+		if code > 0 {
+			ratio = float64(comment) / float64(code)
+		}
+		totalCommentRatio += ratio
+
+		if core > 0 {
+			docCoverage := float64(comment) / float64(core)
 			totalDocCoverage += docCoverage
 		}
 	}

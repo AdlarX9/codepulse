@@ -34,6 +34,7 @@ CREATE TABLE projects (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     project_key_hash VARCHAR(255) NOT NULL,
     name VARCHAR(255),
+    description TEXT,
     visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -42,32 +43,29 @@ CREATE TABLE projects (
 );
 
 -- Create scans table
+-- Aggregate stats are computed from scan_langs
 CREATE TABLE scans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    total INTEGER NOT NULL,
-    code INTEGER NOT NULL,
-    comment INTEGER NOT NULL,
-    blank INTEGER NOT NULL,
-    comment_ratio FLOAT NOT NULL,
-    core_code_lines INTEGER DEFAULT 0,
-    info_lines INTEGER DEFAULT 0,
     device_id VARCHAR(255),
     version_tag VARCHAR(50),
+    median_lines FLOAT DEFAULT 0,
+    gap_lines FLOAT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Create scan_langs table
+-- Code is computed as: total - comment - blank
 CREATE TABLE scan_langs (
     scan_id UUID NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
     language VARCHAR(50) NOT NULL,
     files INTEGER NOT NULL,
     total INTEGER NOT NULL,
-    code INTEGER NOT NULL,
     comment INTEGER NOT NULL,
     blank INTEGER NOT NULL,
+    median_lines FLOAT DEFAULT 0,
+    gap_lines FLOAT DEFAULT 0,
     PRIMARY KEY (scan_id, language)
 );
 
@@ -205,10 +203,8 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Link scans to repositories/PRs/commits (added columns)
-ALTER TABLE scans ADD COLUMN IF NOT EXISTS repository_id UUID REFERENCES repositories(id) ON DELETE SET NULL;
-ALTER TABLE scans ADD COLUMN IF NOT EXISTS commit_sha VARCHAR(40);
-ALTER TABLE scans ADD COLUMN IF NOT EXISTS pull_request INTEGER;
+-- Note: scans table no longer has repository_id, commit_sha, pull_request
+-- These were removed to simplify the model
 
 -- =========================
 -- Indexes
@@ -229,12 +225,8 @@ CREATE INDEX idx_projects_visibility ON projects(visibility);
 CREATE INDEX idx_projects_deleted_at ON projects(deleted_at);
 
 -- scans
-CREATE INDEX idx_scans_user_id ON scans(user_id);
 CREATE INDEX idx_scans_project_id ON scans(project_id);
 CREATE INDEX idx_scans_created_at ON scans(created_at);
-CREATE INDEX IF NOT EXISTS idx_scans_repository_id ON scans(repository_id);
-CREATE INDEX IF NOT EXISTS idx_scans_commit_sha ON scans(commit_sha);
-CREATE INDEX IF NOT EXISTS idx_scans_pull_request ON scans(pull_request);
 
 -- scan_langs
 CREATE INDEX idx_scan_langs_scan_id ON scan_langs(scan_id);

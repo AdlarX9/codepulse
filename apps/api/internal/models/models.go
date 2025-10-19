@@ -45,6 +45,7 @@ type Project struct {
 	UserID         string         `json:"user_id" gorm:"type:uuid;not null"`
 	ProjectKeyHash *string        `json:"project_key_hash" gorm:"index"`
 	Name           *string        `json:"name"`
+	Description    *string        `json:"description"`
 	Visibility     string         `json:"visibility" gorm:"type:varchar(10);default:'private';check:visibility IN ('private','public')"`
 	Settings       *JSONMap       `json:"settings" gorm:"type:jsonb"`
 	CreatedAt      time.Time      `json:"created_at"`
@@ -58,41 +59,33 @@ type Project struct {
 }
 
 // Scan represents a code scan result
+// Aggregate stats are computed from ScanLangs
 type Scan struct {
-	ID            string    `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID        string    `json:"user_id" gorm:"type:uuid;not null"`
-	ProjectID     string    `json:"project_id" gorm:"type:uuid;not null"`
-	RepositoryID  *string   `json:"repository_id" gorm:"type:uuid;index"`
-	CommitSHA     *string   `json:"commit_sha" gorm:"index"`
-	PullRequest   *int      `json:"pull_request" gorm:"index"`
-	Total         int       `json:"total" gorm:"not null"`
-	Code          int       `json:"code" gorm:"not null"`
-	Comment       int       `json:"comment" gorm:"not null"`
-	Blank         int       `json:"blank" gorm:"not null"`
-	CommentRatio  float64   `json:"comment_ratio" gorm:"not null"`
-	CoreCodeLines int       `json:"core_code_lines" gorm:"default:0"`
-	InfoLines     int       `json:"info_lines" gorm:"default:0"`
-	DeviceID      *string   `json:"device_id"`
-	VersionTag    *string   `json:"version_tag"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID          string    `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ProjectID   string    `json:"project_id" gorm:"type:uuid;not null"`
+	DeviceID    *string   `json:"device_id"`
+	VersionTag  *string   `json:"version_tag"`
+	MedianLines float64   `json:"median_lines" gorm:"default:0"`
+	GapLines    float64   `json:"gap_lines" gorm:"default:0"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 
 	// Relations
-	User       *User       `json:"user,omitempty" gorm:"foreignKey:UserID"`
-	Project    *Project    `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
-	Repository *Repository `json:"repository,omitempty" gorm:"foreignKey:RepositoryID"`
-	ScanLangs  []ScanLang  `json:"scan_langs,omitempty" gorm:"foreignKey:ScanID"`
+	Project   *Project   `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
+	ScanLangs []ScanLang `json:"scan_langs,omitempty" gorm:"foreignKey:ScanID"`
 }
 
 // ScanLang represents programming language statistics for a scan
+// Code is computed as: Total - Comment - Blank
 type ScanLang struct {
-	ScanID   string `json:"scan_id" gorm:"type:uuid;not null;primaryKey"`
-	Language string `json:"language" gorm:"not null;primaryKey"`
-	Files    int    `json:"files" gorm:"not null"`
-	Total    int    `json:"total" gorm:"not null"`
-	Code     int    `json:"code" gorm:"not null"`
-	Comment  int    `json:"comment" gorm:"not null"`
-	Blank    int    `json:"blank" gorm:"not null"`
+	ScanID      string  `json:"scan_id" gorm:"type:uuid;not null;primaryKey"`
+	Language    string  `json:"language" gorm:"not null;primaryKey"`
+	Files       int     `json:"files" gorm:"not null"`
+	Total       int     `json:"total" gorm:"not null"`
+	Comment     int     `json:"comment" gorm:"not null"`
+	Blank       int     `json:"blank" gorm:"not null"`
+	MedianLines float64 `json:"median_lines" gorm:"default:0"`
+	GapLines    float64 `json:"gap_lines" gorm:"default:0"`
 
 	// Relations
 	Scan *Scan `json:"scan,omitempty" gorm:"foreignKey:ScanID"`
