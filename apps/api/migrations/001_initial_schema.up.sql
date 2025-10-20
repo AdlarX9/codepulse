@@ -6,10 +6,16 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- needed for gen_random_uuid()
 -- Core (users, profiles, projects, scans, etc.)
 -- =========================
 
--- Create users table
+-- Create users table (with gamification fields)
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
+    premium_until TIMESTAMP WITH TIME ZONE,
+    current_streak INT DEFAULT 0,
+    longest_streak INT DEFAULT 0,
+    last_activity_date TIMESTAMP WITH TIME ZONE,
+    total_commit_scans INT DEFAULT 0,
+    badges JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE
@@ -28,7 +34,7 @@ CREATE TABLE profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create projects table
+-- Create projects table (with Git integration fields)
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -36,6 +42,12 @@ CREATE TABLE projects (
     name VARCHAR(255),
     description TEXT,
     visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
+    git_repo_url TEXT,
+    git_provider VARCHAR(20),
+    last_commit_sha VARCHAR(255),
+    last_synced_at TIMESTAMP WITH TIME ZONE,
+    current_streak INT DEFAULT 0,
+    longest_streak INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
@@ -109,102 +121,85 @@ CREATE TABLE sessions (
 );
 
 -- =========================
--- Multi-tenant (organizations, memberships, subscriptions, repos, policies, integrations, audit)
+-- Git & Gamification Tables
 -- =========================
 
--- Organizations table
-CREATE TABLE IF NOT EXISTS organizations (
+-- Create commit_scans table (Git-based scans)
+CREATE TABLE commit_scans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    slug VARCHAR(255) NOT NULL UNIQUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    commit_sha VARCHAR(255) NOT NULL,
+    branch VARCHAR(255),
+    commit_message TEXT,
+    commit_author VARCHAR(255),
+    commit_date TIMESTAMP WITH TIME ZONE NOT NULL,
+    
+    -- Scan metadata
+    device_id VARCHAR(255),
+    version_tag VARCHAR(50),
+    median_lines FLOAT DEFAULT 0,
+    gap_lines FLOAT DEFAULT 0,
+    
+    -- Git diff metrics
+    files_changed INT DEFAULT 0,
+    lines_added INT DEFAULT 0,
+    lines_deleted INT DEFAULT 0,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Memberships table
-CREATE TABLE IF NOT EXISTS memberships (
+-- Create commit_scan_langs table
+CREATE TABLE commit_scan_langs (
+    commit_scan_id UUID NOT NULL REFERENCES commit_scans(id) ON DELETE CASCADE,
+    language VARCHAR(100) NOT NULL,
+    files INT NOT NULL,
+    total INT NOT NULL,
+    comment INT NOT NULL,
+    blank INT NOT NULL,
+    median_lines FLOAT DEFAULT 0,
+    gap_lines FLOAT DEFAULT 0,
+    
+    -- Git diff metrics per language
+    lines_added INT DEFAULT 0,
+    lines_deleted INT DEFAULT 0,
+    
+    PRIMARY KEY (commit_scan_id, language)
+);
+
+-- Create collaborators table
+CREATE TABLE collaborators (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    git_username VARCHAR(255) NOT NULL,
+    git_email VARCHAR(255),
+    role VARCHAR(20) DEFAULT 'contributor' CHECK (role IN ('owner', 'contributor')),
+    commits_count INT DEFAULT 0,
+    lines_added INT DEFAULT 0,
+    lines_deleted INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create challenges table
+CREATE TABLE challenges (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('owner', 'admin', 'member')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    UNIQUE(org_id, user_id)
+    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+    type VARCHAR(50) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    target JSONB NOT NULL,
+    progress JSONB,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'failed', 'expired')),
+    starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    reward VARCHAR(100),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
--- Subscriptions table
-CREATE TABLE IF NOT EXISTS subscriptions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    plan VARCHAR(20) NOT NULL CHECK (plan IN ('free', 'pro', 'team', 'enterprise')),
-    seats INTEGER DEFAULT 1,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due', 'trialing')),
-    current_period_end TIMESTAMP WITH TIME ZONE,
-    stripe_customer_id VARCHAR(255),
-    stripe_subscription_id VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
-);
-
--- Repositories table
-CREATE TABLE IF NOT EXISTS repositories (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    provider VARCHAR(20) DEFAULT 'github' CHECK (provider IN ('github', 'gitlab', 'bitbucket')),
-    external_id VARCHAR(255) NOT NULL,
-    full_name VARCHAR(500) NOT NULL,
-    visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private', 'public', 'internal')),
-    default_branch VARCHAR(255),
-    repo_data JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
-);
-
--- Quality Budgets (Policies) table
-CREATE TABLE IF NOT EXISTS quality_budgets (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    scope VARCHAR(20) NOT NULL CHECK (scope IN ('org', 'repo', 'project')),
-    ref_id UUID,
-    name VARCHAR(255) NOT NULL,
-    thresholds JSONB NOT NULL,
-    mode VARCHAR(10) DEFAULT 'soft' CHECK (mode IN ('soft', 'hard')),
-    enabled BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
-);
-
--- Integrations table
-CREATE TABLE IF NOT EXISTS integrations (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    provider VARCHAR(20) NOT NULL CHECK (provider IN ('slack', 'github', 'email')),
-    config JSONB,
-    encrypted_data TEXT,
-    enabled BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMP WITH TIME ZONE
-);
-
--- Audit Logs table
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    action VARCHAR(255) NOT NULL,
-    resource VARCHAR(255) NOT NULL,
-    details JSONB,
-    ip_address VARCHAR(45),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Note: scans table no longer has repository_id, commit_sha, pull_request
--- These were removed to simplify the model
 
 -- =========================
 -- Indexes
@@ -247,39 +242,20 @@ CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_token ON sessions(token);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 
--- organizations
-CREATE INDEX idx_organizations_deleted_at ON organizations(deleted_at);
-CREATE INDEX idx_organizations_slug ON organizations(slug);
+-- commit_scans
+CREATE INDEX idx_commit_scans_project ON commit_scans(project_id);
+CREATE INDEX idx_commit_scans_sha ON commit_scans(commit_sha);
+CREATE INDEX idx_commit_scans_date ON commit_scans(commit_date);
 
--- memberships
-CREATE INDEX idx_memberships_org_id ON memberships(org_id);
-CREATE INDEX idx_memberships_user_id ON memberships(user_id);
-CREATE INDEX idx_memberships_deleted_at ON memberships(deleted_at);
+-- collaborators
+CREATE INDEX idx_collaborators_project ON collaborators(project_id);
+CREATE INDEX idx_collaborators_user ON collaborators(user_id);
 
--- subscriptions
-CREATE INDEX idx_subscriptions_org_id ON subscriptions(org_id);
-CREATE INDEX idx_subscriptions_stripe_customer_id ON subscriptions(stripe_customer_id);
-CREATE INDEX idx_subscriptions_stripe_subscription_id ON subscriptions(stripe_subscription_id);
-CREATE INDEX idx_subscriptions_deleted_at ON subscriptions(deleted_at);
-
--- repositories
-CREATE INDEX idx_repositories_org_id ON repositories(org_id);
-CREATE INDEX idx_repositories_external_id ON repositories(external_id);
-CREATE INDEX idx_repositories_deleted_at ON repositories(deleted_at);
-
--- quality_budgets
-CREATE INDEX idx_quality_budgets_org_id ON quality_budgets(org_id);
-CREATE INDEX idx_quality_budgets_ref_id ON quality_budgets(ref_id);
-CREATE INDEX idx_quality_budgets_deleted_at ON quality_budgets(deleted_at);
-
--- integrations
-CREATE INDEX idx_integrations_org_id ON integrations(org_id);
-CREATE INDEX idx_integrations_deleted_at ON integrations(deleted_at);
-
--- audit_logs
-CREATE INDEX idx_audit_logs_org_id ON audit_logs(org_id);
-CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+-- challenges
+CREATE INDEX idx_challenges_user ON challenges(user_id);
+CREATE INDEX idx_challenges_project ON challenges(project_id);
+CREATE INDEX idx_challenges_status ON challenges(status);
+CREATE INDEX idx_challenges_ends_at ON challenges(ends_at);
 
 -- =========================
 -- updated_at trigger function + triggers

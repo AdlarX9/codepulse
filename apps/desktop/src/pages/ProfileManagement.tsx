@@ -363,9 +363,7 @@ export default function ProfileManagement({ onBack, onLogout }: ProfileManagemen
 				<Card className='p-6 space-y-4'>
 					<h2 className='text-lg font-semibold mb-4'>Account Settings</h2>
 					<div>
-						<label className='block text-sm font-medium mb-1'>
-							Username (Handle)
-						</label>
+						<label className='block text-sm font-medium mb-1'>Username (Handle)</label>
 						<input
 							className='w-full border rounded px-3 py-2'
 							placeholder='username'
@@ -378,11 +376,15 @@ export default function ProfileManagement({ onBack, onLogout }: ProfileManagemen
 									handleStatus.available === true
 										? 'text-green-600'
 										: handleStatus.available === false
-										? 'text-red-600'
-										: 'text-gray-600'
+											? 'text-red-600'
+											: 'text-gray-600'
 								}`}
 							>
-								{handleStatus.checking ? '⏳ ' : handleStatus.available ? '✓ ' : '✗ '}
+								{handleStatus.checking
+									? '⏳ '
+									: handleStatus.available
+										? '✓ '
+										: '✗ '}
 								{handleStatus.message}
 							</p>
 						)}
@@ -394,7 +396,9 @@ export default function ProfileManagement({ onBack, onLogout }: ProfileManagemen
 							className='w-full border rounded px-3 py-2'
 							placeholder='your@email.com'
 							value={accountForm.email}
-							onChange={e => setAccountForm({ ...accountForm, email: e.target.value })}
+							onChange={e =>
+								setAccountForm({ ...accountForm, email: e.target.value })
+							}
 						/>
 						<p className='text-xs text-gray-500 mt-1'>
 							Changing email requires your current password
@@ -427,9 +431,7 @@ export default function ProfileManagement({ onBack, onLogout }: ProfileManagemen
 						/>
 					</div>
 					<div>
-						<label className='block text-sm font-medium mb-1'>
-							Current Password
-						</label>
+						<label className='block text-sm font-medium mb-1'>Current Password</label>
 						<input
 							type='password'
 							className='w-full border rounded px-3 py-2'
@@ -448,10 +450,7 @@ export default function ProfileManagement({ onBack, onLogout }: ProfileManagemen
 						<Save className='h-4 w-4 mr-2' />
 						{saving ? 'Saving...' : 'Save Account Settings'}
 					</Button>
-					<Button
-						variant='destructive'
-						onClick={() => setShowDeleteConfirm(true)}
-					>
+					<Button variant='destructive' onClick={() => setShowDeleteConfirm(true)}>
 						<Trash2 className='h-4 w-4 mr-2' />
 						Delete Account
 					</Button>

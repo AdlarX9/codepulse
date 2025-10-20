@@ -143,7 +143,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 
 	// Update profile fields (si fournis)
 	profileUpdates := map[string]interface{}{}
-	
+
 	// Handle handle change (requires checking uniqueness)
 	if req.Handle != nil && *req.Handle != "" {
 		// Check if handle is already taken by another user
@@ -156,7 +156,7 @@ func (h *AuthHandler) UpdateProfile(c *gin.Context) {
 		}
 		profileUpdates["handle"] = *req.Handle
 	}
-	
+
 	if req.DisplayName != nil {
 		profileUpdates["display_name"] = *req.DisplayName
 	}

@@ -33,6 +33,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
+.windsurf
 
 # Logs
 *.log

@@ -17,7 +17,7 @@ func NewPDFExporter() *PDFExporter {
 // For production, consider using a proper PDF library like gopdf or gofpdf
 func (e *PDFExporter) ExportReport(orgName string, stats map[string]interface{}, languages map[string]interface{}, trends []map[string]interface{}) ([]byte, error) {
 	html := e.generateHTML(orgName, stats, languages, trends)
-	
+
 	// For now, we return HTML that can be converted to PDF by the frontend
 	// In a production environment, use a library like wkhtmltopdf or chromedp
 	return []byte(html), nil

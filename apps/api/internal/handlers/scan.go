@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"time"
-	"math"
 
 	"codepulse-api/internal/database"
 	"codepulse-api/internal/middleware"
@@ -313,18 +313,18 @@ type agg struct {
 func isSignificantChange(last models.Scan, lastLangs []models.ScanLang, payload *SyncPayload) bool {
 	// Seuils (adapter au besoin)
 	const (
-		codeAbsThreshold      = 200 // lignes
-		totalAbsThreshold     = 200
-		commentAbsThreshold   = 100
-		blankAbsThreshold     = 100
-		codeRelThreshold      = 0.02 // 2%
-		totalRelThreshold     = 0.02
-		commentRelThreshold   = 0.05 // 5%
-		blankRelThreshold     = 0.05
-		medianAbsThreshold    = 10.0
-		medianRelThreshold    = 0.05 // 5%
-		gapAbsThreshold       = 10.0
-		gapRelThreshold       = 0.05
+		codeAbsThreshold    = 200 // lignes
+		totalAbsThreshold   = 200
+		commentAbsThreshold = 100
+		blankAbsThreshold   = 100
+		codeRelThreshold    = 0.02 // 2%
+		totalRelThreshold   = 0.02
+		commentRelThreshold = 0.05 // 5%
+		blankRelThreshold   = 0.05
+		medianAbsThreshold  = 10.0
+		medianRelThreshold  = 0.05 // 5%
+		gapAbsThreshold     = 10.0
+		gapRelThreshold     = 0.05
 	)
 	lastMap := map[string]agg{}
 	for _, l := range lastLangs {

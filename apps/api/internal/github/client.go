@@ -103,13 +103,13 @@ func (c *Client) GetInstallationToken(installationID int64) (string, error) {
 
 // CheckRunRequest represents a GitHub Check Run request
 type CheckRunRequest struct {
-	Name        string                  `json:"name"`
-	HeadSHA     string                  `json:"head_sha"`
-	Status      string                  `json:"status"` // queued, in_progress, completed
-	Conclusion  string                  `json:"conclusion,omitempty"` // success, failure, neutral, cancelled, skipped, timed_out, action_required
-	StartedAt   *time.Time              `json:"started_at,omitempty"`
-	CompletedAt *time.Time              `json:"completed_at,omitempty"`
-	Output      *CheckRunOutput         `json:"output,omitempty"`
+	Name        string          `json:"name"`
+	HeadSHA     string          `json:"head_sha"`
+	Status      string          `json:"status"`               // queued, in_progress, completed
+	Conclusion  string          `json:"conclusion,omitempty"` // success, failure, neutral, cancelled, skipped, timed_out, action_required
+	StartedAt   *time.Time      `json:"started_at,omitempty"`
+	CompletedAt *time.Time      `json:"completed_at,omitempty"`
+	Output      *CheckRunOutput `json:"output,omitempty"`
 }
 
 // CheckRunOutput represents the output section of a check run
@@ -127,7 +127,7 @@ func (c *Client) CreateCheckRun(installationID int64, owner, repo string, checkR
 	}
 
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/check-runs", owner, repo)
-	
+
 	body, err := json.Marshal(checkRun)
 	if err != nil {
 		return err
@@ -159,16 +159,16 @@ func (c *Client) CreateCheckRun(installationID int64, owner, repo string, checkR
 
 // WebhookEvent represents common webhook event fields
 type WebhookEvent struct {
-	Action       string          `json:"action"`
-	Installation *Installation   `json:"installation"`
-	Repository   *Repository     `json:"repository"`
-	Sender       *User           `json:"sender"`
+	Action       string        `json:"action"`
+	Installation *Installation `json:"installation"`
+	Repository   *Repository   `json:"repository"`
+	Sender       *User         `json:"sender"`
 }
 
 // Installation represents a GitHub App installation
 type Installation struct {
-	ID      int64  `json:"id"`
-	Account *User  `json:"account"`
+	ID      int64 `json:"id"`
+	Account *User `json:"account"`
 }
 
 // Repository represents a GitHub repository

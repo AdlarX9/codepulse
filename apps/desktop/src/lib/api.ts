@@ -1,3 +1,4 @@
+import { ApiScanLang, Project } from '@/types'
 import { invoke } from '@tauri-apps/api/tauri'
 
 export interface User {
@@ -325,21 +326,91 @@ async function rescanProject(
 }
 
 async function exportProject(projectId: string, format: 'csv' | 'pdf' | 'html'): Promise<Blob> {
-    const headers = await getAuthHeaders()
-    const backendFormat = format === 'html' ? 'pdf' : format
-    const endpoint = `${API_BASE}/export?project_id=${encodeURIComponent(projectId)}&format=${encodeURIComponent(backendFormat)}`
-    try {
-        const accept = format === 'csv' ? 'text/csv' : format === 'html' ? 'text/html' : 'application/pdf'
-        const res = await fetch(endpoint, {
-            method: 'GET',
-            headers: { ...headers, Accept: accept }
-        })
-        if (!res.ok) await logAndThrowApiError(res, 'GET /api/export')
-        return res.blob()
-    } catch (error) {
-        logNetworkError(error, 'GET /api/export')
-        throw error
-    }
+	const headers = await getAuthHeaders()
+	const backendFormat = format === 'html' ? 'pdf' : format
+	const endpoint = `${API_BASE}/export?project_id=${encodeURIComponent(projectId)}&format=${encodeURIComponent(backendFormat)}`
+	try {
+		const accept =
+			format === 'csv' ? 'text/csv' : format === 'html' ? 'text/html' : 'application/pdf'
+		const res = await fetch(endpoint, {
+			method: 'GET',
+			headers: { ...headers, Accept: accept }
+		})
+		if (!res.ok) await logAndThrowApiError(res, 'GET /api/export')
+		return res.blob()
+	} catch (error) {
+		logNetworkError(error, 'GET /api/export')
+		throw error
+	}
+}
+
+async function loadProjects(): Promise<Project[]> {
+	try {
+		const data = await api.getProjects()
+		const details = await Promise.all(data.map((p: any) => api.getProjectDetails(p.id)))
+		const mapped: Project[] = (details || []).map((p: any) => {
+			const hasScans = p?.stats?.has_scans
+			const langs: ApiScanLang[] = (p?.stats?.language_stats as ApiScanLang[]) || []
+			const totalLines = langs.reduce((sum, l: ApiScanLang) => sum + (l.total ?? 0), 0)
+			const totalFiles = langs.reduce((sum, l: ApiScanLang) => sum + (l.files ?? 0), 0)
+			const languagesCount = langs.filter(l => (l.total ?? 0) > 0).length
+			const topLanguage = langs.length
+				? [...langs].sort((a, b) => (b.total ?? 0) - (a.total ?? 0))[0]?.language ||
+					undefined
+				: undefined
+			const totalCode = langs.reduce(
+				(sum, l: ApiScanLang) =>
+					sum + Math.max((l.total ?? 0) - (l.comment ?? 0) - (l.blank ?? 0), 0),
+				0
+			)
+			const codePercent =
+				totalLines > 0 ? Math.round((totalCode / totalLines) * 100) : undefined
+			return {
+				id: p.project.id,
+				name: p.project.name || 'Project',
+				description: p.project.description || undefined,
+				createdAt: p.project.created_at,
+				settings: p.project.settings || {},
+				latestScan: hasScans
+					? {
+							totalFiles,
+							totalLines
+						}
+					: undefined,
+				topLanguage,
+				languagesCount,
+				codePercent
+			}
+		})
+		return mapped
+	} catch (err) {
+		console.error('Error loading projects:', err)
+		return []
+	}
+}
+
+async function request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+	const headers = await getAuthHeaders()
+	if (options.body && !headers['Content-Type']) {
+		headers['Content-Type'] = 'application/json'
+	}
+
+	const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint}`
+
+	try {
+		const res = await fetch(url, {
+			...options,
+			headers: {
+				...headers,
+				...options.headers
+			}
+		})
+		if (!res.ok) await logAndThrowApiError(res, `${options.method || 'GET'} ${endpoint}`)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `${options.method || 'GET'} ${endpoint}`)
+		throw error
+	}
 }
 
 export const api = {
@@ -361,5 +432,7 @@ export const api = {
 	checkHandleAvailability,
 	logout,
 	deleteAccount,
-	exportProject
+	exportProject,
+	request,
+	loadProjects
 }

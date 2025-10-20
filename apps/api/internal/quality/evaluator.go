@@ -26,16 +26,16 @@ type FailureDetail struct {
 
 // ScanMetrics represents computed metrics from a scan
 type ScanMetrics struct {
-	TotalLines       int     `json:"total_lines"`
-	CodeLines        int     `json:"code_lines"`
-	CommentLines     int     `json:"comment_lines"`
-	BlankLines       int     `json:"blank_lines"`
-	CoreCodeLines    int     `json:"core_code_lines"`
-	InfoLines        int     `json:"info_lines"`
-	CommentRatio     float64 `json:"comment_ratio"`
-	BloatRatio       float64 `json:"bloat_ratio"`
-	DocCoverage      float64 `json:"doc_coverage"`
-	CoreToInfoRatio  float64 `json:"core_to_info_ratio"`
+	TotalLines      int     `json:"total_lines"`
+	CodeLines       int     `json:"code_lines"`
+	CommentLines    int     `json:"comment_lines"`
+	BlankLines      int     `json:"blank_lines"`
+	CoreCodeLines   int     `json:"core_code_lines"`
+	InfoLines       int     `json:"info_lines"`
+	CommentRatio    float64 `json:"comment_ratio"`
+	BloatRatio      float64 `json:"bloat_ratio"`
+	DocCoverage     float64 `json:"doc_coverage"`
+	CoreToInfoRatio float64 `json:"core_to_info_ratio"`
 }
 
 // ComputeMetrics calculates quality metrics from a scan
@@ -82,7 +82,7 @@ func ComputeMetrics(scan *models.Scan) *ScanMetrics {
 // EvaluatePolicy evaluates a scan against a quality budget
 func EvaluatePolicy(policy *models.QualityBudget, scan *models.Scan) *EvaluationResult {
 	metrics := ComputeMetrics(scan)
-	
+
 	result := &EvaluationResult{
 		Passed:   true,
 		Mode:     policy.Mode,

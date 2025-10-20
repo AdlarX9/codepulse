@@ -17,3 +17,11 @@ export function formatDuration(ms: number): string {
 	const remainingSeconds = Math.floor(seconds % 60)
 	return `${minutes}m ${remainingSeconds}s`
 }
+
+export function formatShortSha(sha: string): string {
+	return sha.substring(0, 7)
+}
+
+export function getCommitSummary(message: string): string {
+	return message.split('\n')[0]
+}

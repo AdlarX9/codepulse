@@ -1,21 +1,24 @@
 import { useState, useEffect } from 'react'
 import Projects from './components/Projects'
-import ProjectDetails from './components/ProjectDetails'
-import Dashboard from './components/Dashboard'
+import {
+	DashboardLayout,
+	OverviewDashboard,
+	EvolutionDashboard,
+	QualityDashboard,
+	ContributorsDashboard
+} from './components/dashboards'
+import ExportButton from './components/export/ExportButton'
 import WelcomePage from './pages/Welcome'
 import ProjectSettings from './pages/ProjectSettings'
 import ProfileManagement from './pages/ProfileManagement'
 import { api, type User as ApiUser } from './lib/api'
-import { orgApi } from './lib/api-org'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
-import type { ScanResult, ScanSettings } from './types'
-import type { Organization } from './types/organization'
+import type { Project, ScanResult, ScanSettings } from './types'
 import ScanSettingsPage from './components/ScanSettings'
 import UserSettingsPage from './components/UserSettings'
 import AuthPage from './pages/Auth'
-import OrganizationPage from './pages/OrganizationPage'
-import AnalyticsPage from './pages/AnalyticsPage'
+import * as git from './lib/git'
 import {
 	Sidebar,
 	SidebarHeader,
@@ -25,12 +28,12 @@ import {
 	SidebarSection
 } from './components/ui/Sidebar'
 import logo from './assets/icon.png'
+import { Code2, Settings } from 'lucide-react'
 
 type User = ApiUser
 
 function App() {
 	const [currentUser, setCurrentUser] = useState<User | null>(null)
-	const [userOrgs, setUserOrgs] = useState<Organization[]>([])
 	const [currentView, setCurrentView] = useState<
 		| 'welcome'
 		| 'projects'
@@ -39,11 +42,11 @@ function App() {
 		| 'project-settings'
 		| 'scan-settings'
 		| 'user-settings'
+		| 'settings'
 		| 'analysis'
 		| 'auth'
-		| 'organization'
-		| 'analytics'
 	>('welcome')
+	const [settingsTab, setSettingsTab] = useState<'scan' | 'user'>('scan')
 	const [previousView, setPreviousView] = useState<
 		| 'welcome'
 		| 'projects'
@@ -52,14 +55,16 @@ function App() {
 		| 'project-settings'
 		| 'scan-settings'
 		| 'user-settings'
+		| 'settings'
 		| 'analysis'
 		| 'auth'
-		| 'organization'
-		| 'analytics'
 	>('welcome')
 	const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 	const [scanPath, setScanPath] = useState<string>('')
+	const [hasGit, setHasGit] = useState<boolean>(false)
+	const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null)
+	const [projects, setProjects] = useState<Project[]>([])
 
 	useEffect(() => {
 		// Check if user is authenticated on startup
@@ -67,23 +72,77 @@ function App() {
 			const user = await api.getCurrentUser()
 			if (user) {
 				setCurrentUser(user)
-				// Load user organizations
-				try {
-					const orgs = await orgApi.getUserOrgs()
-					setUserOrgs(orgs ?? [])
-				} catch (error) {
-					console.error('Failed to load organizations:', error)
-					setUserOrgs([]) // safety fallback
-				}
 				setCurrentView('projects')
 			} else {
 				setCurrentView('welcome')
 			}
+			loadProjects()
 		}
 		init()
 	}, [])
 
-	const hasOrgs = Array.isArray(userOrgs) && userOrgs.length > 0
+	async function loadProjects() {
+		const mapped = await api.loadProjects()
+		setProjects(mapped)
+	}
+
+	async function openProject(projectId: string) {
+		try {
+			// Load details (for name and settings)
+			const details = await api.getProjectDetails(projectId)
+			const p = details.project || details
+			setSelectedProjectId(projectId)
+			setSelectedProjectName(p.name || 'Project')
+
+			// Ensure path binding
+			let boundPath = await invoke<string | null>('get_project_binding', {
+				projectId
+			})
+			if (!boundPath) {
+				const selected = (await openDialog({
+					directory: true,
+					multiple: false
+				})) as string | null
+				if (!selected) return
+				await invoke('set_project_binding', { projectId, basePath: selected })
+				boundPath = selected
+			}
+
+			// Merge settings (project overrides)
+			const settings = await invoke<ScanSettings>('get_scan_settings')
+			const ps = (p.settings as any) || {}
+			const overrideKeys: (keyof ScanSettings)[] = [
+				'excluded_dirs',
+				'excluded_extensions',
+				'excluded_patterns',
+				'follow_symlinks',
+				'excluded_languages',
+				'allowed_languages'
+			]
+			for (const k of overrideKeys)
+				if (ps && ps[k] !== undefined) (settings as any)[k] = ps[k]
+
+			// Scan
+			const result = await invoke<ScanResult>('scan_directory', {
+				path: boundPath,
+				scanSettings: settings
+			})
+			setScanPath(boundPath)
+			setScanResult(result)
+			changeView('analysis')
+		} catch (e) {
+			console.error('Open project failed', e)
+		}
+	}
+
+	useEffect(() => {
+		// Check if current scan path has Git
+		if (scanPath) {
+			git.isGitRepository(scanPath)
+				.then(setHasGit)
+				.catch(() => setHasGit(false))
+		}
+	}, [scanPath])
 
 	function changeView(
 		view:
@@ -94,10 +153,9 @@ function App() {
 			| 'project-settings'
 			| 'scan-settings'
 			| 'user-settings'
+			| 'settings'
 			| 'analysis'
 			| 'auth'
-			| 'organization'
-			| 'analytics'
 	) {
 		if (view !== currentView) {
 			setPreviousView(currentView)
@@ -110,6 +168,8 @@ function App() {
 		const selected = (await openDialog({ directory: true, multiple: false })) as string | null
 		if (!selected) return
 		setScanPath(selected)
+		setSelectedProjectId(null)
+		setSelectedProjectName(selected.split('/').pop() || 'Project')
 		// load settings and scan
 		const settings = await invoke<ScanSettings>('get_scan_settings')
 		const result = await invoke<ScanResult>('scan_directory', {
@@ -124,22 +184,11 @@ function App() {
 		await selectAndScan()
 	}
 
-	function handleProjectSelect(project: any) {
-		setSelectedProjectId(project.id)
-		changeView('project-details')
-	}
-
-	function handleBackToProjects() {
-		changeView('projects')
-		setSelectedProjectId(null)
-	}
-
 	async function handleLogout() {
 		try {
 			await api.clearToken()
 		} finally {
 			setCurrentUser(null)
-			setUserOrgs([])
 			setScanResult(null)
 			setScanPath('')
 			setSelectedProjectId(null)
@@ -147,13 +196,16 @@ function App() {
 		}
 	}
 
-	async function refreshOrganizations() {
-		try {
-			const orgs = await orgApi.getUserOrgs()
-			setUserOrgs(orgs ?? [])
-		} catch (error) {
-			console.error('Failed to refresh organizations:', error)
-			setUserOrgs([]) // safety fallback
+	function renderSettings() {
+		switch (settingsTab) {
+			case 'scan':
+				return <ScanSettingsPage />
+				break
+			case 'user':
+				return <UserSettingsPage />
+				break
+			default:
+				return null
 		}
 	}
 
@@ -166,31 +218,6 @@ function App() {
 						onContinueWithoutAccount={handleContinueWithoutAccount}
 						onOpenSettings={() => changeView('scan-settings')}
 					/>
-				)}
-
-				{currentView === 'analysis' && scanResult && (
-					<div className='container mx-auto p-6'>
-						<Dashboard
-							result={scanResult}
-							onReset={() => {
-								setScanResult(null)
-								changeView(previousView)
-							}}
-							onChooseFolder={selectAndScan}
-							onRescan={async () => {
-								if (!scanPath) {
-									return
-								}
-								const settings = await invoke<ScanSettings>('get_scan_settings')
-								const result = await invoke<ScanResult>('scan_directory', {
-									path: scanPath,
-									scanSettings: settings
-								})
-								setScanResult(result)
-							}}
-							onOpenSettings={() => changeView('scan-settings')}
-						/>
-					</div>
 				)}
 
 				{currentView === 'auth' && (
@@ -221,28 +248,26 @@ function App() {
 					</div>
 				)}
 
-				{currentView === 'scan-settings' && scanResult && (
-					<div className='container mx-auto p-6'>
-						<ScanSettingsPage onBack={() => changeView(previousView)} />
-					</div>
-				)}
-
 				{currentView === 'user-settings' && !currentUser && (
 					<div className='container mx-auto p-6'>
 						<UserSettingsPage onBack={() => changeView(previousView)} />
 					</div>
 				)}
 
+				{currentView === 'scan-settings' && !currentUser && (
+					<div className='container mx-auto p-6'>
+						<ScanSettingsPage onBack={() => changeView(previousView)} />
+					</div>
+				)}
+
 				{currentUser &&
 					currentView !== 'welcome' &&
 					currentView !== 'auth' &&
-					currentView !== 'analysis' &&
-					currentUser &&
-					!scanResult && (
+					currentUser && (
 						<div className='flex h-screen'>
 							<Sidebar>
 								<SidebarHeader>
-									<div className='flex items-center gap-3'>
+									<div className='flex items-center gap-3 mb-4'>
 										<div className='w-12 h-12 rounded-lg flex items-center justify-center'>
 											<img
 												src={logo}
@@ -257,6 +282,12 @@ function App() {
 											</div>
 										</div>
 									</div>
+									<SidebarItem
+										icon={<Settings className='w-5 h-5'/>}
+										label='Settings'
+										active={currentView === 'settings'}
+										onClick={() => changeView('settings')}
+									/>
 								</SidebarHeader>
 								<SidebarBody>
 									<SidebarSection title='Main'>
@@ -276,7 +307,7 @@ function App() {
 													/>
 												</svg>
 											}
-											label='Projects'
+											label='Overview'
 											active={
 												currentView === 'projects' ||
 												currentView === 'project-details' ||
@@ -284,50 +315,7 @@ function App() {
 											}
 											onClick={() => changeView('projects')}
 										/>
-										<SidebarItem
-											icon={
-												<svg
-													className='w-5 h-5'
-													fill='none'
-													viewBox='0 0 24 24'
-													stroke='currentColor'
-												>
-													<path
-														strokeLinecap='round'
-														strokeLinejoin='round'
-														strokeWidth={2}
-														d='M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'
-													/>
-												</svg>
-											}
-											label='Organization'
-											active={currentView === 'organization'}
-											onClick={() => changeView('organization')}
-										/>
-										{hasOrgs && (
-											<SidebarItem
-												icon={
-													<svg
-														className='w-5 h-5'
-														fill='none'
-														viewBox='0 0 24 24'
-														stroke='currentColor'
-													>
-														<path
-															strokeLinecap='round'
-															strokeLinejoin='round'
-															strokeWidth={2}
-															d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
-														/>
-													</svg>
-												}
-												label='Analytics'
-												active={currentView === 'analytics'}
-												onClick={() => changeView('analytics')}
-											/>
-										)}
-									</SidebarSection>
-									<SidebarSection title='Settings'>
+
 										<SidebarItem
 											icon={
 												<svg
@@ -348,58 +336,26 @@ function App() {
 											active={currentView === 'profile'}
 											onClick={() => changeView('profile')}
 										/>
-										<SidebarItem
-											icon={
-												<svg
-													className='w-5 h-5'
-													fill='none'
-													viewBox='0 0 24 24'
-													stroke='currentColor'
-												>
-													<path
-														strokeLinecap='round'
-														strokeLinejoin='round'
-														strokeWidth={2}
-														d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'
-													/>
-													<path
-														strokeLinecap='round'
-														strokeLinejoin='round'
-														strokeWidth={2}
-														d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-													/>
-												</svg>
-											}
-											label='Scan Settings'
-											active={currentView === 'scan-settings'}
-											onClick={() => changeView('scan-settings')}
-										/>
-										<SidebarItem
-											icon={
-												<svg
-													className='w-5 h-5'
-													fill='none'
-													viewBox='0 0 24 24'
-													stroke='currentColor'
-												>
-													<path
-														strokeLinecap='round'
-														strokeLinejoin='round'
-														strokeWidth={2}
-														d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-													/>
-												</svg>
-											}
-											label='User Settings'
-											active={currentView === 'user-settings'}
-											onClick={() => changeView('user-settings')}
-										/>
+									</SidebarSection>
+									<SidebarSection title='Projects'>
+										{projects.map((project: Project) => (
+											<SidebarItem
+												key={project.id}
+												label={project.name}
+												onClick={() => openProject(project.id)}
+												active={
+													currentView === 'analysis' &&
+													selectedProjectId === project.id
+												}
+												icon={<Code2 />}
+											/>
+										))}
 									</SidebarSection>
 								</SidebarBody>
 								<SidebarFooter>
 									<button
 										onClick={selectAndScan}
-										className='w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+										className='w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
 									>
 										<svg
 											className='w-5 h-5'
@@ -418,7 +374,7 @@ function App() {
 									</button>
 									<button
 										onClick={handleLogout}
-										className='w-full flex items-center justify-center gap-2 px-4 py-2 mt-2 text-gray-300 hover:text-white transition-colors'
+										className='w-full flex items-center justify-center gap-2 px-4 py-2 mt-2 text-gray-800 hover:text-red-500 transition-colors'
 									>
 										<svg
 											className='w-5 h-5'
@@ -438,26 +394,13 @@ function App() {
 								</SidebarFooter>
 							</Sidebar>
 							<div className='flex-1 overflow-y-auto'>
-								{currentView === 'organization' && (
-									<OrganizationPage
-										onBack={() => changeView('projects')}
-										onOrganizationChange={refreshOrganizations}
-									/>
-								)}
 								{currentView === 'projects' && (
 									<Projects
-										onProjectSelect={handleProjectSelect}
+										onProjectSelect={(proj: any) => openProject(proj.id)}
 										onOpenProjectSettings={(id: string) => {
 											setSelectedProjectId(id)
 											changeView('project-settings')
 										}}
-									/>
-								)}
-								{currentView === 'project-details' && selectedProjectId && (
-									<ProjectDetails
-										projectId={selectedProjectId}
-										onBack={handleBackToProjects}
-										onOpenSettings={() => changeView('project-settings')}
 									/>
 								)}
 								{currentView === 'profile' && (
@@ -469,27 +412,145 @@ function App() {
 								{currentView === 'project-settings' && selectedProjectId && (
 									<ProjectSettings
 										projectId={selectedProjectId}
-										onBack={() => changeView('project-details')}
+										onBack={() => changeView('analysis')}
 									/>
 								)}
-								{currentView === 'scan-settings' && (
-									<ScanSettingsPage onBack={() => changeView('projects')} />
+								{currentView === 'settings' && (
+									<div className='space-y-4'>
+										<header className='border-b border-gray-200 pb-14'>
+											<nav className='-mb-px flex space-x-8 px-8 pt-5 fixed z-10 bg-white border-b w-full'>
+												<button
+													onClick={() => setSettingsTab('scan')}
+													className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+														settingsTab === 'scan'
+															? 'border-blue-500 text-blue-600'
+															: 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+													}`}
+												>
+													Scan Settings
+												</button>
+												<button
+													onClick={() => setSettingsTab('user')}
+													className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+														settingsTab === 'user'
+															? 'border-blue-500 text-blue-600'
+															: 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+													}`}
+												>
+													User Settings
+												</button>
+											</nav>
+										</header>
+										{renderSettings()}
+									</div>
 								)}
-								{currentView === 'user-settings' && (
-									<UserSettingsPage onBack={() => changeView('projects')} />
-								)}
-								{currentView === 'analytics' &&
-									(hasOrgs && userOrgs[0]?.id ? (
-										<AnalyticsPage
-											orgId={userOrgs[0].id}
-											onBack={() => changeView('projects')}
-										/>
-									) : (
-										<div className='p-6 text-sm text-muted-foreground'>
-											No organization found. Please create or join an
-											organization first.
+								{currentView === 'analysis' && scanResult && (
+									<div className='container mx-auto p-6'>
+										<div className='mb-4 flex justify-between items-center'>
+											<button
+												onClick={() => {
+													setScanResult(null)
+													changeView(previousView)
+												}}
+												className='px-4 py-2 text-gray-600 hover:text-gray-900'
+											>
+												← Back
+											</button>
+											<div className='flex gap-2'>
+												<button
+													onClick={selectAndScan}
+													className='px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded'
+												>
+													Choose Folder
+												</button>
+												<button
+													onClick={async () => {
+														if (!scanPath) return
+														const settings =
+															await invoke<ScanSettings>(
+																'get_scan_settings'
+															)
+														const result = await invoke<ScanResult>(
+															'scan_directory',
+															{
+																path: scanPath,
+																scanSettings: settings
+															}
+														)
+														setScanResult(result)
+													}}
+													className='px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded'
+												>
+													Rescan
+												</button>
+											</div>
 										</div>
-									))}
+										<DashboardLayout
+											projectId=''
+											projectName={
+												selectedProjectName ||
+												scanPath.split('/').pop() ||
+												'Project'
+											}
+											hasGit={hasGit}
+											headerRight={
+												scanResult ? (
+													<div className='flex items-center gap-2'>
+														<ExportButton
+															scanResult={scanResult}
+															projectName={
+																selectedProjectName || 'Project'
+															}
+														/>
+														{selectedProjectId && (
+															<button
+																onClick={() =>
+																	changeView('project-settings')
+																}
+																className='px-3 py-2 border rounded text-sm hover:bg-gray-50'
+															>
+																Edit
+															</button>
+														)}
+													</div>
+												) : null
+											}
+										>
+											{activeTab => {
+												switch (activeTab) {
+													case 'overview':
+														return (
+															<OverviewDashboard
+																scanResult={scanResult}
+																projectPath={scanPath}
+															/>
+														)
+													case 'evolution':
+														return (
+															<EvolutionDashboard
+																projectPath={scanPath}
+																hasGit={hasGit}
+																scanResult={scanResult}
+															/>
+														)
+													case 'quality':
+														return (
+															<QualityDashboard
+																scanResult={scanResult}
+															/>
+														)
+													case 'contributors':
+														return (
+															<ContributorsDashboard
+																projectPath={scanPath}
+																hasGit={hasGit}
+															/>
+														)
+												}
+											}}
+										</DashboardLayout>
+									</div>
+								)}
 							</div>
 						</div>
 					)}

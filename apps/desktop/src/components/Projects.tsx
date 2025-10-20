@@ -5,20 +5,16 @@ import { Plus, Folder, Calendar, Settings, Trash2, BarChart3 } from 'lucide-reac
 import { api } from '../lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
-import type { ScanResult, ScanSettings, UserSettings, ApiScanLang } from '../types'
-import Dashboard from './Dashboard'
-
-interface Project {
-	id: string
-	name: string
-	description?: string
-	createdAt: string
-	settings: ScanSettings
-	latestScan?: {
-		totalFiles: number
-		totalLines: number
-	}
-}
+import type { ScanResult, ScanSettings, UserSettings, Project } from '../types'
+import {
+	DashboardLayout,
+	OverviewDashboard,
+	EvolutionDashboard,
+	QualityDashboard,
+	ContributorsDashboard
+} from './dashboards'
+import ExportButton from './export/ExportButton'
+import * as git from '../lib/git'
 
 interface ProjectsProps {
 	onProjectSelect?: (project: Project) => void
@@ -28,7 +24,6 @@ interface ProjectsProps {
 export default function Projects({ onProjectSelect, onOpenProjectSettings }: ProjectsProps) {
 	const [projects, setProjects] = useState<Project[]>([])
 	const [loading, setLoading] = useState(true)
-	const [error, setError] = useState<string | null>(null)
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false)
 	const [selectedPath, setSelectedPath] = useState<string | null>(null)
 	const [projectName, setProjectName] = useState('')
@@ -36,44 +31,27 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 	const [projectVisibility, setProjectVisibility] = useState<'private' | 'public'>('private')
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 	const [scannedProjectName, setScannedProjectName] = useState<string>('')
+	const [scannedProjectPath, setScannedProjectPath] = useState<string>('')
+	const [scannedProjectId, setScannedProjectId] = useState<string | null>(null)
+	const [hasGit, setHasGit] = useState<boolean>(false)
 
 	useEffect(() => {
 		loadProjects()
 	}, [])
 
-	async function loadProjects() {
-		try {
-			setLoading(true)
-			setError(null)
-
-			const data = await api.getProjects()
-			const details = await Promise.all(data.map((p: any) => api.getProjectDetails(p.id)))
-			const mapped: Project[] = (details || []).map((p: any) => {
-				const hasScans = p?.stats?.has_scans
-				const langs: ApiScanLang[] = (p?.stats?.language_stats as ApiScanLang[]) || []
-				const totalLines = langs.reduce((sum, l: ApiScanLang) => sum + (l.total ?? 0), 0)
-				const totalFiles = langs.reduce((sum, l: ApiScanLang) => sum + (l.files ?? 0), 0)
-				return {
-					id: p.project.id,
-					name: p.project.name || 'Project',
-					description: p.project.description || undefined,
-					createdAt: p.project.created_at,
-					settings: p.project.settings || {},
-					latestScan: hasScans
-						? {
-								totalFiles,
-								totalLines
-							}
-						: undefined
-				}
-			})
-			setProjects(mapped)
-		} catch (err) {
-			setError('Failed to load projects')
-			console.error('Error loading projects:', err)
-		} finally {
-			setLoading(false)
+	useEffect(() => {
+		if (scannedProjectPath) {
+			git.isGitRepository(scannedProjectPath)
+				.then(setHasGit)
+				.catch(() => setHasGit(false))
 		}
+	}, [scannedProjectPath])
+
+	async function loadProjects() {
+		setLoading(true)
+		const mapped = await api.loadProjects()
+		setProjects(mapped)
+		setLoading(false)
 	}
 
 	async function deleteProject(projectId: string) {
@@ -194,6 +172,8 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 			})
 			setScanResult(result)
 			setScannedProjectName(project.name)
+			setScannedProjectPath(boundPath)
+			setScannedProjectId(project.id)
 
 			const userSettings = await invoke<UserSettings>('get_user_settings')
 
@@ -253,22 +233,68 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 		)
 	}
 
-	if (error) {
-		return (
-			<div className='text-center py-8'>
-				<div className='text-red-600 mb-4'>{error}</div>
-				<Button onClick={loadProjects}>Retry</Button>
-			</div>
-		)
-	}
-
 	if (scanResult) {
 		return (
 			<div className='px-6 pt-3'>
 				<div className='flex items-center gap-4 mb-6'>
+					<Button variant='ghost' onClick={() => setScanResult(null)}>
+						← Back
+					</Button>
 					<h1 className='text-2xl font-bold'>{scannedProjectName} - Scan Results</h1>
 				</div>
-				<Dashboard result={scanResult} onReset={() => setScanResult(null)} />
+				<DashboardLayout
+					projectId={scannedProjectId || ''}
+					projectName={scannedProjectName}
+					hasGit={hasGit}
+					headerRight={
+						scanResult ? (
+							<div className='flex items-center gap-2'>
+								<ExportButton
+									scanResult={scanResult}
+									projectName={scannedProjectName || 'Project'}
+								/>
+								{scannedProjectId && (
+									<Button
+										variant='outline'
+										size='sm'
+										onClick={() => onOpenProjectSettings?.(scannedProjectId)}
+									>
+										Edit
+									</Button>
+								)}
+							</div>
+						) : null
+					}
+				>
+					{activeTab => {
+						switch (activeTab) {
+							case 'overview':
+								return (
+									<OverviewDashboard
+										scanResult={scanResult}
+										projectPath={scannedProjectPath}
+									/>
+								)
+							case 'evolution':
+								return (
+									<EvolutionDashboard
+										projectPath={scannedProjectPath}
+										hasGit={hasGit}
+										scanResult={scanResult}
+									/>
+								)
+							case 'quality':
+								return <QualityDashboard scanResult={scanResult} />
+							case 'contributors':
+								return (
+									<ContributorsDashboard
+										projectPath={scannedProjectPath}
+										hasGit={hasGit}
+									/>
+								)
+						}
+					}}
+				</DashboardLayout>
 			</div>
 		)
 	}
@@ -357,6 +383,29 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 										<Calendar className='h-4 w-4' />
 										<span>Created {formatDate(project.createdAt)}</span>
 									</div>
+
+									{/* Mini KPIs */}
+									{(project.topLanguage ||
+										project.languagesCount !== undefined ||
+										project.codePercent !== undefined) && (
+										<div className='flex flex-wrap gap-2 pt-1'>
+											{project.topLanguage && (
+												<span className='px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 border border-gray-200'>
+													Top: {project.topLanguage}
+												</span>
+											)}
+											{project.languagesCount !== undefined && (
+												<span className='px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 border border-gray-200'>
+													{project.languagesCount} languages
+												</span>
+											)}
+											{project.codePercent !== undefined && (
+												<span className='px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 border border-gray-200'>
+													{project.codePercent}% code
+												</span>
+											)}
+										</div>
+									)}
 
 									{/* Action Buttons */}
 									<div className='flex gap-2 pt-2'>

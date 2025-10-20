@@ -95,3 +95,18 @@ export interface ApiProject {
 	created_at: string
 	updated_at: string
 }
+
+export interface Project {
+	id: string
+	name: string
+	description?: string
+	createdAt: string
+	settings: ScanSettings
+	latestScan?: {
+		totalFiles: number
+		totalLines: number
+	}
+	topLanguage?: string
+	languagesCount?: number
+	codePercent?: number
+}

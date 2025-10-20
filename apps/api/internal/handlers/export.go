@@ -290,13 +290,19 @@ func (h *ExportHandler) formatScansForJSON(scans []models.Scan, includeLanguages
 			for j, lang := range scan.ScanLangs {
 				lcode := lang.Total - lang.Comment - lang.Blank
 				langs[j] = gin.H{
-					"language":   lang.Language,
-					"lines":      lang.Total,
-					"files":      lang.Files,
-					"percentage": func() float64 { t := total; if t == 0 { return 0 } ; return float64(lang.Total) / float64(t) * 100 }(),
-					"code":       lcode,
-					"comment":    lang.Comment,
-					"blank":      lang.Blank,
+					"language": lang.Language,
+					"lines":    lang.Total,
+					"files":    lang.Files,
+					"percentage": func() float64 {
+						t := total
+						if t == 0 {
+							return 0
+						}
+						return float64(lang.Total) / float64(t) * 100
+					}(),
+					"code":    lcode,
+					"comment": lang.Comment,
+					"blank":   lang.Blank,
 				}
 			}
 			scanData["scan_langs"] = langs
@@ -354,7 +360,12 @@ func (h *ExportHandler) exportPDF(c *gin.Context, project models.Project, scans 
 				"code":    float64(lcode),
 				"comment": float64(lang.Comment),
 				"blank":   float64(lang.Blank),
-				"percentage": func() float64 { if t == 0 { return 0 } ; return float64(lang.Total) / float64(t) * 100 }(),
+				"percentage": func() float64 {
+					if t == 0 {
+						return 0
+					}
+					return float64(lang.Total) / float64(t) * 100
+				}(),
 			}
 		}
 	}

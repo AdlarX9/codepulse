@@ -21,7 +21,7 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 		excluded_patterns: [],
 		follow_symlinks: false,
 		excluded_languages: [],
-		allowed_languages: [],
+		allowed_languages: []
 	})
 
 	useEffect(() => {
@@ -41,7 +41,7 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 				excluded_patterns: p.settings?.excluded_patterns || [],
 				follow_symlinks: !!p.settings?.follow_symlinks,
 				excluded_languages: p.settings?.excluded_languages || [],
-				allowed_languages: p.settings?.allowed_languages || [],
+				allowed_languages: p.settings?.allowed_languages || []
 			})
 		} catch (e) {
 			setError('Failed to load project settings')

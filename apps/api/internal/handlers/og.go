@@ -105,8 +105,18 @@ func (h *OGHandler) generateProjectOGSVG(projectName string, scan *models.Scan) 
   <rect x="200" y="180" width="%.1f" height="20" fill="#3b82f6" rx="10"/>
   <text x="520" y="195" font-family="Arial, sans-serif" font-size="16" fill="white">%.1f%% code</text>`,
 			formatNumber(total),
-			func() float64 { if total == 0 { return 0 }; return float64(code)/float64(total)*300 }(),
-			func() float64 { if total == 0 { return 0 }; return float64(code)/float64(total)*100 }(),
+			func() float64 {
+				if total == 0 {
+					return 0
+				}
+				return float64(code) / float64(total) * 300
+			}(),
+			func() float64 {
+				if total == 0 {
+					return 0
+				}
+				return float64(code) / float64(total) * 100
+			}(),
 		)
 
 		// Top languages (if available)
@@ -118,7 +128,12 @@ func (h *OGHandler) generateProjectOGSVG(projectName string, scan *models.Scan) 
 					break
 				}
 				y := 270 + i*25
-				percentage := func() float64 { if total == 0 { return 0 }; return float64(lang.Total) / float64(total) * 100 }()
+				percentage := func() float64 {
+					if total == 0 {
+						return 0
+					}
+					return float64(lang.Total) / float64(total) * 100
+				}()
 
 				svg += fmt.Sprintf(`
   <rect x="200" y="%d" width="200" height="15" fill="#374151" rx="7"/>

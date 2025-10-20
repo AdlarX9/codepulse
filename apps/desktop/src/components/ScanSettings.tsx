@@ -8,7 +8,7 @@ import type { ScanSettings } from '../types'
 import { ALL_LANGUAGES, COMMON_EXCLUDED_LANGUAGES } from '../constants/languages'
 
 interface ScanSettingsProps {
-	onBack: () => void
+	onBack?: () => void
 }
 
 type ScanSettingsFormProps = {
@@ -19,14 +19,20 @@ type ScanSettingsFormProps = {
 	title?: string
 }
 
-export function ScanSettingsForm({ initial, onSave, onCancel, saving, title }: ScanSettingsFormProps) {
+export function ScanSettingsForm({
+	initial,
+	onSave,
+	onCancel,
+	saving,
+	title
+}: ScanSettingsFormProps) {
 	const [settings, setSettings] = useState<ScanSettings>({
 		excluded_dirs: [],
 		excluded_extensions: [],
 		excluded_patterns: [],
 		follow_symlinks: false,
 		excluded_languages: [],
-		allowed_languages: [],
+		allowed_languages: []
 	})
 	const [isSaving, setIsSaving] = useState(false)
 
@@ -38,14 +44,16 @@ export function ScanSettingsForm({ initial, onSave, onCancel, saving, title }: S
 	const [newExt, setNewExt] = useState('')
 
 	useEffect(() => {
-		setSettings(initial || {
-			excluded_dirs: [],
-			excluded_extensions: [],
-			excluded_patterns: [],
-			follow_symlinks: false,
-			excluded_languages: [],
-			allowed_languages: [],
-		})
+		setSettings(
+			initial || {
+				excluded_dirs: [],
+				excluded_extensions: [],
+				excluded_patterns: [],
+				follow_symlinks: false,
+				excluded_languages: [],
+				allowed_languages: []
+			}
+		)
 	}, [initial])
 
 	async function saveSettings() {
@@ -458,7 +466,7 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 		excluded_patterns: [],
 		follow_symlinks: false,
 		excluded_languages: [],
-		allowed_languages: [],
+		allowed_languages: []
 	})
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -482,7 +490,7 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 		setSaving(true)
 		try {
 			await invoke('update_scan_settings', { settings: s })
-			onBack()
+			onBack?.()
 		} catch (error) {
 			console.error('Failed to save scan settings:', error)
 			alert(`Failed to save scan settings: ${error}`)
@@ -500,6 +508,12 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 	}
 
 	return (
-		<ScanSettingsForm initial={settings} onSave={saveUserSettings} onCancel={onBack} saving={saving} title='Scan Settings' />
+		<ScanSettingsForm
+			initial={settings}
+			onSave={saveUserSettings}
+			onCancel={onBack}
+			saving={saving}
+			title='Scan Settings'
+		/>
 	)
 }

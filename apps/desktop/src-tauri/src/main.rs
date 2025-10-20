@@ -9,6 +9,7 @@ mod categories;
 mod updater;
 mod auth;
 mod projects;
+mod git;
 
 use scanner::{ScanResult, to_snapshot};
 use user_settings::{UserSettings, load_user_settings, save_user_settings};
@@ -128,6 +129,86 @@ async fn compute_project_key_hash(basePath: &str) -> Result<String, String> {
     projects::compute_project_key_hash(basePath)
 }
 
+// Git commands
+#[tauri::command]
+async fn git_is_repository(path: String) -> Result<bool, String> {
+    Ok(git::repo::is_git_repository(&path))
+}
+
+#[tauri::command]
+async fn git_get_repo_info(path: String) -> Result<git::GitRepoInfo, String> {
+    git::repo::get_repo_info(&path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_get_branches(path: String) -> Result<Vec<String>, String> {
+    git::repo::get_branches(&path)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_get_commits(
+    path: String,
+    branch: Option<String>,
+    limit: usize,
+) -> Result<Vec<git::GitCommitInfo>, String> {
+    git::commits::get_commits(&path, branch.as_deref(), limit)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_get_commits_since(
+    path: String,
+    since_sha: String,
+    branch: Option<String>,
+) -> Result<Vec<git::GitCommitInfo>, String> {
+    git::commits::get_commits_since(&path, &since_sha, branch.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_get_commit_by_sha(
+    path: String,
+    sha: String,
+) -> Result<git::GitCommitInfo, String> {
+    git::commits::get_commit_by_sha(&path, &sha)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_get_commit_diff_stats(
+    path: String,
+    commit_sha: String,
+) -> Result<git::GitDiffStats, String> {
+    git::diff::get_commit_diff_stats(&path, &commit_sha)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_get_commit_file_changes(
+    path: String,
+    commit_sha: String,
+) -> Result<Vec<git::GitFileChange>, String> {
+    git::diff::get_commit_file_changes(&path, &commit_sha)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_fetch_from_remote(
+    path: String,
+    remote_name: String,
+) -> Result<(), String> {
+    git::repo::fetch_from_remote(&path, &remote_name)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn git_has_uncommitted_changes(path: String) -> Result<bool, String> {
+    git::repo::has_uncommitted_changes(&path)
+        .map_err(|e| e.to_string())
+}
+
 fn main() {
     // Load user settings for background tasks
     let user_settings = load_user_settings().expect("Failed to load user settings");
@@ -141,9 +222,9 @@ fn main() {
         .manage(AppState {
             cancel_flag: Arc::new(AtomicBool::new(false)),
         })
-        .setup(move |app| {
+        .setup(move |_app| {
             // Spawn background tasks within Tauri runtime
-            // let app_handle = app.handle(); // Unused for now
+            // let app_handle = _app.handle(); // Unused for now
 
             // Sync worker
             tauri::async_runtime::spawn(async move {
@@ -173,6 +254,16 @@ fn main() {
             set_project_binding,
             clear_project_binding,
             compute_project_key_hash,
+            git_is_repository,
+            git_get_repo_info,
+            git_get_branches,
+            git_get_commits,
+            git_get_commits_since,
+            git_get_commit_by_sha,
+            git_get_commit_diff_stats,
+            git_get_commit_file_changes,
+            git_fetch_from_remote,
+            git_has_uncommitted_changes,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,7 +6,7 @@ import { Card } from './ui/Card'
 import type { UserSettings } from '../types'
 
 interface UserSettingsProps {
-	onBack: () => void
+	onBack?: () => void
 }
 
 export default function UserSettingsPage({ onBack }: UserSettingsProps) {
@@ -14,7 +14,7 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 		device_id: '',
 		local_salt: '',
 		update_channel: 'stable',
-		last_update_check: '',
+		last_update_check: ''
 	})
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)
@@ -38,7 +38,7 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 		setSaving(true)
 		try {
 			await invoke('update_user_settings', { settings })
-			onBack()
+			onBack?.()
 		} catch (error) {
 			console.error('Failed to save user settings:', error)
 			alert(`Failed to save user settings: ${error}`)
@@ -60,9 +60,11 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 			<div className='max-w-3xl mx-auto'>
 				<div className='flex items-center justify-between mb-6'>
 					<h1 className='text-3xl font-bold'>User Settings</h1>
-					<Button variant='ghost' size='sm' onClick={onBack}>
-						<X className='h-5 w-5' />
-					</Button>
+					{onBack && (
+						<Button variant='ghost' size='sm' onClick={onBack}>
+							<X className='h-5 w-5' />
+						</Button>
+					)}
 				</div>
 
 				<div className='space-y-6'>
@@ -70,7 +72,8 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 					<Card className='p-6'>
 						<h2 className='text-xl font-semibold mb-4'>Device Information</h2>
 						<p className='text-sm text-muted-foreground mb-6'>
-							These identifiers are generated automatically and used for syncing your data.
+							These identifiers are generated automatically and used for syncing your
+							data.
 						</p>
 
 						<div className='space-y-4'>
@@ -104,12 +107,15 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 					<Card className='p-6'>
 						<h2 className='text-xl font-semibold mb-4'>Update Settings</h2>
 						<p className='text-sm text-muted-foreground mb-6'>
-							Configure how CodePulse checks for updates. Updates are always checked automatically.
+							Configure how CodePulse checks for updates. Updates are always checked
+							automatically.
 						</p>
 
 						<div className='space-y-4'>
 							<div>
-								<label className='text-sm font-medium mb-2 block'>Update Channel</label>
+								<label className='text-sm font-medium mb-2 block'>
+									Update Channel
+								</label>
 								<select
 									value={settings.update_channel}
 									onChange={e =>
@@ -136,7 +142,7 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 										{settings.last_update_check
 											? new Date(
 													parseInt(settings.last_update_check) * 1000
-											  ).toLocaleString()
+												).toLocaleString()
 											: 'Never'}
 									</code>
 								</div>
@@ -151,8 +157,9 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 							<div className='text-sm text-blue-900 dark:text-blue-100'>
 								<p className='font-medium mb-1'>Automatic Updates</p>
 								<p className='text-xs opacity-90'>
-									CodePulse automatically checks for updates to ensure you have the latest
-									features and security patches. You cannot disable this feature.
+									CodePulse automatically checks for updates to ensure you have
+									the latest features and security patches. You cannot disable
+									this feature.
 								</p>
 							</div>
 						</div>
