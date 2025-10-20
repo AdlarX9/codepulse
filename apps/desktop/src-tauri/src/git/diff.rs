@@ -1,5 +1,5 @@
 use super::{GitDiffStats, GitError, GitFileChange};
-use git2::{Diff, DiffDelta, DiffOptions, Oid};
+use git2::{Diff, DiffDelta, DiffOptions, Oid, Patch, Delta};
 use std::collections::HashMap;
 
 /// Gets diff statistics for a commit
@@ -37,19 +37,39 @@ pub fn get_commit_diff_stats(
     })
 }
 
-/// Gets detailed file changes for a commit
+fn delta_status_to_string(status: Delta) -> String {
+    match status {
+        Delta::Unmodified => "unmodified",
+        Delta::Added => "added",
+        Delta::Deleted => "deleted",
+        Delta::Modified => "modified",
+        Delta::Renamed => "renamed",
+        Delta::Copied => "copied",
+        Delta::Ignored => "ignored",
+        Delta::Untracked => "untracked",
+        Delta::Typechange => "typechange",
+        Delta::Unreadable => "unreadable",
+        Delta::Conflicted => "conflicted",
+    }
+    .to_string()
+}
+
+/// Gets detailed file changes for a commit (per-file insertions/deletions),
+/// not the totals for the whole commit.
+///
+/// Notes:
+/// - Merge commits are diffed against the first parent (like `git show`).
+/// - Binary files or cases where a patch cannot be generated will report 0/0.
 pub fn get_commit_file_changes(
     repo_path: &str,
     commit_sha: &str,
 ) -> Result<Vec<GitFileChange>, GitError> {
     let repo = super::repo::open_repository(repo_path)?;
-    
-    let oid = Oid::from_str(commit_sha)
-        .map_err(|_| GitError::CommitNotFound)?;
-    
+
+    let oid = Oid::from_str(commit_sha).map_err(|_| GitError::CommitNotFound)?;
     let commit = repo.find_commit(oid)?;
     let tree = commit.tree()?;
-    
+
     let parent_tree = if commit.parent_count() > 0 {
         Some(commit.parent(0)?.tree()?)
     } else {
@@ -57,25 +77,40 @@ pub fn get_commit_file_changes(
     };
 
     let mut diff_opts = DiffOptions::new();
-    let diff = repo.diff_tree_to_tree(
-        parent_tree.as_ref(),
-        Some(&tree),
-        Some(&mut diff_opts),
-    )?;
+    // Optional: enable rename detection if you want better rename reporting
+    // diff_opts.rename_threshold(50).detect_renames(true);
+
+    let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
 
     let mut file_changes = Vec::new();
-    
-    diff.foreach(
-        &mut |delta, _| {
-            if let Some(change) = extract_file_change(&delta, &diff) {
-                file_changes.push(change);
-            }
-            true
-        },
-        None,
-        None,
-        None,
-    )?;
+
+    for (idx, delta) in diff.deltas().enumerate() {
+        let status = delta_status_to_string(delta.status());
+        // Prefer new path; fall back to old path for deletions
+        let path = delta
+            .new_file()
+            .path()
+            .or_else(|| delta.old_file().path())
+            .and_then(|p| p.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        // Build a per-file patch to get line stats
+        let (insertions, deletions) = if let Ok(Some(patch)) = Patch::from_diff(&diff, idx) {
+            // (context, additions, deletions) — all usize
+            let (_, adds, dels) = patch.line_stats().unwrap_or((0, 0, 0));
+            (adds, dels)
+        } else {
+            (0, 0)
+        };
+
+        file_changes.push(GitFileChange {
+            path,
+            status,            // <-- now provided
+            insertions,        // usize
+            deletions,         // usize
+        });
+    }
 
     Ok(file_changes)
 }

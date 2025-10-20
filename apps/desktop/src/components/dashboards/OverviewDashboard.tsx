@@ -60,7 +60,7 @@ export default function OverviewDashboard({ scanResult, projectPath }: OverviewD
 		<div className='space-y-6'>
 			{/* KPI Cards */}
 			<div className='grid grid-cols-2 md:grid-cols-5 gap-4'>
-				<Card className='p-4 hover:shadow-md transition-shadow'>
+				<Card className='p-4 rounded-md border bg-white'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
 						<FileCode className='h-4 w-4' />
 						<span className='text-sm font-medium'>Files</span>
@@ -70,7 +70,7 @@ export default function OverviewDashboard({ scanResult, projectPath }: OverviewD
 					</div>
 				</Card>
 
-				<Card className='p-4 hover:shadow-md transition-shadow'>
+				<Card className='p-4 rounded-md border bg-white'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
 						<FileText className='h-4 w-4' />
 						<span className='text-sm font-medium'>Total Lines</span>
@@ -80,7 +80,7 @@ export default function OverviewDashboard({ scanResult, projectPath }: OverviewD
 					</div>
 				</Card>
 
-				<Card className='p-4 hover:shadow-md transition-shadow'>
+				<Card className='p-4 rounded-md border bg-white'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
 						<Code2 className='h-4 w-4' />
 						<span className='text-sm font-medium'>Code</span>
@@ -93,7 +93,7 @@ export default function OverviewDashboard({ scanResult, projectPath }: OverviewD
 					</div>
 				</Card>
 
-				<Card className='p-4 hover:shadow-md transition-shadow'>
+				<Card className='p-4 rounded-md border bg-white'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
 						<MessageSquare className='h-4 w-4' />
 						<span className='text-sm font-medium'>Comments</span>
@@ -106,7 +106,7 @@ export default function OverviewDashboard({ scanResult, projectPath }: OverviewD
 					</div>
 				</Card>
 
-				<Card className='p-4 hover:shadow-md transition-shadow'>
+				<Card className='p-4 rounded-md border bg-white'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
 						<Layers className='h-4 w-4' />
 						<span className='text-sm font-medium'>Languages</span>

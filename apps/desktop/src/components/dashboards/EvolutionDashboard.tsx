@@ -88,109 +88,129 @@ export default function EvolutionDashboard({
 			md: 'Markdown',
 			markdown: 'Markdown',
 			txt: 'Text',
-			json: 'JSON',
-			xlsx: 'Excel',
-			pptx: 'PowerPoint',
-			pdf: 'PDF',
-			zip: 'Archive',
-			rar: 'Archive',
-			'7z': 'Archive',
-			jpg: 'Image',
-			png: 'Image',
-			gif: 'Image',
-			webp: 'Image',
-			svg: 'Image',
-			mp4: 'Video',
-			avi: 'Video',
-			mov: 'Video',
-			mp3: 'Audio',
-			aac: 'Audio',
-			wav: 'Audio',
-			ogg: 'Audio',
-			flac: 'Audio'
+			json: 'JSON'
 		}
 		return map[ext] || 'Other'
 	}
 
-	useEffect(() => {
-		// Build LOC over time series by language using baseline from scanResult
-		async function buildLocSeries() {
-			if (!hasGit || !scanResult || commits.length === 0) {
+	// Build LOC over time series by language using baseline from scanResult
+	// Fix: reconstruct per-day totals forward in time (oldest -> newest) so values
+	// stay consistent with HEAD baseline and never go negative.
+	async function buildLocSeries() {
+		if (!hasGit || !scanResult || commits.length === 0) {
+			setLocSeries([])
+			return
+		}
+		setLocLoading(true)
+		try {
+			// 1) HEAD baseline: LOC per language at current scan (HEAD)
+			const baseline: Record<string, number> = {}
+			Object.entries(scanResult.languages).forEach(([lang, stats]: any) => {
+				baseline[lang] = Number(stats?.code || 0)
+			})
+
+			// 2) Limit to last N commits (newest -> oldest), then reverse to oldest -> newest
+			const recentDesc = commits.slice(0, 500) // newest -> oldest (as provided)
+			if (recentDesc.length === 0) {
 				setLocSeries([])
 				return
 			}
-			setLocLoading(true)
-			try {
-				// Use the current scan's language code counts as baseline at HEAD
-				const baseline: Record<string, number> = {}
-				Object.entries(scanResult.languages).forEach(([lang, stats]) => {
-					baseline[lang] = stats.code
-				})
+			const recentAsc = [...recentDesc].reverse() // oldest -> newest
 
-				// Limit to last N commits to control cost
-				const recent = commits.slice(0, 60) // newest -> oldest
-
-				// For each commit, fetch file changes and aggregate net change per language
-				const perCommitDelta: Array<{
-					sha: string
-					date: string
-					deltas: Record<string, number>
-				}> = []
-				for (const c of recent) {
-					const changes = await git.getCommitFileChanges(projectPath, c.sha)
-					const deltas: Record<string, number> = {}
-					for (const ch of changes) {
-						const lang = extToLang(ch.path)
-						deltas[lang] = (deltas[lang] || 0) + (ch.insertions - ch.deletions)
-					}
-					const date = new Date(c.timestamp * 1000).toISOString().slice(0, 10)
-					perCommitDelta.push({ sha: c.sha, date, deltas })
-				}
-
-				// Walk backwards from HEAD baseline applying reverse deltas to reconstruct history
-				// Group by date to daily series
-				const dates = Array.from(new Set(perCommitDelta.map(d => d.date))).sort()
-				// We'll compute values from oldest -> newest, but we have baseline at newest (HEAD)
-				// So we accumulate reverse by starting from HEAD and subtracting per-day totals going backwards
-				const dailyTotals: Record<string, Record<string, number>> = {}
-
-				// Sum deltas by date
-				const dailyDeltas: Record<string, Record<string, number>> = {}
-				for (const d of perCommitDelta) {
-					dailyDeltas[d.date] = dailyDeltas[d.date] || {}
-					for (const [lang, delta] of Object.entries(d.deltas)) {
-						dailyDeltas[d.date][lang] = (dailyDeltas[d.date][lang] || 0) + delta
-					}
-				}
-
-				// Compute daily totals by accumulating deltas from oldest to newest
-				for (const date of dates) {
-					for (const lang in baseline) {
-						dailyTotals[date] = dailyTotals[date] || {}
-						dailyTotals[date][lang] =
-							(dailyTotals[date][lang] || 0) + (baseline[lang] || 0)
-					}
-					for (const lang in dailyDeltas[date]) {
-						dailyTotals[date][lang] =
-							(dailyTotals[date][lang] || 0) - dailyDeltas[date][lang]
-					}
-				}
-
-				// Convert to series format
-				const series: Array<Record<string, number | string>> = []
-				for (const date of dates) {
-					const row: Record<string, number | string> = { date }
-					for (const lang in dailyTotals[date]) {
-						row[lang] = dailyTotals[date][lang]
-					}
-					series.push(row)
-				}
-
-				setLocSeries(series)
-			} finally {
-				setLocLoading(false)
+			// 3) For each commit, compute per-file delta and aggregate per language
+			type PerCommit = {
+				sha: string
+				date: string // YYYY-MM-DD
+				deltas: Record<string, number> // insertions - deletions per language
 			}
+
+			const perCommitAsc: PerCommit[] = []
+			const allLangs = new Set<string>(Object.keys(baseline))
+
+			for (const c of recentAsc) {
+				const changes = await git.getCommitFileChanges(projectPath, c.sha)
+				const deltas: Record<string, number> = {}
+
+				for (const ch of changes) {
+					const langRaw = extToLang(ch.path)
+					const lang = langRaw || 'Other'
+					// Aggregate net change per language
+					deltas[lang] =
+						(deltas[lang] || 0) +
+						(Number(ch.insertions || 0) - Number(ch.deletions || 0))
+					allLangs.add(lang)
+				}
+				const date = new Date(c.timestamp * 1000).toISOString().slice(0, 10)
+				perCommitAsc.push({ sha: c.sha, date, deltas })
+			}
+
+			// 4) Group per-commit deltas by date (oldest -> newest dates)
+			const dailyDeltasAsc: Record<string, Record<string, number>> = {}
+			for (const pc of perCommitAsc) {
+				if (!dailyDeltasAsc[pc.date]) dailyDeltasAsc[pc.date] = {}
+				for (const [lang, d] of Object.entries(pc.deltas)) {
+					dailyDeltasAsc[pc.date][lang] = (dailyDeltasAsc[pc.date][lang] || 0) + d
+				}
+			}
+
+			// 5) Compute total delta across the whole range to derive the earliest total
+			// S_head = S_initial + sum(deltas) => S_initial = S_head - sum(deltas)
+			const totalDeltas: Record<string, number> = {}
+			for (const dd of Object.values(dailyDeltasAsc)) {
+				for (const [lang, d] of Object.entries(dd)) {
+					totalDeltas[lang] = (totalDeltas[lang] || 0) + d
+				}
+			}
+
+			// Initialize totals at the state BEFORE the oldest commit in our window
+			const currentTotals: Record<string, number> = {}
+			for (const lang of allLangs) {
+				const head = baseline[lang] || 0
+				const total = head - (totalDeltas[lang] || 0)
+				// Clamp to 0 to avoid negative lines (cannot have negative LOC)
+				currentTotals[lang] = Math.max(0, total)
+			}
+
+			// 6) Walk forward by date (oldest -> newest), applying that day's net delta
+			const datesAsc = Object.keys(dailyDeltasAsc).sort() // YYYY-MM-DD lexicographic works
+			const snapshotsByDate: Record<string, Record<string, number>> = {}
+
+			for (const date of datesAsc) {
+				const dayDelta = dailyDeltasAsc[date]
+				// Apply day's delta: S_after_day = S_before_day + delta_day
+				for (const lang of allLangs) {
+					const d = dayDelta[lang] || 0
+					const next = (currentTotals[lang] || 0) + d
+					// Clamp to 0 to avoid negatives caused by noisy diffs or partial windows
+					currentTotals[lang] = Math.max(0, next)
+				}
+				// Snapshot totals at the end of this date
+				// Make a shallow copy so subsequent mutations don't affect stored snapshot
+				snapshotsByDate[date] = {}
+				for (const lang of allLangs) {
+					snapshotsByDate[date][lang] = currentTotals[lang] || 0
+				}
+			}
+
+			// 7) Convert snapshots into series rows, ensuring stable language keys
+			const series: Array<Record<string, number | string>> = []
+			for (const date of datesAsc) {
+				const row: Record<string, number | string> = { date }
+				for (const lang of allLangs) {
+					// Ensure numeric and non-negative
+					const val = snapshotsByDate[date][lang] || 0
+					row[lang] = val < 0 ? 0 : val
+				}
+				series.push(row)
+			}
+
+			setLocSeries(series)
+		} finally {
+			setLocLoading(false)
 		}
+	}
+
+	useEffect(() => {
 		buildLocSeries()
 	}, [hasGit, scanResult, commits])
 
@@ -255,37 +275,35 @@ export default function EvolutionDashboard({
 									<YAxis tick={{ fontSize: 12 }} />
 									<Tooltip />
 									<Legend />
-									{Object.keys(scanResult.languages)
-										.slice(0, 6)
-										.map((lang, idx) => (
-											<Area
-												key={lang}
-												type='monotone'
-												dataKey={lang}
-												stackId='1'
-												stroke={
-													[
-														'#3B82F6',
-														'#10B981',
-														'#F59E0B',
-														'#EF4444',
-														'#8B5CF6',
-														'#EC4899'
-													][idx % 6]
-												}
-												fill={
-													[
-														'#3B82F6',
-														'#10B981',
-														'#F59E0B',
-														'#EF4444',
-														'#8B5CF6',
-														'#EC4899'
-													][idx % 6]
-												}
-												fillOpacity={0.35}
-											/>
-										))}
+									{Object.keys(scanResult.languages).map((lang, idx) => (
+										<Area
+											key={lang}
+											type='monotone'
+											dataKey={lang}
+											stackId='1'
+											stroke={
+												[
+													'#3B82F6',
+													'#10B981',
+													'#F59E0B',
+													'#EF4444',
+													'#8B5CF6',
+													'#EC4899'
+												][idx % 6]
+											}
+											fill={
+												[
+													'#3B82F6',
+													'#10B981',
+													'#F59E0B',
+													'#EF4444',
+													'#8B5CF6',
+													'#EC4899'
+												][idx % 6]
+											}
+											fillOpacity={0.35}
+										/>
+									))}
 								</AreaChart>
 							</ResponsiveContainer>
 						)}

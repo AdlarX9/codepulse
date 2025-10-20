@@ -40,6 +40,7 @@ interface DashboardLayoutProps {
 	projectName: string
 	hasGit: boolean
 	headerRight?: React.ReactNode
+	rightSidebar?: React.ReactNode
 	children: (activeTab: DashboardTab['id']) => React.ReactNode
 }
 
@@ -47,6 +48,7 @@ export default function DashboardLayout({
 	projectName,
 	hasGit,
 	headerRight,
+	rightSidebar,
 	children
 }: DashboardLayoutProps) {
 	const [activeTab, setActiveTab] = useState<DashboardTab['id']>('overview')
@@ -102,7 +104,10 @@ export default function DashboardLayout({
 
 			{/* Content Area */}
 			<div className='flex-1 overflow-auto bg-gray-50'>
-				<div className='p-6'>{children(activeTab)}</div>
+				<div className='flex'>
+					<div className='flex-1 p-6'>{children(activeTab)}</div>
+					{rightSidebar && <div className='hidden xl:block'>{rightSidebar}</div>}
+				</div>
 			</div>
 		</div>
 	)

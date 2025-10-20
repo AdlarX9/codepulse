@@ -8,6 +8,8 @@ import {
 	ContributorsDashboard
 } from './components/dashboards'
 import ExportButton from './components/export/ExportButton'
+import GitSyncStatus from './components/sync/GitSyncStatus'
+import GamificationSidebar from './components/gamification/GamificationSidebar'
 import WelcomePage from './pages/Welcome'
 import ProjectSettings from './pages/ProjectSettings'
 import ProfileManagement from './pages/ProfileManagement'
@@ -29,6 +31,7 @@ import {
 } from './components/ui/Sidebar'
 import logo from './assets/icon.png'
 import { Code2, Settings } from 'lucide-react'
+import Titlebar from './components/ui/TitleBar'
 
 type User = ApiUser
 
@@ -65,6 +68,11 @@ function App() {
 	const [hasGit, setHasGit] = useState<boolean>(false)
 	const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null)
 	const [projects, setProjects] = useState<Project[]>([])
+	const [showEditProjectModal, setShowEditProjectModal] = useState<boolean>(false)
+	const [editName, setEditName] = useState<string>('')
+	const [editDescription, setEditDescription] = useState<string>('')
+	const [editVisibility, setEditVisibility] = useState<'private' | 'public'>('private')
+	const [savingEdit, setSavingEdit] = useState<boolean>(false)
 
 	useEffect(() => {
 		// Check if user is authenticated on startup
@@ -76,10 +84,50 @@ function App() {
 			} else {
 				setCurrentView('welcome')
 			}
-			loadProjects()
 		}
 		init()
 	}, [])
+
+	useEffect(() => {
+		loadProjects()
+	}, [currentView])
+
+	async function openEditProjectModal() {
+		if (!selectedProjectId) return
+		try {
+			const details = await api.getProjectDetails(selectedProjectId)
+			const p = details.project || details
+			setEditName(p.name || '')
+			setEditDescription(p.description || '')
+			setEditVisibility((p.visibility as 'private' | 'public') || 'private')
+			setShowEditProjectModal(true)
+		} catch (e) {
+			console.error('Failed to load project details for edit:', e)
+		}
+	}
+
+	async function handleConfirmEditProject() {
+		if (!selectedProjectId) return
+		try {
+			setSavingEdit(true)
+			await api.updateProject(selectedProjectId, {
+				name: editName?.trim() || undefined,
+				description: editDescription?.trim() || '',
+				visibility: editVisibility
+			})
+			setSelectedProjectName(editName || selectedProjectName)
+			await loadProjects()
+			setShowEditProjectModal(false)
+		} catch (e) {
+			console.error('Failed to update project:', e)
+		} finally {
+			setSavingEdit(false)
+		}
+	}
+
+	function handleCancelEditProject() {
+		setShowEditProjectModal(false)
+	}
 
 	async function loadProjects() {
 		const mapped = await api.loadProjects()
@@ -200,10 +248,8 @@ function App() {
 		switch (settingsTab) {
 			case 'scan':
 				return <ScanSettingsPage />
-				break
 			case 'user':
 				return <UserSettingsPage />
-				break
 			default:
 				return null
 		}
@@ -211,6 +257,7 @@ function App() {
 
 	return (
 		<div className='min-h-screen bg-background'>
+			<Titlebar />
 			<main>
 				{currentView === 'welcome' && (
 					<WelcomePage
@@ -283,7 +330,7 @@ function App() {
 										</div>
 									</div>
 									<SidebarItem
-										icon={<Settings className='w-5 h-5'/>}
+										icon={<Settings className='w-5 h-5' />}
 										label='Settings'
 										active={currentView === 'settings'}
 										onClick={() => changeView('settings')}
@@ -496,6 +543,12 @@ function App() {
 											headerRight={
 												scanResult ? (
 													<div className='flex items-center gap-2'>
+														{selectedProjectId && (
+															<GitSyncStatus
+																projectId={selectedProjectId}
+																compact
+															/>
+														)}
 														<ExportButton
 															scanResult={scanResult}
 															projectName={
@@ -504,9 +557,7 @@ function App() {
 														/>
 														{selectedProjectId && (
 															<button
-																onClick={() =>
-																	changeView('project-settings')
-																}
+																onClick={openEditProjectModal}
 																className='px-3 py-2 border rounded text-sm hover:bg-gray-50'
 															>
 																Edit
@@ -514,6 +565,11 @@ function App() {
 														)}
 													</div>
 												) : null
+											}
+											rightSidebar={
+												<GamificationSidebar
+													projectId={selectedProjectId || undefined}
+												/>
 											}
 										>
 											{activeTab => {
@@ -555,6 +611,78 @@ function App() {
 						</div>
 					)}
 			</main>
+			{showEditProjectModal && (
+				<div className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50'>
+					<div className='bg-white rounded-lg shadow-xl max-w-md w-full mx-4'>
+						<div className='p-6'>
+							<h2 className='text-xl font-bold mb-4'>Edit Project</h2>
+
+							<div className='space-y-4'>
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Project Name
+									</label>
+									<input
+										type='text'
+										value={editName}
+										onChange={e => setEditName(e.target.value)}
+										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+										placeholder='Enter project name'
+									/>
+								</div>
+
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Description (Optional)
+									</label>
+									<input
+										type='text'
+										value={editDescription}
+										onChange={e => setEditDescription(e.target.value)}
+										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+										placeholder='Enter project description'
+									/>
+								</div>
+
+								<div>
+									<label className='block text-sm font-medium text-gray-700 mb-1'>
+										Visibility
+									</label>
+									<select
+										value={editVisibility}
+										onChange={e =>
+											setEditVisibility(
+												(e.target.value as 'private' | 'public') ||
+													'private'
+											)
+										}
+										className='w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500'
+									>
+										<option value='private'>Private</option>
+										<option value='public'>Public</option>
+									</select>
+								</div>
+							</div>
+
+							<div className='flex gap-3 mt-6'>
+								<button
+									onClick={handleCancelEditProject}
+									className='flex-1 px-4 py-2 border rounded-md hover:bg-gray-50'
+								>
+									Cancel
+								</button>
+								<button
+									onClick={handleConfirmEditProject}
+									disabled={savingEdit || !editName.trim()}
+									className='flex-1 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50'
+								>
+									{savingEdit ? 'Saving...' : 'Save Changes'}
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	)
 }

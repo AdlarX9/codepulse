@@ -15,6 +15,8 @@ import {
 } from './dashboards'
 import ExportButton from './export/ExportButton'
 import * as git from '../lib/git'
+import GamificationSidebar from './gamification/GamificationSidebar'
+import GitSyncStatus from './sync/GitSyncStatus'
 
 interface ProjectsProps {
 	onProjectSelect?: (project: Project) => void
@@ -249,6 +251,9 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 					headerRight={
 						scanResult ? (
 							<div className='flex items-center gap-2'>
+								{scannedProjectId && (
+									<GitSyncStatus projectId={scannedProjectId} compact />
+								)}
 								<ExportButton
 									scanResult={scanResult}
 									projectName={scannedProjectName || 'Project'}
@@ -265,6 +270,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 							</div>
 						) : null
 					}
+					rightSidebar={<GamificationSidebar projectId={scannedProjectId || undefined} />}
 				>
 					{activeTab => {
 						switch (activeTab) {
