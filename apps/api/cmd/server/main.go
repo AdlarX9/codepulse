@@ -54,6 +54,7 @@ func main() {
 			&models.Download{},
 			&models.Session{},
 			&models.DeviceLoginSession{},
+			&models.Invite{},
 		); err != nil {
 			log.Printf("Auto-migration failed: %v", err)
 		}
@@ -70,6 +71,8 @@ func main() {
 	statsHandler := handlers.NewStatsHandler(db)
 	gitHandler := handlers.NewGitHandler(db)
 	gamificationHandler := handlers.NewGamificationHandler(db)
+	inviteHandler := handlers.NewInviteHandler(db)
+	userHandler := handlers.NewUserHandler(db)
 
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(db.DB, cfg)
@@ -117,6 +120,7 @@ func main() {
 			me.POST("/projects", projectHandler.CreateProject)
 			me.GET("/projects/:id", projectHandler.GetProject)
 			me.PATCH("/projects/:id", projectHandler.UpdateProject)
+			me.POST("/projects/:id/transfer", projectHandler.TransferOwnership)
 			me.DELETE("/projects/:id", projectHandler.DeleteProject)
 
 			// Project Details
@@ -131,6 +135,14 @@ func main() {
 			me.GET("/projects/:id/commits", gitHandler.GetCommitScans)
 			me.POST("/projects/:id/commits/sync", gitHandler.SyncCommit)
 			me.GET("/projects/:id/collaborators", gitHandler.GetCollaborators)
+			me.POST("/projects/:id/collaborators", gitHandler.AddCollaborator)
+			me.PATCH("/projects/:id/collaborators/:collab_id", gitHandler.UpdateCollaborator)
+			me.DELETE("/projects/:id/collaborators/:collab_id", gitHandler.RemoveCollaborator)
+
+			// Invites
+			me.GET("/projects/:id/invites", inviteHandler.ListInvites)
+			me.POST("/projects/:id/invites", inviteHandler.CreateInvite)
+			me.DELETE("/projects/:id/invites/:invite_id", inviteHandler.RevokeInvite)
 
 			// Read/Update Profile
 			me.GET("/profile", authHandler.GetProfile)
@@ -147,6 +159,9 @@ func main() {
 			me.POST("/challenges", gamificationHandler.CreateChallenge)
 			me.PATCH("/challenges/:id/progress", gamificationHandler.UpdateChallengeProgress)
 			me.POST("/challenges/:id/complete", gamificationHandler.CompleteChallenge)
+
+			// User summary
+			me.GET("/summary", userHandler.GetUserSummary)
 		}
 
 		// Public routes
@@ -163,6 +178,13 @@ func main() {
 		public := api.Group("/u")
 		{
 			public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
+		}
+
+		// Invite public routes
+		inv := api.Group("/invites")
+		{
+			inv.GET("/:token", inviteHandler.GetInvitePublic)
+			inv.POST("/:token/accept", authMiddleware.RequireAuth(), inviteHandler.AcceptInvite)
 		}
 
 		// GitHub routes

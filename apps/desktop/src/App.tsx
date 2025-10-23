@@ -9,7 +9,8 @@ import {
 } from './components/dashboards'
 import ExportButton from './components/export/ExportButton'
 import GitSyncStatus from './components/sync/GitSyncStatus'
-import GamificationSidebar from './components/gamification/GamificationSidebar'
+import { ensureDefaultChallenges } from './lib/gamification'
+import ExportCenter from './components/export/ExportCenter'
 import WelcomePage from './pages/Welcome'
 import ProjectSettings from './pages/ProjectSettings'
 import ProfileManagement from './pages/ProfileManagement'
@@ -81,6 +82,10 @@ function App() {
 			if (user) {
 				setCurrentUser(user)
 				setCurrentView('projects')
+				// Seed default challenges for new/empty accounts
+				try {
+					await ensureDefaultChallenges()
+				} catch {}
 			} else {
 				setCurrentView('welcome')
 			}
@@ -533,7 +538,7 @@ function App() {
 											</div>
 										</div>
 										<DashboardLayout
-											projectId=''
+											projectId={selectedProjectId || ''}
 											projectName={
 												selectedProjectName ||
 												scanPath.split('/').pop() ||
@@ -566,11 +571,6 @@ function App() {
 													</div>
 												) : null
 											}
-											rightSidebar={
-												<GamificationSidebar
-													projectId={selectedProjectId || undefined}
-												/>
-											}
 										>
 											{activeTab => {
 												switch (activeTab) {
@@ -593,6 +593,8 @@ function App() {
 														return (
 															<QualityDashboard
 																scanResult={scanResult}
+																projectPath={scanPath}
+																hasGit={hasGit}
 															/>
 														)
 													case 'contributors':
@@ -600,6 +602,22 @@ function App() {
 															<ContributorsDashboard
 																projectPath={scanPath}
 																hasGit={hasGit}
+															/>
+														)
+													case 'settings':
+														return selectedProjectId ? (
+															<ProjectSettings
+																projectId={selectedProjectId}
+																onBack={() => {}}
+															/>
+														) : null
+													case 'exports':
+														return (
+															<ExportCenter
+																scanResult={scanResult}
+																projectName={
+																	selectedProjectName || 'Project'
+																}
 															/>
 														)
 												}

@@ -103,6 +103,54 @@ export default function UserSettingsPage({ onBack }: UserSettingsProps) {
 						</div>
 					</Card>
 
+					{/* Git Provider Tokens */}
+					<Card className='p-6'>
+						<h2 className='text-xl font-semibold mb-4'>Git Provider Tokens</h2>
+						<p className='text-sm text-muted-foreground mb-6'>
+							Optional: provide Personal Access Tokens to enable advanced KPIs
+							(PR-based throughput, cycle/lead time) and remote repository features.
+							Tokens are stored locally on your device.
+						</p>
+
+						<div className='space-y-4'>
+							<div>
+								<label className='text-sm font-medium mb-2 block'>
+									GitHub Token
+								</label>
+								<input
+									type='password'
+									value={settings.github_token || ''}
+									onChange={e =>
+										setSettings({ ...settings, github_token: e.target.value })
+									}
+									className='w-full px-3 py-2 bg-background border border-input rounded-md'
+									placeholder='ghp_...'
+								/>
+								<p className='text-xs text-muted-foreground mt-1'>
+									Requires repo:read (or equivalent) to read merged PRs.
+								</p>
+							</div>
+
+							<div>
+								<label className='text-sm font-medium mb-2 block'>
+									GitLab Token
+								</label>
+								<input
+									type='password'
+									value={settings.gitlab_token || ''}
+									onChange={e =>
+										setSettings({ ...settings, gitlab_token: e.target.value })
+									}
+									className='w-full px-3 py-2 bg-background border border-input rounded-md'
+									placeholder='glpat-...'
+								/>
+								<p className='text-xs text-muted-foreground mt-1'>
+									Requires read_api to read merged MRs.
+								</p>
+							</div>
+						</div>
+					</Card>
+
 					{/* Update Settings */}
 					<Card className='p-6'>
 						<h2 className='text-xl font-semibold mb-4'>Update Settings</h2>

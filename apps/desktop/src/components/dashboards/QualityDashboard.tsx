@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { Target, Shield, AlertTriangle, CheckCircle, BarChart3 } from 'lucide-react'
 import { Card } from '../ui/Card'
 import {
@@ -8,15 +8,61 @@ import {
 	PolarGrid,
 	PolarAngleAxis,
 	PolarRadiusAxis,
-	Radar
+	Radar,
+	LineChart,
+	Line,
+	XAxis,
+	YAxis,
+	CartesianGrid,
+	Legend
 } from 'recharts'
 import type { ScanResult } from '@/types'
+import { getDeliveryKpis, getFallbackKpis } from '@/lib/devops'
+import type { DeliveryKpis, FallbackKpis } from '@/lib/devops'
 
 interface QualityDashboardProps {
 	scanResult: ScanResult | null
+	projectPath?: string
+	hasGit?: boolean
 }
 
-export default function QualityDashboard({ scanResult }: QualityDashboardProps) {
+export default function QualityDashboard({
+	scanResult,
+	projectPath,
+	hasGit
+}: QualityDashboardProps) {
+	const [kpis, setKpis] = useState<DeliveryKpis | null>(null)
+	const [fallback, setFallback] = useState<FallbackKpis | null>(null)
+	const [loadingKpis, setLoadingKpis] = useState(false)
+
+	useEffect(() => {
+		let cancelled = false
+		async function load() {
+			if (!hasGit || !projectPath) {
+				setKpis(null)
+				setFallback(null)
+				return
+			}
+			setLoadingKpis(true)
+			try {
+				const d = await getDeliveryKpis(projectPath)
+				if (cancelled) return
+				setKpis(d)
+				if (!d) {
+					const fb = await getFallbackKpis(projectPath)
+					if (!cancelled) setFallback(fb)
+				} else {
+					setFallback(null)
+				}
+			} finally {
+				if (!cancelled) setLoadingKpis(false)
+			}
+		}
+		load()
+		return () => {
+			cancelled = true
+		}
+	}, [projectPath, hasGit])
 	// Calculate quality metrics
 	const metrics = useMemo(() => {
 		if (!scanResult) return null
@@ -83,6 +129,61 @@ export default function QualityDashboard({ scanResult }: QualityDashboardProps) 
 						Scan your project to see quality metrics
 					</p>
 				</div>
+
+				<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
+					<Card className='p-4'>
+						<div className='flex items-center justify-between mb-1'>
+							<div className='text-sm font-medium text-gray-600'>Throughput</div>
+							<div className='text-xs text-gray-500'>
+								{loadingKpis
+									? 'Loading…'
+									: kpis?.provider
+										? kpis.provider
+										: hasGit
+											? 'git'
+											: 'n/a'}
+							</div>
+						</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{typeof kpis?.throughput.thisMonth === 'number'
+								? kpis?.throughput.thisMonth
+								: (fallback?.throughput.thisMonthCommits ?? 0)}
+						</div>
+						<p className='text-xs text-gray-500 mt-1'>
+							{typeof kpis?.throughput.lastMonth === 'number'
+								? `Last month: ${kpis?.throughput.lastMonth}`
+								: `Last month: ${fallback?.throughput.lastMonthCommits ?? 0}`}
+						</p>
+					</Card>
+
+					<Card className='p-4'>
+						<div className='text-sm font-medium text-gray-600 mb-1'>Cycle Time</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{typeof kpis?.cycleTime.thisMonthMedianDays === 'number'
+								? `${kpis?.cycleTime.thisMonthMedianDays.toFixed(1)}d`
+								: 'N/A'}
+						</div>
+						<p className='text-xs text-gray-500 mt-1'>
+							{typeof kpis?.cycleTime.lastMonthMedianDays === 'number'
+								? `Last month: ${kpis?.cycleTime.lastMonthMedianDays?.toFixed(1)}d`
+								: 'Last month: N/A'}
+						</p>
+					</Card>
+
+					<Card className='p-4'>
+						<div className='text-sm font-medium text-gray-600 mb-1'>Lead Time</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{typeof kpis?.leadTime.thisMonthMedianDays === 'number'
+								? `${kpis?.leadTime.thisMonthMedianDays.toFixed(1)}d`
+								: 'N/A'}
+						</div>
+						<p className='text-xs text-gray-500 mt-1'>
+							{typeof kpis?.leadTime.lastMonthMedianDays === 'number'
+								? `Last month: ${kpis?.leadTime.lastMonthMedianDays?.toFixed(1)}d`
+								: 'Last month: N/A'}
+						</p>
+					</Card>
+				</div>
 			</div>
 		)
 	}
@@ -128,7 +229,6 @@ export default function QualityDashboard({ scanResult }: QualityDashboardProps) 
 				</div>
 			</Card>
 
-			{/* Key Metrics */}
 			<div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
 				<Card className='p-4'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
@@ -185,7 +285,6 @@ export default function QualityDashboard({ scanResult }: QualityDashboardProps) 
 				</Card>
 			</div>
 
-			{/* Charts Row */}
 			<div className='grid md:grid-cols-2 gap-6'>
 				{/* Quality Radar */}
 				<Card className='p-6'>
@@ -207,7 +306,6 @@ export default function QualityDashboard({ scanResult }: QualityDashboardProps) 
 					</ResponsiveContainer>
 				</Card>
 
-				{/* Code Composition */}
 				<Card className='p-6'>
 					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Code Composition</h3>
 					<div className='space-y-4 mt-6'>
@@ -257,7 +355,60 @@ export default function QualityDashboard({ scanResult }: QualityDashboardProps) 
 				</Card>
 			</div>
 
-			{/* Recommendations */}
+			<Card className='p-6'>
+				<h3 className='text-lg font-semibold text-gray-900 mb-4'>Delivery KPIs (Weekly)</h3>
+				<div className='h-72'>
+					<ResponsiveContainer width='100%' height='100%'>
+						<LineChart
+							data={(
+								kpis?.throughput.byWeek ||
+								fallback?.throughput.byWeekCommits ||
+								[]
+							).map((d: any) => ({
+								date: d.weekStart,
+								throughput: d.count,
+								cycle:
+									kpis?.cycleTime.byWeekMedianDays?.find(
+										x => x.weekStart === d.weekStart
+									)?.medianDays ?? null,
+								lead:
+									kpis?.leadTime.byWeekMedianDays?.find(
+										x => x.weekStart === d.weekStart
+									)?.medianDays ?? null
+							}))}
+						>
+							<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
+							<XAxis dataKey='date' tick={{ fontSize: 12 }} />
+							<YAxis yAxisId='left' tick={{ fontSize: 12 }} />
+							<YAxis yAxisId='right' orientation='right' tick={{ fontSize: 12 }} />
+							<Tooltip />
+							<Legend />
+							<Line
+								yAxisId='left'
+								type='monotone'
+								dataKey='throughput'
+								stroke='#3B82F6'
+								name='Throughput'
+							/>
+							<Line
+								yAxisId='right'
+								type='monotone'
+								dataKey='cycle'
+								stroke='#10B981'
+								name='Cycle (days)'
+							/>
+							<Line
+								yAxisId='right'
+								type='monotone'
+								dataKey='lead'
+								stroke='#F59E0B'
+								name='Lead (days)'
+							/>
+						</LineChart>
+					</ResponsiveContainer>
+				</div>
+			</Card>
+
 			<Card className='p-6 bg-yellow-50 border-yellow-200'>
 				<h3 className='text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2'>
 					<AlertTriangle className='h-5 w-5 text-yellow-600' />

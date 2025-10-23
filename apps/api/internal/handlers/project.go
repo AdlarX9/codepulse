@@ -22,6 +22,95 @@ type CreateProjectRequest struct {
 	Settings    *models.JSONMap `json:"settings"`
 }
 
+// TransferOwnership handles POST /me/projects/:id/transfer
+// Only the current owner can transfer ownership to another user
+func (h *ProjectHandler) TransferOwnership(c *gin.Context) {
+	projectID := c.Param("id")
+	userID, exists := middleware.GetCurrentUserID(c)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	type Req struct {
+		NewOwnerUserID string `json:"new_owner_user_id" binding:"required"`
+	}
+	var req Req
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
+		return
+	}
+	if req.NewOwnerUserID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "new_owner_user_id is required"})
+		return
+	}
+	if req.NewOwnerUserID == userID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot transfer to yourself"})
+		return
+	}
+
+	var project models.Project
+	if err := h.db.DB.Where("id = ?", projectID).First(&project).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+	if project.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Only the owner can transfer ownership"})
+		return
+	}
+
+	tx := h.db.DB.Begin()
+	// Update project owner
+	if err := tx.Model(&models.Project{}).Where("id = ?", projectID).Update("user_id", req.NewOwnerUserID).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transfer ownership"})
+		return
+	}
+
+	// Ensure previous owner becomes admin collaborator
+	var collab models.Collaborator
+	err := tx.Where("project_id = ? AND user_id = ?", projectID, userID).First(&collab).Error
+	if err == gorm.ErrRecordNotFound {
+		uid := userID
+		newCollab := models.Collaborator{ProjectID: projectID, UserID: &uid, GitUsername: "", Role: "admin"}
+		if err := tx.Create(&newCollab).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add previous owner as admin"})
+			return
+		}
+	} else if err == nil {
+		if collab.Role != "admin" {
+			if err := tx.Model(&collab).Update("role", "admin").Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update collaborator role"})
+				return
+			}
+		}
+	} else {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	// Remove any collaborator row for the new owner to avoid duplication
+	if err := tx.Where("project_id = ? AND user_id = ?", projectID, req.NewOwnerUserID).Delete(&models.Collaborator{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cleanup collaborators"})
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize transfer"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Ownership transferred"})
+}
+
 // CreateProject handles POST /me/projects
 func (h *ProjectHandler) CreateProject(c *gin.Context) {
 	userID, exists := middleware.GetCurrentUserID(c)
@@ -84,6 +173,41 @@ func NewProjectHandler(db *database.Database) *ProjectHandler {
 	return &ProjectHandler{db: db}
 }
 
+// --- Permission helpers ---
+func (h *ProjectHandler) isProjectOwner(userID, projectID string) (bool, error) {
+	var count int64
+	if err := h.db.DB.Model(&models.Project{}).Where("id = ? AND user_id = ?", projectID, userID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (h *ProjectHandler) isProjectCollaborator(userID, projectID string) (bool, error) {
+	var count int64
+	if err := h.db.DB.Model(&models.Collaborator{}).
+		Where("project_id = ? AND user_id = ?", projectID, userID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (h *ProjectHandler) isProjectAdmin(userID, projectID string) (bool, error) {
+	// Owner is implicitly admin
+	if ok, err := h.isProjectOwner(userID, projectID); err != nil {
+		return false, err
+	} else if ok {
+		return true, nil
+	}
+	var count int64
+	if err := h.db.DB.Model(&models.Collaborator{}).
+		Where("project_id = ? AND user_id = ? AND role = ?", projectID, userID, "admin").
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 type UpdateProjectRequest struct {
 	Name        *string         `json:"name"`
 	Description *string         `json:"description"`
@@ -100,7 +224,8 @@ func (h *ProjectHandler) GetProjects(c *gin.Context) {
 	}
 
 	var projects []models.Project
-	query := h.db.DB.Where("user_id = ?", userID).
+	sub := h.db.DB.Model(&models.Collaborator{}).Select("project_id").Where("user_id = ?", userID)
+	query := h.db.DB.Where("user_id = ? OR id IN (?)", userID, sub).
 		Preload("Scans", func(db *gorm.DB) *gorm.DB {
 			return db.Order("created_at DESC").Limit(1)
 		}).
@@ -125,11 +250,31 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 	}
 
 	var project models.Project
-	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).
+	if err := h.db.DB.Where("id = ?", projectID).
 		Preload("GitHubLinks").
 		First(&project).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
+	}
+
+	if project.Visibility != "public" {
+		// Require owner or collaborator
+		permitted, err := h.isProjectOwner(userID, projectID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+			return
+		}
+		if !permitted {
+			permitted, err = h.isProjectCollaborator(userID, projectID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+				return
+			}
+			if !permitted {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+				return
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"project": project})
@@ -156,10 +301,18 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	// Find and update project
+	// Load project and check admin permissions (owner or admin collaborator)
 	var project models.Project
-	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).First(&project).Error; err != nil {
+	if err := h.db.DB.Where("id = ?", projectID).First(&project).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
+	if ok, err := h.isProjectAdmin(userID, projectID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+		return
+	} else if !ok {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
 		return
 	}
 
@@ -201,6 +354,33 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
+	}
+
+	// Verify owner or collaborator (or public) and get project info
+	var project models.Project
+	if err := h.db.DB.Where("id = ?", projectID).
+		Preload("GitHubLinks").
+		First(&project).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+	if project.Visibility != "public" {
+		permitted, err := h.isProjectOwner(userID, projectID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+			return
+		}
+		if !permitted {
+			permitted, err = h.isProjectCollaborator(userID, projectID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+				return
+			}
+			if !permitted {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+				return
+			}
+		}
 	}
 
 	// Soft delete the project

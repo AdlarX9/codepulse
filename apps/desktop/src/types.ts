@@ -42,6 +42,8 @@ export interface UserSettings {
 	local_salt: string
 	update_channel: string
 	last_update_check: string
+	github_token?: string
+	gitlab_token?: string
 }
 
 export interface ScanSettings {

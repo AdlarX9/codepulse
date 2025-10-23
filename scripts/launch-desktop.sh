@@ -16,7 +16,7 @@ fi
 # Vérifier que les icônes existent
 if [ ! -f "apps/desktop/src-tauri/icons/32x32.png" ]; then
 	echo "⚠️  Icônes manquantes. Génération..."
-	python3 scripts/create-dev-icons.py
+	./scripts/create-dev-icons.sh
 	echo ""
 fi
 

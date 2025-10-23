@@ -20,6 +20,41 @@ func NewGitHandler(db *database.Database) *GitHandler {
 	return &GitHandler{db: db}
 }
 
+// --- Permissions helpers ---
+func (h *GitHandler) isProjectOwner(userID string, projectID string) (bool, error) {
+	var count int64
+	if err := h.db.DB.Model(&models.Project{}).Where("id = ? AND user_id = ?", projectID, userID).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (h *GitHandler) isProjectAdmin(userID string, projectID string) (bool, error) {
+	// Owner is implicitly admin
+	if ok, err := h.isProjectOwner(userID, projectID); err != nil {
+		return false, err
+	} else if ok {
+		return true, nil
+	}
+	var count int64
+	if err := h.db.DB.Model(&models.Collaborator{}).
+		Where("project_id = ? AND user_id = ? AND role = ?", projectID, userID, "admin").
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (h *GitHandler) isProjectCollaborator(userID string, projectID string) (bool, error) {
+	var count int64
+	if err := h.db.DB.Model(&models.Collaborator{}).
+		Where("project_id = ? AND user_id = ?", projectID, userID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // LinkGitRepo links a Git repository to a project
 // PATCH /api/projects/:id/git
 func (h *GitHandler) LinkGitRepo(c *gin.Context) {
@@ -37,14 +72,24 @@ func (h *GitHandler) LinkGitRepo(c *gin.Context) {
 		return
 	}
 
-	// Verify project ownership
+	// Verify admin (owner or admin collaborator)
 	var project models.Project
-	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).First(&project).Error; err != nil {
+	if err := h.db.DB.Where("id = ?", projectID).First(&project).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	isAdmin, err := h.isProjectAdmin(userID.(string), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
 		return
 	}
 
@@ -145,17 +190,35 @@ func (h *GitHandler) GetCollaborators(c *gin.Context) {
 	projectID := c.Param("id")
 	userID, _ := c.Get("user_id")
 
-	// Verify project ownership or visibility
+	// Verify membership (owner or collaborator) or public visibility
 	var project models.Project
-	query := h.db.DB.Where("id = ?", projectID)
-	query = query.Where("user_id = ? OR visibility = ?", userID, "public")
-
-	if err := query.First(&project).Error; err != nil {
+	if err := h.db.DB.Where("id = ?", projectID).First(&project).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+	permitted := project.Visibility == "public"
+	if !permitted {
+		if ok, err := h.isProjectOwner(userID.(string), projectID); err == nil && ok {
+			permitted = true
+		} else if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+			return
+		}
+		if !permitted {
+			if ok, err := h.isProjectCollaborator(userID.(string), projectID); err == nil && ok {
+				permitted = true
+			} else if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+				return
+			}
+		}
+	}
+	if !permitted {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
 		return
 	}
 
@@ -273,4 +336,163 @@ func (h *GitHandler) SyncCommit(c *gin.Context) {
 		"message":     "Commit synced successfully",
 		"commit_scan": commitScan,
 	})
+}
+
+// --- Collaborators management ---
+
+// AddCollaborator adds a collaborator to the project
+// POST /api/me/projects/:id/collaborators
+func (h *GitHandler) AddCollaborator(c *gin.Context) {
+	projectID := c.Param("id")
+	userID, _ := c.Get("user_id")
+
+	type AddRequest struct {
+		UserID      *string `json:"user_id"`
+		GitUsername *string `json:"git_username"`
+		GitEmail    *string `json:"git_email"`
+		Role        *string `json:"role"` // admin | collaborator
+	}
+
+	var req AddRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Permission: owner or admin
+	isAdmin, err := h.isProjectAdmin(userID.(string), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+		return
+	}
+
+	// Validate input
+	if req.UserID == nil && (req.GitUsername == nil || *req.GitUsername == "") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id or git_username is required"})
+		return
+	}
+	role := "collaborator"
+	if req.Role != nil && (*req.Role == "admin" || *req.Role == "collaborator") {
+		role = *req.Role
+	}
+
+	// Upsert collaborator by user_id or git_username
+	var collab models.Collaborator
+	tx := h.db.DB.Where("project_id = ? AND (user_id = ? OR git_username = ?)", projectID, req.UserID, req.GitUsername).
+		First(&collab)
+	if tx.Error == nil {
+		// Update existing
+		updates := map[string]interface{}{"role": role}
+		if req.GitEmail != nil {
+			updates["git_email"] = *req.GitEmail
+		}
+		if err := h.db.DB.Model(&collab).Updates(updates).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update collaborator"})
+			return
+		}
+	} else if tx.Error == gorm.ErrRecordNotFound {
+		// Create new
+		collab = models.Collaborator{
+			ProjectID: projectID,
+			UserID:    req.UserID,
+			GitUsername: func() string {
+				if req.GitUsername != nil {
+					return *req.GitUsername
+				}
+				return ""
+			}(),
+			GitEmail: req.GitEmail,
+			Role:     role,
+		}
+		if err := h.db.DB.Create(&collab).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add collaborator"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"collaborator": collab})
+}
+
+// UpdateCollaborator updates collaborator role
+// PATCH /api/me/projects/:id/collaborators/:collab_id
+func (h *GitHandler) UpdateCollaborator(c *gin.Context) {
+	projectID := c.Param("id")
+	collabID := c.Param("collab_id")
+	userID, _ := c.Get("user_id")
+
+	type UpdateRequest struct {
+		Role *string `json:"role"`
+	}
+	var req UpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Permission
+	isAdmin, err := h.isProjectAdmin(userID.(string), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+		return
+	}
+
+	// Load collaborator
+	var collab models.Collaborator
+	if err := h.db.DB.Where("id = ? AND project_id = ?", collabID, projectID).First(&collab).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Collaborator not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+
+	updates := map[string]interface{}{}
+	if req.Role != nil && (*req.Role == "admin" || *req.Role == "collaborator") {
+		updates["role"] = *req.Role
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No valid fields to update"})
+		return
+	}
+	if err := h.db.DB.Model(&collab).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update collaborator"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"collaborator": collab})
+}
+
+// RemoveCollaborator removes a collaborator from the project
+// DELETE /api/me/projects/:id/collaborators/:collab_id
+func (h *GitHandler) RemoveCollaborator(c *gin.Context) {
+	projectID := c.Param("id")
+	collabID := c.Param("collab_id")
+	userID, _ := c.Get("user_id")
+
+	isAdmin, err := h.isProjectAdmin(userID.(string), projectID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+		return
+	}
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+		return
+	}
+
+	if err := h.db.DB.Where("id = ? AND project_id = ?", collabID, projectID).Delete(&models.Collaborator{}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove collaborator"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Collaborator removed"})
 }

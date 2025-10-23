@@ -47,7 +47,7 @@ async function getProfile(handle: string) {
 			[profile.user_id]
 		)
 
-		const projects = []
+		const projects = [] as any[]
 		let totalScans = 0
 		let totalLines = 0
 		let totalStars = 0
@@ -91,6 +91,38 @@ async function getProfile(handle: string) {
 			})
 		}
 
+		// Aggregate languages using latest scan per project
+		const latestScans = await client.query(
+			`
+			WITH latest_scans AS (
+				SELECT DISTINCT ON (project_id) id, project_id
+				FROM scans
+				WHERE project_id = ANY($1)
+				ORDER BY project_id, created_at DESC
+			)
+			SELECT sl.language, SUM(sl.total) AS total
+			FROM scan_langs sl
+			JOIN latest_scans ls ON sl.scan_id = ls.id
+			GROUP BY sl.language
+			ORDER BY total DESC
+			LIMIT 10
+		`,
+			[projects.map(p => p.id)]
+		)
+
+		// Determine best project: prefer highest stars, fallback to largest total lines
+		let bestProject: any = null
+		if (projects.length > 0) {
+			bestProject = [...projects].sort((a, b) => {
+				const aStars = a.stars_count || 0
+				const bStars = b.stars_count || 0
+				if (bStars !== aStars) return bStars - aStars
+				const aLines = a.scans?.[0]?.total || 0
+				const bLines = b.scans?.[0]?.total || 0
+				return bLines - aLines
+			})[0]
+		}
+
 		return {
 			profile: {
 				...profile,
@@ -106,7 +138,9 @@ async function getProfile(handle: string) {
 				totalProjects: projects.length,
 				totalScans,
 				totalLines,
-				totalStars
+				totalStars,
+				topLanguages: latestScans.rows || [],
+				bestProject
 			}
 		}
 	} finally {
@@ -178,7 +212,7 @@ function ProfileHeader({ profile, stats }: { profile: any; stats: any }) {
 							<p className='text-gray-700 mb-4 max-w-2xl'>{profile.bio}</p>
 						)}
 
-						<div className='flex items-center gap-6 text-sm text-gray-600 mb-4'>
+						<div className='flex flex-wrap items-center gap-6 text-sm text-gray-600 mb-4'>
 							<div>
 								<span className='font-semibold'>{stats.totalProjects}</span> public
 								projects
@@ -197,38 +231,17 @@ function ProfileHeader({ profile, stats }: { profile: any; stats: any }) {
 							)}
 						</div>
 
-						{Object.keys(links).length > 0 && (
-							<div className='flex gap-3'>
-								{links.github && (
-									<a
-										href={links.github}
-										target='_blank'
-										rel='noopener noreferrer'
-										className='text-blue-600 hover:underline text-sm'
+						{/* Top Languages */}
+						{stats.topLanguages?.length > 0 && (
+							<div className='flex flex-wrap gap-2 mb-2'>
+								{stats.topLanguages.map((l: any) => (
+									<span
+										key={l.language}
+										className='px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 border border-gray-200'
 									>
-										GitHub
-									</a>
-								)}
-								{links.website && (
-									<a
-										href={links.website}
-										target='_blank'
-										rel='noopener noreferrer'
-										className='text-blue-600 hover:underline text-sm'
-									>
-										Website
-									</a>
-								)}
-								{links.twitter && (
-									<a
-										href={links.twitter}
-										target='_blank'
-										rel='noopener noreferrer'
-										className='text-blue-600 hover:underline text-sm'
-									>
-										Twitter
-									</a>
-								)}
+										{l.language} · {l.total?.toLocaleString?.() || l.total}
+									</span>
+								))}
 							</div>
 						)}
 					</div>
@@ -342,6 +355,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 					</div>
 				) : (
 					<>
+						{stats.bestProject && (
+							<div className='mb-8'>
+								<h2 className='text-2xl font-bold mb-3'>Best Project</h2>
+								<ProjectCard project={stats.bestProject} />
+							</div>
+						)}
 						<div className='flex items-center justify-between mb-6'>
 							<h2 className='text-2xl font-bold'>Public Projects</h2>
 							<span className='text-gray-500'>{projects.length} projects</span>

@@ -188,11 +188,7 @@ format_code() {
 	echo -e "${BLUE}🎨 Formatage du code...${NC}"
 	npm run format
 	cd apps/api
-	go fmt ./internal/handlers
-	go fmt ./internal/middleware
-	go fmt ./internal/config
-	go fmt ./internal/database
-	go fmt ./internal/models
+	gofmt -s -w ./*/*/*.go
 	cd ../..
 }
 

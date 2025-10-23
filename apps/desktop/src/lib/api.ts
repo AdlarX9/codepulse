@@ -8,6 +8,172 @@ export interface User {
 	created_at?: string
 }
 
+// --- Membership & Summary helpers ---
+async function getUserSummary(): Promise<any> {
+	const headers = await getAuthHeaders()
+	const endpoint = `${API_BASE}/me/summary`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, 'GET /me/summary')
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, 'GET /me/summary')
+		throw error
+	}
+}
+
+async function listInvites(projectId: string): Promise<any[]> {
+	const headers = await getAuthHeaders()
+	const endpoint = `${API_BASE}/me/projects/${projectId}/invites`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${projectId}/invites`)
+		const data = await res.json()
+		return data.invites || []
+	} catch (error) {
+		logNetworkError(error, `GET /me/projects/${projectId}/invites`)
+		throw error
+	}
+}
+
+async function createInvite(
+	projectId: string,
+	payload: {
+		email?: string
+		git_username?: string
+		role?: 'admin' | 'collaborator'
+		expires_in_days?: number
+	}
+): Promise<any> {
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
+	const endpoint = `${API_BASE}/me/projects/${projectId}/invites`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(payload)
+		})
+		if (!res.ok) await logAndThrowApiError(res, `POST /me/projects/${projectId}/invites`)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `POST /me/projects/${projectId}/invites`)
+		throw error
+	}
+}
+
+async function revokeInvite(projectId: string, inviteId: string): Promise<void> {
+	const headers = await getAuthHeaders()
+	const endpoint = `${API_BASE}/me/projects/${projectId}/invites/${inviteId}`
+	try {
+		const res = await fetch(endpoint, { method: 'DELETE', headers })
+		if (!res.ok)
+			await logAndThrowApiError(res, `DELETE /me/projects/${projectId}/invites/${inviteId}`)
+	} catch (error) {
+		logNetworkError(error, `DELETE /me/projects/${projectId}/invites/${inviteId}`)
+		throw error
+	}
+}
+
+async function transferOwnership(projectId: string, newOwnerUserId: string): Promise<void> {
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
+	const endpoint = `${API_BASE}/me/projects/${projectId}/transfer`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ new_owner_user_id: newOwnerUserId })
+		})
+		if (!res.ok) await logAndThrowApiError(res, `POST /me/projects/${projectId}/transfer`)
+	} catch (error) {
+		logNetworkError(error, `POST /me/projects/${projectId}/transfer`)
+		throw error
+	}
+}
+
+async function getCollaborators(projectId: string): Promise<any[]> {
+	const headers = await getAuthHeaders()
+	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators`
+	try {
+		const res = await fetch(endpoint, { headers })
+		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${projectId}/collaborators`)
+		const data = await res.json()
+		return data.collaborators || []
+	} catch (error) {
+		logNetworkError(error, `GET /me/projects/${projectId}/collaborators`)
+		throw error
+	}
+}
+
+async function addCollaborator(
+	projectId: string,
+	payload: {
+		user_id?: string
+		git_username?: string
+		git_email?: string
+		role?: 'admin' | 'collaborator'
+	}
+): Promise<any> {
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
+	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify(payload)
+		})
+		if (!res.ok) await logAndThrowApiError(res, `POST /me/projects/${projectId}/collaborators`)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `POST /me/projects/${projectId}/collaborators`)
+		throw error
+	}
+}
+
+async function updateCollaborator(
+	projectId: string,
+	collabId: string,
+	payload: { role?: 'admin' | 'collaborator' }
+): Promise<any> {
+	const headers = await getAuthHeaders()
+	headers['Content-Type'] = 'application/json'
+	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators/${collabId}`
+	try {
+		const res = await fetch(endpoint, {
+			method: 'PATCH',
+			headers,
+			body: JSON.stringify(payload)
+		})
+		if (!res.ok)
+			await logAndThrowApiError(
+				res,
+				`PATCH /me/projects/${projectId}/collaborators/${collabId}`
+			)
+		return res.json()
+	} catch (error) {
+		logNetworkError(error, `PATCH /me/projects/${projectId}/collaborators/${collabId}`)
+		throw error
+	}
+}
+
+async function removeCollaborator(projectId: string, collabId: string): Promise<void> {
+	const headers = await getAuthHeaders()
+	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators/${collabId}`
+	try {
+		const res = await fetch(endpoint, { method: 'DELETE', headers })
+		if (!res.ok)
+			await logAndThrowApiError(
+				res,
+				`DELETE /me/projects/${projectId}/collaborators/${collabId}`
+			)
+	} catch (error) {
+		logNetworkError(error, `DELETE /me/projects/${projectId}/collaborators/${collabId}`)
+		throw error
+	}
+}
+
 async function readErrorPayload(res: Response): Promise<unknown> {
 	try {
 		const ct = res.headers.get('content-type') || ''
@@ -434,5 +600,14 @@ export const api = {
 	deleteAccount,
 	exportProject,
 	request,
-	loadProjects
+	loadProjects,
+	getCollaborators,
+	addCollaborator,
+	updateCollaborator,
+	removeCollaborator,
+	getUserSummary,
+	listInvites,
+	createInvite,
+	revokeInvite,
+	transferOwnership
 }

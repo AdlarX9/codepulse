@@ -15,8 +15,20 @@ import {
 } from './dashboards'
 import ExportButton from './export/ExportButton'
 import * as git from '../lib/git'
-import GamificationSidebar from './gamification/GamificationSidebar'
 import GitSyncStatus from './sync/GitSyncStatus'
+import LocalStreakWidget from './gamification/LocalStreakWidget'
+import ChallengesList from './gamification/ChallengesList'
+import {
+	ResponsiveContainer,
+	BarChart,
+	Bar,
+	XAxis,
+	YAxis,
+	Tooltip,
+	CartesianGrid,
+	AreaChart,
+	Area
+} from 'recharts'
 
 interface ProjectsProps {
 	onProjectSelect?: (project: Project) => void
@@ -26,6 +38,7 @@ interface ProjectsProps {
 export default function Projects({ onProjectSelect, onOpenProjectSettings }: ProjectsProps) {
 	const [projects, setProjects] = useState<Project[]>([])
 	const [loading, setLoading] = useState(true)
+	const [summary, setSummary] = useState<any | null>(null)
 	const [showAddProjectModal, setShowAddProjectModal] = useState(false)
 	const [selectedPath, setSelectedPath] = useState<string | null>(null)
 	const [projectName, setProjectName] = useState('')
@@ -39,6 +52,7 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 
 	useEffect(() => {
 		loadProjects()
+		loadSummary()
 	}, [])
 
 	useEffect(() => {
@@ -54,6 +68,167 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 		const mapped = await api.loadProjects()
 		setProjects(mapped)
 		setLoading(false)
+	}
+
+	function startOfWeek(d: Date) {
+		const date = new Date(d)
+		const day = (date.getDay() + 6) % 7 // Mon=0
+		date.setHours(0, 0, 0, 0)
+		date.setDate(date.getDate() - day)
+		return date
+	}
+
+	function formatISODate(d: Date) {
+		return d.toISOString().slice(0, 10)
+	}
+
+	function parseRepoSlug(remote?: string): string | null {
+		if (!remote) return null
+		// git@github.com:user/repo.git or https://github.com/user/repo.git
+		const ssh = remote.match(/git@[^:]+:([^\s]+?)(\.git)?$/)
+		if (ssh) return ssh[1]
+		try {
+			const url = new URL(remote)
+			const parts = url.pathname.replace(/^\//, '').replace(/\.git$/, '')
+			return parts || null
+		} catch {
+			return null
+		}
+	}
+
+	async function loadSummary() {
+		try {
+			// 1) Get server summary first to preserve fields like active_challenges and top_languages
+			let serverSummary: any = null
+			try {
+				serverSummary = await api.getUserSummary()
+			} catch {}
+
+			// 2) Build local summary from bound project paths and Git history
+			const now = new Date()
+			const thisWeekStart = startOfWeek(now)
+			const lastWeekStart = new Date(thisWeekStart)
+			lastWeekStart.setDate(thisWeekStart.getDate() - 7)
+			const lastWeekEnd = new Date(thisWeekStart.getTime() - 1)
+			const fourteenDaysAgo = new Date(now)
+			fourteenDaysAgo.setDate(now.getDate() - 14)
+
+			// Resolve local paths for all projects
+			const list = await api.getProjects()
+			const boundInfos = await Promise.all(
+				(list || []).map(async (p: any) => {
+					try {
+						const path = await invoke<string | null>('get_project_binding', {
+							projectId: p.id
+						})
+						return { id: p.id, path }
+					} catch {
+						return { id: p.id, path: null as string | null }
+					}
+				})
+			)
+
+			// For each repo, compute commits and diff stats
+			const repoPaths: string[] = []
+			const repoSlugs: string[] = []
+			let thisWeekAdded = 0
+			let thisWeekDeleted = 0
+			let lastWeekAdded = 0
+			let lastWeekDeleted = 0
+			const activityMap = new Map<string, number>()
+			for (let i = 0; i < 14; i++) {
+				const d = new Date(fourteenDaysAgo)
+				d.setDate(fourteenDaysAgo.getDate() + i)
+				activityMap.set(formatISODate(d), 0)
+			}
+
+			for (const b of boundInfos) {
+				if (!b.path) continue
+				let isGit = false
+				try {
+					isGit = await git.isGitRepository(b.path)
+				} catch {
+					isGit = false
+				}
+				if (!isGit) continue
+
+				repoPaths.push(b.path)
+				try {
+					const info = await git.getRepoInfo(b.path)
+					const slug = parseRepoSlug(info?.remote_url)
+					if (slug && !repoSlugs.includes(slug)) repoSlugs.push(slug)
+				} catch {}
+
+				// Pull commits and filter by date
+				let commits: git.GitCommitInfo[] = []
+				try {
+					commits = await git.getCommits(b.path, undefined, 300)
+				} catch {}
+				const recent = commits.filter(c => c.timestamp * 1000 >= fourteenDaysAgo.getTime())
+
+				// Aggregate activity counts by date
+				for (const c of recent) {
+					const day = formatISODate(new Date(c.timestamp * 1000))
+					activityMap.set(day, (activityMap.get(day) || 0) + 1)
+				}
+
+				// Sum additions/deletions for this and last week
+				const thisWeekCommits = commits.filter(
+					c => c.timestamp * 1000 >= thisWeekStart.getTime()
+				)
+				const lastWeekCommits = commits.filter(
+					c =>
+						c.timestamp * 1000 >= lastWeekStart.getTime() &&
+						c.timestamp * 1000 <= lastWeekEnd.getTime()
+				)
+
+				async function sumDiffs(cs: git.GitCommitInfo[]) {
+					let added = 0,
+						deleted = 0
+					for (const c of cs) {
+						try {
+							const stats = await git.getCommitDiffStats(b.path!, c.sha)
+							added += stats.insertions || 0
+							deleted += stats.deletions || 0
+						} catch {}
+					}
+					return { added, deleted }
+				}
+
+				try {
+					const a = await sumDiffs(thisWeekCommits)
+					thisWeekAdded += a.added
+					thisWeekDeleted += a.deleted
+				} catch {}
+				try {
+					const bsum = await sumDiffs(lastWeekCommits)
+					lastWeekAdded += bsum.added
+					lastWeekDeleted += bsum.deleted
+				} catch {}
+			}
+
+			const recent_activity = Array.from(activityMap.entries()).map(([date, count]) => ({
+				date,
+				count
+			}))
+
+			const localSummary = {
+				repos: repoSlugs,
+				additions_deletions: {
+					this_week: { added: thisWeekAdded, deleted: thisWeekDeleted },
+					last_week: { added: lastWeekAdded, deleted: lastWeekDeleted }
+				},
+				recent_activity
+			}
+
+			setSummary({ ...(serverSummary || {}), ...localSummary })
+		} catch (e) {
+			// Fallback to server-only summary if local fails
+			try {
+				const data = await api.getUserSummary()
+				setSummary(data)
+			} catch {}
+		}
 	}
 
 	async function deleteProject(projectId: string) {
@@ -270,7 +445,6 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 							</div>
 						) : null
 					}
-					rightSidebar={<GamificationSidebar projectId={scannedProjectId || undefined} />}
 				>
 					{activeTab => {
 						switch (activeTab) {
@@ -290,7 +464,13 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 									/>
 								)
 							case 'quality':
-								return <QualityDashboard scanResult={scanResult} />
+								return (
+									<QualityDashboard
+										scanResult={scanResult}
+										projectPath={scannedProjectPath}
+										hasGit={hasGit}
+									/>
+								)
 							case 'contributors':
 								return (
 									<ContributorsDashboard
@@ -308,6 +488,162 @@ export default function Projects({ onProjectSelect, onOpenProjectSettings }: Pro
 	return (
 		<div className='space-y-6 px-6 pt-3'>
 			<div className='space-y-4'>
+				{/* Streaks & Weekly Diffs */}
+				{summary && (
+					<div className='grid gap-4 md:grid-cols-3'>
+						<div className='md:col-span-2'>
+							<LocalStreakWidget />
+						</div>
+						<div className='border rounded-md p-4'>
+							<div className='text-sm text-muted-foreground mb-2'>
+								Additions/Deletions (This vs Last Week)
+							</div>
+							<div className='h-40'>
+								<ResponsiveContainer width='100%' height='100%'>
+									<BarChart
+										data={[
+											{
+												name: 'This Week',
+												Added:
+													summary.additions_deletions?.this_week?.added ||
+													0,
+												Deleted:
+													summary.additions_deletions?.this_week
+														?.deleted || 0
+											},
+											{
+												name: 'Last Week',
+												Added:
+													summary.additions_deletions?.last_week?.added ||
+													0,
+												Deleted:
+													summary.additions_deletions?.last_week
+														?.deleted || 0
+											}
+										]}
+									>
+										<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
+										<XAxis dataKey='name' />
+										<YAxis />
+										<Tooltip />
+										<Bar dataKey='Added' fill='#10B981' />
+										<Bar dataKey='Deleted' fill='#EF4444' />
+									</BarChart>
+								</ResponsiveContainer>
+							</div>
+						</div>
+					</div>
+				)}
+				{/* User Summary */}
+				{summary && (
+					<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
+						<div className='border rounded-md p-4'>
+							<div className='text-sm text-muted-foreground mb-1'>
+								Active Challenges
+							</div>
+							<div className='text-2xl font-semibold'>
+								{summary.active_challenges || 0}
+							</div>
+						</div>
+						<div className='border rounded-md p-4'>
+							<div className='text-sm text-muted-foreground mb-1'>
+								Additions (this vs last week)
+							</div>
+							<div className='text-lg font-mono'>
+								{summary.additions_deletions?.this_week?.added ?? 0}
+								<span className='text-xs text-muted-foreground'>
+									{' '}
+									/ {summary.additions_deletions?.last_week?.added ?? 0}
+								</span>
+							</div>
+						</div>
+						<div className='border rounded-md p-4'>
+							<div className='text-sm text-muted-foreground mb-1'>
+								Deletions (this vs last week)
+							</div>
+							<div className='text-lg font-mono'>
+								{summary.additions_deletions?.this_week?.deleted ?? 0}
+								<span className='text-xs text-muted-foreground'>
+									{' '}
+									/ {summary.additions_deletions?.last_week?.deleted ?? 0}
+								</span>
+							</div>
+						</div>
+						<div className='border rounded-md p-4'>
+							<div className='text-sm text-muted-foreground mb-2'>Top Languages</div>
+							<div className='flex flex-wrap gap-2'>
+								{(summary.top_languages || []).slice(0, 5).map((l: any) => (
+									<span
+										key={l.language}
+										className='px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700 border border-gray-200'
+									>
+										{l.language} · {l.total}
+									</span>
+								))}
+							</div>
+						</div>
+					</div>
+				)}
+
+				{/* Repositories, Activity & Challenges */}
+				{summary && (
+					<div className='grid gap-4 md:grid-cols-3'>
+						<div className='border rounded-md p-4 md:col-span-2'>
+							<div className='text-sm text-muted-foreground mb-2'>
+								Recent Activity (14d)
+							</div>
+							<div className='h-40'>
+								<ResponsiveContainer width='100%' height='100%'>
+									<AreaChart
+										data={(summary.recent_activity || []).map((d: any) => ({
+											date: d.date,
+											count: d.count
+										}))}
+									>
+										<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
+										<XAxis dataKey='date' />
+										<YAxis />
+										<Tooltip />
+										<Area
+											dataKey='count'
+											type='monotone'
+											stroke='#3B82F6'
+											fill='#93C5FD'
+										/>
+									</AreaChart>
+								</ResponsiveContainer>
+							</div>
+						</div>
+						<div className='space-y-4'>
+							<div className='border rounded-md p-4'>
+								<div className='text-sm text-muted-foreground mb-2'>
+									Repositories
+								</div>
+								<div className='flex flex-col gap-2'>
+									{(summary.repos || []).slice(0, 6).map((r: string) => (
+										<a
+											key={r}
+											href={`https://github.com/${r}`}
+											target='_blank'
+											rel='noreferrer'
+											className='text-sm text-blue-600 hover:underline'
+										>
+											{r}
+										</a>
+									))}
+									{(summary.repos || []).length === 0 && (
+										<div className='text-sm text-muted-foreground'>
+											No linked repositories.
+										</div>
+									)}
+								</div>
+							</div>
+							<div>
+								<ChallengesList showCompleted />
+							</div>
+						</div>
+					</div>
+				)}
 				<div className='flex items-center justify-between'>
 					<h2 className='text-2xl font-bold'>Your Projects</h2>
 					<div className='flex gap-2'>

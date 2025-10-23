@@ -7,6 +7,63 @@ export interface Streak {
 	lastActivityDate: string | null
 }
 
+/**
+ * Ensure the user has a baseline set of challenges. If none exist, create a few defaults.
+ */
+export async function ensureDefaultChallenges(): Promise<void> {
+	try {
+		const current = await getChallenges('active')
+		if ((current?.length || 0) > 0) return
+
+		const defaults = [
+			{
+				type: 'commit_streak',
+				title: 'Coder 5 jours d’affilé',
+				description: 'Fais au moins un commit par jour pendant 5 jours consécutifs.',
+				target: { days: 5 },
+				duration_days: 14
+			},
+			{
+				type: 'daily_commits',
+				title: '10 commits en 7 jours',
+				description: 'Atteins 10 commits sur la semaine.',
+				target: { commits: 10 },
+				duration_days: 7
+			},
+			{
+				type: 'code_lines',
+				title: 'Ajouter 2k lignes de code',
+				description: 'Ajoute 2000 lignes de code au total.',
+				target: { lines: 2000 },
+				duration_days: 21
+			},
+			{
+				type: 'quality_score',
+				title: 'Qualité 90/100',
+				description: 'Atteins un score de qualité de 90/100 sur un projet.',
+				target: { score: 90 },
+				duration_days: 30
+			}
+		]
+
+		for (const d of defaults) {
+			await api.request('/me/challenges', {
+				method: 'POST',
+				body: JSON.stringify({
+					type: d.type,
+					title: d.title,
+					description: d.description,
+					target: d.target,
+					duration_days: d.duration_days
+				})
+			})
+		}
+	} catch (e) {
+		// non-blocking
+		console.warn('ensureDefaultChallenges failed', e)
+	}
+}
+
 export interface Badge {
 	id: string
 	name: string

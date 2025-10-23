@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Ré-exécution automatique sous bash si lancé depuis zsh ou un autre shell
+# (utile quand on fait `zsh build-tauri.sh` sur macOS).
+if [ -z "${BASH_VERSION:-}" ]; then
+  exec /usr/bin/env bash "$0" "$@"
+fi
+
 set -euo pipefail
 
 # -----------------------------------------------------------------------------
@@ -33,7 +39,7 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 
 PLATFORM="all"
-DO_INSTALL="yes"
+DO_INSTALL="no"
 LINUX_BUNDLES="appimage"	 # "appimage" ou "all" (appimage+deb+rpm si possible)
 
 # Détection du gestionnaire de paquets JS
@@ -44,11 +50,11 @@ BUILD_CMD_TAURI=""
 detect_pkg_manager() {
 	if [[ -f "pnpm-lock.yaml" ]]; then
 		PKG_MANAGER="pnpm"
-		INSTALL_CMD="pnpm install --frozen-lockfile"
+		INSTALL_CMD="pnpm install"
 		BUILD_CMD_TAURI="pnpm tauri build"
 	elif [[ -f "yarn.lock" ]]; then
 		PKG_MANAGER="yarn"
-		INSTALL_CMD="yarn install --frozen-lockfile"
+		INSTALL_CMD="yarn install"
 		BUILD_CMD_TAURI="yarn tauri build"
 	else
 		PKG_MANAGER="npm"
@@ -113,8 +119,6 @@ build_macos_arm64() {
 	rustup target add aarch64-apple-darwin || true
 
 	msg "Build Tauri macOS (dmg)…"
-	# Le bundler crée un .app et un .dmg; on force bundles dmg pour clarté.
-	# Si votre tauri.conf.json gère déjà ça, l’option --bundles est optionnelle.
 	if [[ "${ARCH}" == "arm64" ]]; then
 		# Build natif arm64
 		eval "${BUILD_CMD_TAURI} --bundles dmg"
@@ -126,8 +130,9 @@ build_macos_arm64() {
 	fi
 
 	mkdir -p dist/macos
-	if compgen -G "${OUT_DIR}/*.dmg" > /dev/null; then
-		cp -f "${OUT_DIR}"/*.dmg dist/macos/
+	# Copie des DMG (sans compgen, fonctionne partout)
+	if find "${OUT_DIR}" -maxdepth 1 -type f -name "*.dmg" -print -quit | grep -q .; then
+		find "${OUT_DIR}" -maxdepth 1 -type f -name "*.dmg" -exec cp -f {} dist/macos/ \;
 		msg "DMG copié dans dist/macos/"
 	else
 		err "DMG non trouvé dans ${OUT_DIR}. Vérifiez la config Tauri."
@@ -200,7 +205,10 @@ build_linux() {
 }
 
 build_windows_note_or_native() {
-	if [[ "$(uname -s)" =~ MINGW|MSYS|CYGWIN || "$OS" == "Windows_NT" ]]; then
+	# Détection Windows sans regex fragile
+	local uname_s
+	uname_s="$(uname -s)"
+	if [[ "${uname_s}" == MINGW* || "${uname_s}" == MSYS* || "${uname_s}" == CYGWIN* || "${OS:-}" == "Windows_NT" ]]; then
 		msg "Build Windows natif…"
 		# Bundles: nsis et/ou msi selon votre config. Exemple avec nsis:
 		eval "${BUILD_CMD_TAURI} --bundles nsis"
@@ -219,7 +227,8 @@ build_windows_note_or_native() {
 }
 
 make_checksums() {
-	if compgen -G "dist/**/*" > /dev/null; then
+	# Recherche d’artefacts sans compgen/globstar
+	if [ -d "dist" ] && find dist -type f ! -name "checksums.txt" -print -quit | grep -q .; then
 		msg "Génération des checksums SHA256…"
 		pushd dist >/dev/null
 			# macOS: shasum -a 256 ; Linux: sha256sum

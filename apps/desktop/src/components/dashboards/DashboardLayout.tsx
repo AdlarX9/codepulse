@@ -1,8 +1,15 @@
 import { useState } from 'react'
-import { LayoutDashboard, TrendingUp, Target, Users } from 'lucide-react'
+import {
+	LayoutDashboard,
+	TrendingUp,
+	Target,
+	Users,
+	Settings as SettingsIcon,
+	Download
+} from 'lucide-react'
 
 interface DashboardTab {
-	id: 'overview' | 'evolution' | 'quality' | 'contributors'
+	id: 'overview' | 'evolution' | 'quality' | 'contributors' | 'settings' | 'exports'
 	label: string
 	icon: React.ReactNode
 	description: string
@@ -32,6 +39,18 @@ const TABS: DashboardTab[] = [
 		label: 'Contributors',
 		icon: <Users className='h-4 w-4' />,
 		description: 'Git-based contributor ranking'
+	},
+	{
+		id: 'exports',
+		label: 'Exports',
+		icon: <Download className='h-4 w-4' />,
+		description: 'Export data in multiple formats'
+	},
+	{
+		id: 'settings',
+		label: 'Settings',
+		icon: <SettingsIcon className='h-4 w-4' />,
+		description: 'Project-specific settings'
 	}
 ]
 
@@ -45,6 +64,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({
+	projectId,
 	projectName,
 	hasGit,
 	headerRight,
@@ -54,7 +74,10 @@ export default function DashboardLayout({
 	const [activeTab, setActiveTab] = useState<DashboardTab['id']>('overview')
 
 	// Filter tabs based on Git availability
-	const availableTabs = hasGit ? TABS : TABS.filter(tab => tab.id !== 'contributors')
+	let availableTabs = hasGit ? TABS : TABS.filter(tab => tab.id !== 'contributors')
+	if (!projectId) {
+		availableTabs = availableTabs.filter(tab => tab.id !== 'settings')
+	}
 
 	return (
 		<div className='h-full flex flex-col'>

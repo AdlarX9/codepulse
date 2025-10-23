@@ -32,6 +32,28 @@ type User struct {
 	Challenges []Challenge `json:"challenges,omitempty" gorm:"foreignKey:UserID"`
 }
 
+// Invite represents a collaboration invite to a project
+type Invite struct {
+	ID            string         `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	ProjectID     string         `json:"project_id" gorm:"type:uuid;not null;index"`
+	InviterUserID string         `json:"inviter_user_id" gorm:"type:uuid;not null;index"`
+	InviteeUserID *string        `json:"invitee_user_id" gorm:"type:uuid;index"`
+	Email         *string        `json:"email"`
+	GitUsername   *string        `json:"git_username"`
+	Role          string         `json:"role" gorm:"type:varchar(20);default:'collaborator';check:role IN ('admin','collaborator')"`
+	Token         string         `json:"token" gorm:"uniqueIndex;not null"`
+	Status        string         `json:"status" gorm:"type:varchar(20);default:'pending';check:status IN ('pending','accepted','revoked','expired')"`
+	ExpiresAt     *time.Time     `json:"expires_at"`
+	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
+	DeletedAt     gorm.DeletedAt `json:"-" gorm:"index"`
+
+	// Relations
+	Project *Project `json:"project,omitempty" gorm:"foreignKey:ProjectID"`
+	Inviter *User    `json:"inviter,omitempty" gorm:"foreignKey:InviterUserID"`
+	Invitee *User    `json:"invitee,omitempty" gorm:"foreignKey:InviteeUserID"`
+}
+
 // Profile represents user profile information
 type Profile struct {
 	UserID      string    `json:"user_id" gorm:"type:uuid;primaryKey"`
@@ -168,7 +190,7 @@ type Collaborator struct {
 	UserID       *string   `json:"user_id" gorm:"type:uuid;index"` // Null if Git contributor not a user
 	GitUsername  string    `json:"git_username" gorm:"not null"`
 	GitEmail     *string   `json:"git_email"`
-	Role         string    `json:"role" gorm:"type:varchar(20);default:'contributor';check:role IN ('owner','contributor')"`
+	Role         string    `json:"role" gorm:"type:varchar(20);default:'collaborator';check:role IN ('owner','admin','collaborator')"`
 	CommitsCount int       `json:"commits_count" gorm:"default:0"`
 	LinesAdded   int       `json:"lines_added" gorm:"default:0"`
 	LinesDeleted int       `json:"lines_deleted" gorm:"default:0"`
