@@ -2,6 +2,7 @@ mod counter;
 mod filter;
 #[path = "../models/languages.rs"]
 mod languages;
+pub mod history;
 
 use rayon::prelude::*;
 use serde::Serialize;
@@ -15,6 +16,7 @@ use walkdir::WalkDir;
 pub use crate::scan_settings::ScanSettings;
 pub use filter::count_files;
 pub use languages::detect_language;
+pub use counter::count_lines;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileStats {

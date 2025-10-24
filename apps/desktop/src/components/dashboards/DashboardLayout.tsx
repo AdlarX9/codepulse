@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 
 interface DashboardTab {
-	id: 'overview' | 'evolution' | 'quality' | 'contributors' | 'settings' | 'exports'
+	id: 'overview' | 'productivity' | 'quality' | 'contributors' | 'settings' | 'exports'
 	label: string
 	icon: React.ReactNode
 	description: string
@@ -23,8 +23,8 @@ const TABS: DashboardTab[] = [
 		description: 'Global state, lines, languages, structure'
 	},
 	{
-		id: 'evolution',
-		label: 'Evolution',
+		id: 'productivity',
+		label: 'Productivity',
 		icon: <TrendingUp className='h-4 w-4' />,
 		description: 'Growth over time, commits, trends'
 	},

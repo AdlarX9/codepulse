@@ -79,11 +79,6 @@ fn default_allowed_languages() -> Vec<String> {
 	vec![]
 }
 
-// Expose common-excluded languages list to the frontend
-pub fn get_common_excluded_languages() -> Vec<String> {
-    default_excluded_languages()
-}
-
 impl Default for ScanSettings {
 	fn default() -> Self {
 		Self {

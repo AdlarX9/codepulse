@@ -5,10 +5,6 @@ use walkdir::DirEntry;
 /// Examples:
 /// - pattern `*lib*` matches `mylib`, `my_lib.rs`, `lib`
 /// - pattern `*lock.*` matches `package-lock.json`, but NOT `yarn.lock` (because nothing after the dot)
-fn matches_any(name: &str, patterns: &[impl AsRef<str>]) -> bool {
-	patterns.iter().any(|p| wildcard_match(p.as_ref(), name))
-}
-
 /// Case-insensitive variant (simple Unicode lowercase comparison).
 fn matches_any_ci(name: &str, patterns: &[impl AsRef<str>]) -> bool {
 	let name = name.to_lowercase();

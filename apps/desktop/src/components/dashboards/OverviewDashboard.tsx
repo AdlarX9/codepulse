@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { FileCode, FileText, Code2, MessageSquare, Layers } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { FileCode, FileText, Code2, MessageSquare, Layers, Search } from 'lucide-react'
 import { Card } from '../ui/Card'
 import {
 	PieChart,
@@ -23,6 +23,9 @@ interface OverviewDashboardProps {
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6']
 
 export default function OverviewDashboard({ scanResult, projectPath }: OverviewDashboardProps) {
+	const [searchLang, setSearchLang] = useState<string>('')
+	const [searchQuery, setSearchQuery] = useState<string>('')
+
 	const languageData = useMemo(() => {
 		if (!scanResult) return []
 		return Object.entries(scanResult.languages)
@@ -232,6 +235,85 @@ export default function OverviewDashboard({ scanResult, projectPath }: OverviewD
 					</p>
 				</div>
 			</Card>
+
+			<Card className='p-4'>
+				<div className='flex items-center gap-2 text-gray-600 mb-2'>
+					<Search className='h-4 w-4' />
+					<span className='text-sm font-medium'>File Search</span>
+				</div>
+				<div className='flex gap-2'>
+					<select
+						className='border rounded px-2 py-1 text-sm'
+						value={searchLang}
+						onChange={e => setSearchLang(e.target.value)}
+					>
+						<option value=''>All</option>
+						{scanResult &&
+							Object.keys(scanResult.languages).map(l => (
+								<option key={l} value={l}>
+									{l}
+								</option>
+							))}
+					</select>
+					<input
+						type='text'
+						className='border rounded px-2 py-1 text-sm flex-1'
+						placeholder='Search path...'
+						value={searchQuery}
+						onChange={e => setSearchQuery(e.target.value)}
+					/>
+				</div>
+			</Card>
+
+			{/* File search by language */}
+			{scanResult && (
+				<Card className='p-6'>
+					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Files Explorer</h3>
+					<div className='overflow-x-auto'>
+						<table className='w-full'>
+							<thead className='border-b'>
+								<tr className='text-left text-sm text-gray-600'>
+									<th className='pb-3 font-medium'>Path</th>
+									<th className='pb-3 font-medium'>Language</th>
+									<th className='pb-3 font-medium text-right'>Code</th>
+									<th className='pb-3 font-medium text-right'>Comments</th>
+									<th className='pb-3 font-medium text-right'>Blank</th>
+									<th className='pb-3 font-medium text-right'>Total</th>
+								</tr>
+							</thead>
+							<tbody className='divide-y'>
+								{(scanResult.files || [])
+									.filter(f => !searchLang || f.language === searchLang)
+									.filter(
+										f =>
+											!searchQuery ||
+											f.path.toLowerCase().includes(searchQuery.toLowerCase())
+									)
+									.sort((a, b) => b.code - a.code)
+									.slice(0, 100)
+									.map(f => (
+										<tr key={f.path} className='text-sm hover:bg-gray-50'>
+											<td className='py-3 font-mono text-xs'>{f.path}</td>
+											<td className='py-3'>{f.language}</td>
+											<td className='py-3 text-right text-gray-900 font-medium'>
+												{f.code}
+											</td>
+											<td className='py-3 text-right text-gray-600'>
+												{f.comment}
+											</td>
+											<td className='py-3 text-right text-gray-600'>
+												{f.blank}
+											</td>
+											<td className='py-3 text-right text-gray-900 font-semibold'>
+												{f.total}
+											</td>
+										</tr>
+									))}
+							</tbody>
+						</table>
+					</div>
+				</Card>
+			)}
 		</div>
 	)
 }

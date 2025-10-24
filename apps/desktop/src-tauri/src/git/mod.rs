@@ -52,7 +52,6 @@ pub enum GitError {
 	NotARepository,
 	InvalidPath,
 	CommitNotFound,
-	BranchNotFound,
 	RemoteError(String),
 	GitOperationFailed(String),
 }
@@ -63,7 +62,6 @@ impl std::fmt::Display for GitError {
 			GitError::NotARepository => write!(f, "Not a Git repository"),
 			GitError::InvalidPath => write!(f, "Invalid path"),
 			GitError::CommitNotFound => write!(f, "Commit not found"),
-			GitError::BranchNotFound => write!(f, "Branch not found"),
 			GitError::RemoteError(msg) => write!(f, "Remote error: {}", msg),
 			GitError::GitOperationFailed(msg) => write!(f, "Git operation failed: {}", msg),
 		}

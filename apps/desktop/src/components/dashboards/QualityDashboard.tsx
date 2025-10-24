@@ -8,17 +8,11 @@ import {
 	PolarGrid,
 	PolarAngleAxis,
 	PolarRadiusAxis,
-	Radar,
-	LineChart,
-	Line,
-	XAxis,
-	YAxis,
-	CartesianGrid,
-	Legend
+	Radar
 } from 'recharts'
 import type { ScanResult } from '@/types'
-import { getDeliveryKpis, getFallbackKpis } from '@/lib/devops'
-import type { DeliveryKpis, FallbackKpis } from '@/lib/devops'
+import * as git from '@/lib/git'
+import { invoke } from '@tauri-apps/api/tauri'
 
 interface QualityDashboardProps {
 	scanResult: ScanResult | null
@@ -31,55 +25,102 @@ export default function QualityDashboard({
 	projectPath,
 	hasGit
 }: QualityDashboardProps) {
-	const [kpis, setKpis] = useState<DeliveryKpis | null>(null)
-	const [fallback, setFallback] = useState<FallbackKpis | null>(null)
-	const [loadingKpis, setLoadingKpis] = useState(false)
+	const [qMetrics, setQMetrics] = useState<git.QualityMetrics | null>(null)
+	const [loadingQ, setLoadingQ] = useState(false)
+	const [baseBranch, setBaseBranch] = useState<string>('main')
+	const [branches, setBranches] = useState<string[]>([])
+	const [branchDeltas, setBranchDeltas] = useState<git.BranchQualityDelta[] | null>(null)
+	const [loadingBranches, setLoadingBranches] = useState(false)
 
 	useEffect(() => {
 		let cancelled = false
-		async function load() {
-			if (!hasGit || !projectPath) {
-				setKpis(null)
-				setFallback(null)
+		async function loadQuality() {
+			if (!projectPath) {
+				setQMetrics(null)
 				return
 			}
-			setLoadingKpis(true)
+			setLoadingQ(true)
 			try {
-				const d = await getDeliveryKpis(projectPath)
-				if (cancelled) return
-				setKpis(d)
-				if (!d) {
-					const fb = await getFallbackKpis(projectPath)
-					if (!cancelled) setFallback(fb)
-				} else {
-					setFallback(null)
-				}
+				const settings = await invoke<any>('get_scan_settings')
+				const q = await git.computeQualityMetrics(projectPath, settings)
+				if (!cancelled) setQMetrics(q)
+			} catch {
+				if (!cancelled) setQMetrics(null)
 			} finally {
-				if (!cancelled) setLoadingKpis(false)
+				if (!cancelled) setLoadingQ(false)
 			}
 		}
-		load()
+		loadQuality()
+		return () => {
+			cancelled = true
+		}
+	}, [projectPath])
+
+	// Branch analysis: detect base branch and compute diff-based effects
+	useEffect(() => {
+		let cancelled = false
+		async function loadBranches() {
+			if (!hasGit || !projectPath) {
+				setBranches([])
+				setBranchDeltas(null)
+				return
+			}
+			setLoadingBranches(true)
+			try {
+				const list = await git.getBranches(projectPath)
+				if (cancelled) return
+				const base = list.includes('main')
+					? 'main'
+					: list.includes('master')
+						? 'master'
+						: list[0] || 'main'
+				setBaseBranch(base)
+				setBranches(list)
+				const settings = await invoke<any>('get_scan_settings')
+				const deltas = await git.computeBranchQualityDeltas(
+					projectPath,
+					base,
+					list,
+					settings
+				)
+				if (!cancelled) setBranchDeltas(deltas)
+			} finally {
+				if (!cancelled) setLoadingBranches(false)
+			}
+		}
+		loadBranches()
 		return () => {
 			cancelled = true
 		}
 	}, [projectPath, hasGit])
+
 	// Calculate quality metrics
 	const metrics = useMemo(() => {
 		if (!scanResult) return null
 
-		const commentRatio = (scanResult.total_comments / scanResult.total_code) * 100
-		const codeRatio = (scanResult.total_code / scanResult.total_lines) * 100
-		const blankRatio = (scanResult.total_blank / scanResult.total_lines) * 100
+		const commentRatio = (scanResult.total_comments / Math.max(1, scanResult.total_code)) * 100
+		const codeRatio = (scanResult.total_code / Math.max(1, scanResult.total_lines)) * 100
+		const blankRatio = (scanResult.total_blank / Math.max(1, scanResult.total_lines)) * 100
 
-		// Simple complexity estimation based on file sizes
-		const avgFileSize = scanResult.total_lines / scanResult.total_files
+		const avgFileSize =
+			scanResult.total_files > 0 ? scanResult.total_lines / scanResult.total_files : 0
 		const complexity = avgFileSize > 500 ? 'High' : avgFileSize > 200 ? 'Medium' : 'Low'
 
-		// Quality score (0-100)
+		const coverageBoost = ((qMetrics?.test_coverage ?? 0) + (qMetrics?.doc_coverage ?? 0)) / 2
+		const deadCodePenalty = Math.min(20, (qMetrics?.dead_code_findings ?? 0) * 0.2)
+
+		// Enhanced overall score (0-100)
+		// Weights: code density 30, comments 20, file size 15, dispersion (stddev) 10, blanks 5, coverage 15, penalties 5+
+		const normStd = Math.max(0, 100 - Math.min(100, (qMetrics?.stddev_file_lines ?? 0) / 10))
+		const fileSizeScore = avgFileSize < 300 ? 85 : avgFileSize < 500 ? 70 : 50
 		let qualityScore = 0
-		qualityScore += Math.min(commentRatio * 2, 30) // Max 30 points for comments (15% ideal)
-		qualityScore += Math.min(codeRatio, 40) // Max 40 points for code density
-		qualityScore += avgFileSize < 300 ? 30 : avgFileSize < 500 ? 20 : 10 // File size score
+		qualityScore += Math.min(codeRatio, 100) * 0.3
+		qualityScore += Math.min(commentRatio, 100) * 0.2
+		qualityScore += fileSizeScore * 0.15
+		qualityScore += normStd * 0.1
+		qualityScore += Math.max(0, 100 - blankRatio) * 0.05
+		qualityScore += Math.min(100, coverageBoost) * 0.15
+		qualityScore -= deadCodePenalty
 
 		return {
 			commentRatio,
@@ -87,10 +128,77 @@ export default function QualityDashboard({
 			blankRatio,
 			avgFileSize,
 			complexity,
-			qualityScore: Math.round(qualityScore),
+			qualityScore: Math.max(0, Math.round(qualityScore)),
 			documentationCoverage: commentRatio > 10 ? 'Good' : commentRatio > 5 ? 'Fair' : 'Low'
 		}
-	}, [scanResult])
+	}, [scanResult, qMetrics])
+
+	// Helper: approximate quality score for given totals (keep dispersion/coverage from qMetrics)
+	function approxQualityScore(
+		total_lines: number,
+		total_code: number,
+		total_comments: number,
+		total_blank: number
+	) {
+		const commentRatio = (total_comments / Math.max(1, total_code)) * 100
+		const codeRatio = (total_code / Math.max(1, total_lines)) * 100
+		const blankRatio = (total_blank / Math.max(1, total_lines)) * 100
+		const avgFileSize =
+			qMetrics && qMetrics.total_files > 0 ? total_lines / qMetrics.total_files : 0
+		const coverageBoost = ((qMetrics?.test_coverage ?? 0) + (qMetrics?.doc_coverage ?? 0)) / 2
+		const deadCodePenalty = Math.min(20, (qMetrics?.dead_code_findings ?? 0) * 0.2)
+		const normStd = Math.max(0, 100 - Math.min(100, (qMetrics?.stddev_file_lines ?? 0) / 10))
+		const fileSizeScore = avgFileSize < 300 ? 85 : avgFileSize < 500 ? 70 : 50
+		let score = 0
+		score += Math.min(codeRatio, 100) * 0.3
+		score += Math.min(commentRatio, 100) * 0.2
+		score += fileSizeScore * 0.15
+		score += normStd * 0.1
+		score += Math.max(0, 100 - blankRatio) * 0.05
+		score += Math.min(100, coverageBoost) * 0.15
+		score -= deadCodePenalty
+		return Math.max(0, Math.round(score))
+	}
+
+	const branchEffects = useMemo(() => {
+		if (!branchDeltas || !qMetrics) return []
+		// Compute base score from qMetrics + scanResult totals if present
+		const baseTotals = {
+			total_lines: qMetrics.total_lines,
+			total_code: qMetrics.total_code,
+			total_comments: qMetrics.total_comments,
+			total_blank: qMetrics.total_blank
+		}
+		const baseScore = approxQualityScore(
+			baseTotals.total_lines,
+			baseTotals.total_code,
+			baseTotals.total_comments,
+			baseTotals.total_blank
+		)
+		return branchDeltas
+			.filter(d => d.branch !== baseBranch)
+			.map(d => {
+				const next = {
+					total_lines: Math.max(0, baseTotals.total_lines + d.delta_total),
+					total_code: Math.max(0, baseTotals.total_code + d.delta_code),
+					total_comments: Math.max(0, baseTotals.total_comments + d.delta_comments),
+					total_blank: Math.max(0, baseTotals.total_blank + d.delta_blank)
+				}
+				const nextScore = approxQualityScore(
+					next.total_lines,
+					next.total_code,
+					next.total_comments,
+					next.total_blank
+				)
+				return {
+					branch: d.branch,
+					changed_files: d.changed_files,
+					delta_score: nextScore - baseScore,
+					d
+				}
+			})
+			.sort((a, b) => b.delta_score - a.delta_score)
+	}, [branchDeltas, qMetrics, baseBranch])
 
 	// Radar chart data
 	const radarData = useMemo(() => {
@@ -128,61 +236,6 @@ export default function QualityDashboard({
 					<p className='text-sm text-gray-400 mt-2'>
 						Scan your project to see quality metrics
 					</p>
-				</div>
-
-				<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-					<Card className='p-4'>
-						<div className='flex items-center justify-between mb-1'>
-							<div className='text-sm font-medium text-gray-600'>Throughput</div>
-							<div className='text-xs text-gray-500'>
-								{loadingKpis
-									? 'Loading…'
-									: kpis?.provider
-										? kpis.provider
-										: hasGit
-											? 'git'
-											: 'n/a'}
-							</div>
-						</div>
-						<div className='text-3xl font-bold text-gray-900'>
-							{typeof kpis?.throughput.thisMonth === 'number'
-								? kpis?.throughput.thisMonth
-								: (fallback?.throughput.thisMonthCommits ?? 0)}
-						</div>
-						<p className='text-xs text-gray-500 mt-1'>
-							{typeof kpis?.throughput.lastMonth === 'number'
-								? `Last month: ${kpis?.throughput.lastMonth}`
-								: `Last month: ${fallback?.throughput.lastMonthCommits ?? 0}`}
-						</p>
-					</Card>
-
-					<Card className='p-4'>
-						<div className='text-sm font-medium text-gray-600 mb-1'>Cycle Time</div>
-						<div className='text-3xl font-bold text-gray-900'>
-							{typeof kpis?.cycleTime.thisMonthMedianDays === 'number'
-								? `${kpis?.cycleTime.thisMonthMedianDays.toFixed(1)}d`
-								: 'N/A'}
-						</div>
-						<p className='text-xs text-gray-500 mt-1'>
-							{typeof kpis?.cycleTime.lastMonthMedianDays === 'number'
-								? `Last month: ${kpis?.cycleTime.lastMonthMedianDays?.toFixed(1)}d`
-								: 'Last month: N/A'}
-						</p>
-					</Card>
-
-					<Card className='p-4'>
-						<div className='text-sm font-medium text-gray-600 mb-1'>Lead Time</div>
-						<div className='text-3xl font-bold text-gray-900'>
-							{typeof kpis?.leadTime.thisMonthMedianDays === 'number'
-								? `${kpis?.leadTime.thisMonthMedianDays.toFixed(1)}d`
-								: 'N/A'}
-						</div>
-						<p className='text-xs text-gray-500 mt-1'>
-							{typeof kpis?.leadTime.lastMonthMedianDays === 'number'
-								? `Last month: ${kpis?.leadTime.lastMonthMedianDays?.toFixed(1)}d`
-								: 'Last month: N/A'}
-						</p>
-					</Card>
 				</div>
 			</div>
 		)
@@ -285,6 +338,108 @@ export default function QualityDashboard({
 				</Card>
 			</div>
 
+			<div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+				<Card className='p-4'>
+					<div className='text-sm font-medium text-gray-600 mb-1'>Test Coverage</div>
+					<div className='text-3xl font-bold text-blue-600'>
+						{loadingQ
+							? '…'
+							: qMetrics?.test_coverage != null
+								? `${(qMetrics.test_coverage as number).toFixed(1)}%`
+								: 'N/A'}
+					</div>
+				</Card>
+				<Card className='p-4'>
+					<div className='text-sm font-medium text-gray-600 mb-1'>Doc Coverage</div>
+					<div className='text-3xl font-bold text-green-600'>
+						{loadingQ
+							? '…'
+							: qMetrics?.doc_coverage != null
+								? `${(qMetrics.doc_coverage as number).toFixed(1)}%`
+								: 'N/A'}
+					</div>
+				</Card>
+				<Card className='p-4'>
+					<div className='text-sm font-medium text-gray-600 mb-1'>Dead Code</div>
+					<div className='text-3xl font-bold text-red-600'>
+						{loadingQ ? '…' : (qMetrics?.dead_code_findings ?? 0)}
+					</div>
+				</Card>
+				<Card className='p-4'>
+					<div className='text-sm font-medium text-gray-600 mb-1'>Nesting (approx)</div>
+					<div className='text-3xl font-bold text-purple-600'>
+						{loadingQ
+							? '…'
+							: Math.max(
+									0,
+									Math.min(
+										100,
+										Math.round((qMetrics?.stddev_file_lines ?? 0) / 5)
+									)
+								)}
+					</div>
+				</Card>
+			</div>
+
+			{/* Branch analysis vs base (diff-based effects) */}
+			{hasGit && (
+				<Card className='p-6'>
+					<div className='flex items-center justify-between mb-4'>
+						<h3 className='text-lg font-semibold text-gray-900'>
+							Branch Analysis vs {baseBranch}
+						</h3>
+						<div className='text-xs text-gray-500'>
+							{loadingBranches ? 'Loading…' : `${branches.length} branches`}
+						</div>
+					</div>
+					<div className='overflow-x-auto'>
+						<table className='w-full'>
+							<thead className='border-b'>
+								<tr className='text-left text-sm text-gray-600'>
+									<th className='pb-3 font-medium'>Branch</th>
+									<th className='pb-3 font-medium text-right'>Changed Files</th>
+									<th className='pb-3 font-medium text-right'>Δ Code</th>
+									<th className='pb-3 font-medium text-right'>Δ Comments</th>
+									<th className='pb-3 font-medium text-right'>Δ Blank</th>
+									<th className='pb-3 font-medium text-right'>
+										Predicted Δ Score
+									</th>
+								</tr>
+							</thead>
+							<tbody className='divide-y'>
+								{branchEffects.map(row => (
+									<tr key={row.branch} className='text-sm hover:bg-gray-50'>
+										<td className='py-3 font-medium text-gray-900'>
+											{row.branch}
+										</td>
+										<td className='py-3 text-right text-gray-600'>
+											{row.changed_files}
+										</td>
+										<td
+											className={`py-3 text-right ${row.d.delta_code >= 0 ? 'text-green-600' : 'text-red-600'}`}
+										>
+											{row.d.delta_code}
+										</td>
+										<td className='py-3 text-right text-gray-600'>
+											{row.d.delta_comments}
+										</td>
+										<td className='py-3 text-right text-gray-600'>
+											{row.d.delta_blank}
+										</td>
+										<td
+											className={`py-3 text-right font-semibold ${row.delta_score >= 0 ? 'text-green-700' : 'text-red-700'}`}
+										>
+											{row.delta_score > 0 ? '+' : ''}
+											{row.delta_score}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				</Card>
+			)}
+
 			<div className='grid md:grid-cols-2 gap-6'>
 				{/* Quality Radar */}
 				<Card className='p-6'>
@@ -354,60 +509,6 @@ export default function QualityDashboard({
 					</div>
 				</Card>
 			</div>
-
-			<Card className='p-6'>
-				<h3 className='text-lg font-semibold text-gray-900 mb-4'>Delivery KPIs (Weekly)</h3>
-				<div className='h-72'>
-					<ResponsiveContainer width='100%' height='100%'>
-						<LineChart
-							data={(
-								kpis?.throughput.byWeek ||
-								fallback?.throughput.byWeekCommits ||
-								[]
-							).map((d: any) => ({
-								date: d.weekStart,
-								throughput: d.count,
-								cycle:
-									kpis?.cycleTime.byWeekMedianDays?.find(
-										x => x.weekStart === d.weekStart
-									)?.medianDays ?? null,
-								lead:
-									kpis?.leadTime.byWeekMedianDays?.find(
-										x => x.weekStart === d.weekStart
-									)?.medianDays ?? null
-							}))}
-						>
-							<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
-							<XAxis dataKey='date' tick={{ fontSize: 12 }} />
-							<YAxis yAxisId='left' tick={{ fontSize: 12 }} />
-							<YAxis yAxisId='right' orientation='right' tick={{ fontSize: 12 }} />
-							<Tooltip />
-							<Legend />
-							<Line
-								yAxisId='left'
-								type='monotone'
-								dataKey='throughput'
-								stroke='#3B82F6'
-								name='Throughput'
-							/>
-							<Line
-								yAxisId='right'
-								type='monotone'
-								dataKey='cycle'
-								stroke='#10B981'
-								name='Cycle (days)'
-							/>
-							<Line
-								yAxisId='right'
-								type='monotone'
-								dataKey='lead'
-								stroke='#F59E0B'
-								name='Lead (days)'
-							/>
-						</LineChart>
-					</ResponsiveContainer>
-				</div>
-			</Card>
 
 			<Card className='p-6 bg-yellow-50 border-yellow-200'>
 				<h3 className='text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2'>

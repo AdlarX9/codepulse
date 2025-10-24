@@ -4,7 +4,7 @@
 #[path = "./app/auth.rs"]
 mod auth;
 #[path = "./models/languages.rs"]
-mod categories;
+mod languages;
 mod git;
 #[path = "./models/projects.rs"]
 mod projects;
@@ -13,6 +13,10 @@ mod storage;
 #[path = "./models/scan_settings.rs"]
 mod scan_settings;
 mod scanner;
+#[path = "./github/mod.rs"]
+mod github;
+#[path = "./quality/mod.rs"]
+mod quality;
 #[path = "./app/updater.rs"]
 mod updater;
 #[path = "./models/user_settings.rs"]
@@ -21,24 +25,79 @@ mod user_settings;
 use auth::{clear_token, get_token, set_token};
 use scan_settings::{load_scan_settings, save_scan_settings, ScanSettings};
 use scanner::{ScanResult};
+use scanner::history::{scan_repo_history, CommitScan};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{State, Window};
 use serde_json::Value as JsonValue;
 use user_settings::{load_user_settings, save_user_settings, UserSettings};
+// Tauri commands for GitHub/quality are defined below, we don't import functions from modules here
 
 struct AppState {
 	cancel_flag: Arc<AtomicBool>,
 }
 
 #[tauri::command]
+async fn compute_github_metrics_for_path(
+    path: String,
+    weeks: usize,
+    github_token: Option<String>,
+) -> Result<github::metrics::GitHubMetrics, String> {
+    let info = git::repo::get_repo_info(&path).map_err(|e| e.to_string())?;
+    let slug = match info.remote_url.and_then(|u| github::parse_repo_slug(&u)) {
+        Some(s) => s,
+        None => return Err("No GitHub remote detected".into()),
+    };
+    github::metrics::compute_metrics_for_repo(&slug, weeks, github_token.as_deref()).await
+}
+
+#[tauri::command]
+async fn compute_quality_metrics(
+    path: String,
+    settings: ScanSettings,
+) -> Result<quality::QualityMetrics, String> {
+    quality::compute_quality_metrics(&path, &settings).await
+}
+
+#[tauri::command]
+async fn compute_quality_metrics_for_branch(
+    path: String,
+    branch: String,
+    settings: ScanSettings,
+) -> Result<quality::QualityMetrics, String> {
+    quality::compute_quality_metrics_for_branch(&path, &branch, &settings).await
+}
+
+#[tauri::command]
+async fn compute_branch_quality_deltas(
+    path: String,
+    base_branch: String,
+    branches: Vec<String>,
+    settings: ScanSettings,
+) -> Result<Vec<quality::BranchQualityDelta>, String> {
+    quality::compute_branch_quality_deltas(&path, &base_branch, &branches, &settings).await
+}
+
+#[tauri::command]
+async fn scan_repo_history_cmd(
+    path: &str,
+    scan_settings: ScanSettings,
+    limit: usize,
+    window: Window,
+    state: State<'_, AppState>,
+) -> Result<Vec<CommitScan>, String> {
+    state.cancel_flag.store(false, Ordering::Relaxed);
+    scan_repo_history(path, scan_settings, limit, window, state.cancel_flag.clone()).await
+}
+
+#[tauri::command]
 async fn list_supported_languages() -> Result<Vec<String>, String> {
-    Ok(categories::get_supported_languages())
+    Ok(languages::get_supported_languages())
 }
 
 #[tauri::command]
 async fn get_common_excluded_languages() -> Result<Vec<String>, String> {
-    Ok(categories::get_common_excluded_languages())
+    Ok(languages::get_common_excluded_languages())
 }
 
 #[tauri::command]
@@ -263,6 +322,11 @@ fn main() {
 			// Scan
 			scan_directory,
 			cancel_scan,
+			scan_repo_history_cmd,
+			compute_github_metrics_for_path,
+			compute_quality_metrics,
+			compute_quality_metrics_for_branch,
+			compute_branch_quality_deltas,
 
 			// Storage
 			get_user_settings,
@@ -270,6 +334,7 @@ fn main() {
 			get_scan_settings,
 			update_scan_settings,
 			list_supported_languages,
+			get_common_excluded_languages,
 
 			// Auth
 			check_for_updates,

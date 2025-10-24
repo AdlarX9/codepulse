@@ -6,7 +6,7 @@ import type { ScanResult, ApiProject } from '../types'
 import {
 	DashboardLayout,
 	OverviewDashboard,
-	EvolutionDashboard,
+	ProductivityDashboard,
 	QualityDashboard,
 	ContributorsDashboard
 } from '../components/dashboards'
@@ -255,9 +255,9 @@ export default function Overview({ onProjectSelect, onOpenProjectSettings }: Ove
 										projectPath={scannedProjectPath}
 									/>
 								)
-							case 'evolution':
+							case 'productivity':
 								return (
-									<EvolutionDashboard
+									<ProductivityDashboard
 										projectPath={scannedProjectPath}
 										hasGit={hasGit}
 										scanResult={scanResult}

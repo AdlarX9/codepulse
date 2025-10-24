@@ -121,7 +121,7 @@ fn extract_file_change(delta: &DiffDelta, diff: &Diff) -> Option<GitFileChange> 
 }
 
 /// Calculates insertions and deletions for a specific file in a diff
-fn calculate_file_stats(diff: &Diff, file_path: &str) -> (usize, usize) {
+fn calculate_file_stats(diff: &Diff, _file_path: &str) -> (usize, usize) {
 	let mut insertions = 0;
 	let mut deletions = 0;
 

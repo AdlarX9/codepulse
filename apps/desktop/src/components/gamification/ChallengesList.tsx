@@ -9,7 +9,10 @@ interface ChallengesListProps {
 	showCompleted?: boolean
 }
 
-export default function ChallengesList({ projectId: _projectId, showCompleted = false }: ChallengesListProps) {
+export default function ChallengesList({
+	projectId: _projectId,
+	showCompleted = false
+}: ChallengesListProps) {
 	const [challenges, setChallenges] = useState<gamification.Challenge[]>([])
 	const [loading, setLoading] = useState(true)
 	const [filter, setFilter] = useState<'active' | 'completed'>('active')

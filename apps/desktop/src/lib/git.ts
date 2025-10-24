@@ -1,5 +1,6 @@
 // Git operations wrapper using Tauri commands
 import { invoke } from '@tauri-apps/api/tauri'
+import type { ScanResult, ScanSettings } from '@/types'
 
 export interface GitCommitInfo {
 	sha: string
@@ -145,4 +146,98 @@ export function formatShortSha(sha: string): string {
  */
 export function getCommitSummary(message: string): string {
 	return message.split('\n')[0]
+}
+
+// ----- Extended helpers (Tauri commands) -----
+
+export interface CommitScan {
+	commit: GitCommitInfo
+	result: ScanResult
+}
+
+export async function scanRepoHistory(
+	path: string,
+	scanSettings: ScanSettings,
+	limit: number
+): Promise<CommitScan[]> {
+	return invoke<CommitScan[]>('scan_repo_history_cmd', { path, scanSettings, limit })
+}
+
+export interface GitHubWeeklyMetrics {
+	week: { start_iso: string; end_iso: string }
+	throughput: number
+	lead_time_days_avg: number
+	cycle_time_days_avg: number
+}
+
+export interface GitHubMetrics {
+	repo: string
+	generated_at: string
+	weeks: GitHubWeeklyMetrics[]
+}
+
+export async function computeGithubMetricsForPath(
+	path: string,
+	weeks: number,
+	githubToken?: string
+): Promise<GitHubMetrics> {
+	return invoke<GitHubMetrics>('compute_github_metrics_for_path', {
+		path,
+		weeks,
+		githubToken: githubToken ?? null
+	})
+}
+
+export interface QualityMetrics {
+	total_files: number
+	total_lines: number
+	total_code: number
+	total_comments: number
+	total_blank: number
+	comment_percentage: number
+	code_percentage: number
+	avg_file_lines: number
+	median_file_lines: number
+	stddev_file_lines: number
+	dead_code_findings: number
+	test_coverage?: number | null
+	doc_coverage?: number | null
+}
+
+export async function computeQualityMetrics(
+	path: string,
+	settings: ScanSettings
+): Promise<QualityMetrics> {
+	return invoke<QualityMetrics>('compute_quality_metrics', { path, settings })
+}
+
+export async function computeQualityMetricsForBranch(
+	path: string,
+	branch: string,
+	settings: ScanSettings
+): Promise<QualityMetrics> {
+	return invoke<QualityMetrics>('compute_quality_metrics_for_branch', { path, branch, settings })
+}
+
+export interface BranchQualityDelta {
+	branch: string
+	changed_files: number
+	delta_total: number
+	delta_code: number
+	delta_comments: number
+	delta_blank: number
+}
+
+export async function computeBranchQualityDeltas(
+	path: string,
+	baseBranch: string,
+	branches: string[],
+	settings: ScanSettings
+): Promise<BranchQualityDelta[]> {
+	return invoke<BranchQualityDelta[]>('compute_branch_quality_deltas', {
+		path,
+		baseBranch,
+		branches,
+		settings
+	})
 }

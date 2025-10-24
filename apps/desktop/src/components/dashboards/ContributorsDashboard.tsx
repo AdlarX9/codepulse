@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Users, Trophy, GitCommit, Award } from 'lucide-react'
+import { Users, Trophy, GitCommit, Award, Scale, TrendingUp, BarChart3 } from 'lucide-react'
 import { Card } from '../ui/Card'
 import {
 	BarChart,
@@ -27,6 +27,14 @@ interface Contributor {
 	commits: number
 	percentage: number
 	rank: number
+	additions?: number
+	deletions?: number
+	churn?: number
+	avgChurn?: number
+	reworkRatio?: number // deletions/(add+del)
+	productivityScore?: number // 0-100
+	qualityScore?: number // 0-100
+	overallScore?: number // 0-100
 }
 
 const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
@@ -34,6 +42,7 @@ const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 export default function ContributorsDashboard({ projectPath, hasGit }: ContributorsDashboardProps) {
 	const [commits, setCommits] = useState<GitCommitInfo[]>([])
 	const [loading, setLoading] = useState(true)
+	const [enriched, setEnriched] = useState<Contributor[] | null>(null)
 
 	useEffect(() => {
 		if (!hasGit) {
@@ -86,8 +95,63 @@ export default function ContributorsDashboard({ projectPath, hasGit }: Contribut
 		return contributorList
 	}, [commits])
 
-	const topContributors = contributors.slice(0, 5)
-	const chartData = contributors.slice(0, 10)
+	useEffect(() => {
+		if (!hasGit || contributors.length === 0) {
+			setEnriched(null)
+			return
+		}
+		;(async () => {
+			// Aggregate additions/deletions per author from recent commits
+			const recent = commits.slice(0, 400)
+			const agg: Record<string, { additions: number; deletions: number; commits: number }> =
+				{}
+			for (const c of recent) {
+				const stats = await git.getCommitDiffStats(projectPath, c.sha)
+				const key = c.author_email
+				const a = (agg[key] = agg[key] || { additions: 0, deletions: 0, commits: 0 })
+				a.additions += Number(stats.insertions || 0)
+				a.deletions += Number(stats.deletions || 0)
+				a.commits += 1
+			}
+			// Compute normalization baselines
+			let maxCommits = 1,
+				maxChurn = 1
+			const base = contributors.map(c => {
+				const m = agg[c.email] || { additions: 0, deletions: 0, commits: 0 }
+				const churn = m.additions + m.deletions
+				if (c.commits > maxCommits) maxCommits = c.commits
+				if (churn > maxChurn) maxChurn = churn
+				return {
+					...c,
+					additions: m.additions,
+					deletions: m.deletions,
+					churn,
+					avgChurn: m.commits > 0 ? churn / m.commits : 0,
+					reworkRatio: churn > 0 ? m.deletions / churn : 0
+				}
+			})
+			// Scores
+			const withScores = base.map(c => {
+				const prod = (c.commits / maxCommits) * 60 + (c.churn! / maxChurn) * 40
+				const avgChurnNorm = Math.min(1, (c.avgChurn || 0) / 500) // 0..1, >500 lines/commit considered heavy
+				const quality = (1 - (c.reworkRatio || 0)) * 70 + (1 - avgChurnNorm) * 30
+				// Equal weighting between productivity and quality as requested
+				const overall = 0.5 * prod + 0.5 * quality
+				return {
+					...c,
+					productivityScore: Math.round(prod),
+					qualityScore: Math.round(quality),
+					overallScore: Math.round(overall)
+				}
+			})
+			// Sort by overall
+			withScores.sort((a, b) => (b.overallScore || 0) - (a.overallScore || 0))
+			setEnriched(withScores)
+		})()
+	}, [hasGit, projectPath, contributors, commits])
+
+	const topContributors = (enriched || contributors).slice(0, 5)
+	const chartData = (enriched || contributors).slice(0, 10)
 
 	if (!hasGit) {
 		return (
@@ -160,6 +224,48 @@ export default function ContributorsDashboard({ projectPath, hasGit }: Contribut
 				</Card>
 			</div>
 
+			{/* Productivity & Quality snapshot */}
+			{enriched && (
+				<div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
+					<Card className='p-4'>
+						<div className='flex items-center gap-2 text-gray-600 mb-2'>
+							<TrendingUp className='h-4 w-4' />
+							<span className='text-sm font-medium'>Top Productivity</span>
+						</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{Math.max(...enriched.map(c => c.productivityScore || 0))}
+						</div>
+					</Card>
+					<Card className='p-4'>
+						<div className='flex items-center gap-2 text-gray-600 mb-2'>
+							<Scale className='h-4 w-4' />
+							<span className='text-sm font-medium'>Top Quality</span>
+						</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{Math.max(...enriched.map(c => c.qualityScore || 0))}
+						</div>
+					</Card>
+					<Card className='p-4'>
+						<div className='flex items-center gap-2 text-gray-600 mb-2'>
+							<BarChart3 className='h-4 w-4' />
+							<span className='text-sm font-medium'>Max Churn</span>
+						</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{formatNumber(Math.max(...enriched.map(c => c.churn || 0)))}
+						</div>
+					</Card>
+					<Card className='p-4'>
+						<div className='flex items-center gap-2 text-gray-600 mb-2'>
+							<GitCommit className='h-4 w-4' />
+							<span className='text-sm font-medium'>Max Commits</span>
+						</div>
+						<div className='text-3xl font-bold text-gray-900'>
+							{Math.max(...enriched.map(c => c.commits))}
+						</div>
+					</Card>
+				</div>
+			)}
+
 			{/* Top 3 Podium */}
 			<Card className='p-6 bg-gradient-to-br from-yellow-50 to-orange-50 border-2'>
 				<h3 className='text-lg font-semibold text-gray-900 mb-6 flex items-center gap-2'>
@@ -199,7 +305,7 @@ export default function ContributorsDashboard({ projectPath, hasGit }: Contribut
 				{/* Commit Distribution Bar Chart */}
 				<Card className='p-6'>
 					<h3 className='text-lg font-semibold text-gray-900 mb-4'>
-						Commits by Contributor
+						{enriched ? 'Overall Score by Contributor' : 'Commits by Contributor'}
 					</h3>
 					<ResponsiveContainer width='100%' height={300}>
 						<BarChart data={chartData} layout='vertical'>
@@ -211,7 +317,7 @@ export default function ContributorsDashboard({ projectPath, hasGit }: Contribut
 								tick={{ fontSize: 11 }}
 							/>
 							<Tooltip />
-							<Bar dataKey='commits' fill='#3B82F6'>
+							<Bar dataKey={enriched ? 'overallScore' : 'commits'} fill='#3B82F6'>
 								{chartData.map((_, index) => (
 									<Cell
 										key={`cell-${index}`}
@@ -267,11 +373,20 @@ export default function ContributorsDashboard({ projectPath, hasGit }: Contribut
 								<th className='pb-3 font-medium'>Contributor</th>
 								<th className='pb-3 font-medium'>Email</th>
 								<th className='pb-3 font-medium text-right'>Commits</th>
+								{enriched && (
+									<>
+										<th className='pb-3 font-medium text-right'>Additions</th>
+										<th className='pb-3 font-medium text-right'>Deletions</th>
+										<th className='pb-3 font-medium text-right'>Prod</th>
+										<th className='pb-3 font-medium text-right'>Quality</th>
+										<th className='pb-3 font-medium text-right'>Overall</th>
+									</>
+								)}
 								<th className='pb-3 font-medium text-right'>Share</th>
 							</tr>
 						</thead>
 						<tbody className='divide-y'>
-							{contributors.map(contributor => (
+							{(enriched || contributors).map(contributor => (
 								<tr key={contributor.email} className='text-sm hover:bg-gray-50'>
 									<td className='py-3'>
 										<div className='flex items-center gap-2'>
@@ -295,6 +410,25 @@ export default function ContributorsDashboard({ projectPath, hasGit }: Contribut
 									<td className='py-3 text-right font-semibold text-blue-600'>
 										{formatNumber(contributor.commits)}
 									</td>
+									{enriched && (
+										<>
+											<td className='py-3 text-right text-gray-600'>
+												{formatNumber(contributor.additions || 0)}
+											</td>
+											<td className='py-3 text-right text-gray-600'>
+												{formatNumber(contributor.deletions || 0)}
+											</td>
+											<td className='py-3 text-right text-gray-900 font-medium'>
+												{Math.round(contributor.productivityScore || 0)}
+											</td>
+											<td className='py-3 text-right text-gray-900 font-medium'>
+												{Math.round(contributor.qualityScore || 0)}
+											</td>
+											<td className='py-3 text-right text-gray-900 font-semibold'>
+												{Math.round(contributor.overallScore || 0)}
+											</td>
+										</>
+									)}
 									<td className='py-3 text-right text-gray-600'>
 										<div className='flex items-center justify-end gap-2'>
 											<div className='w-24 bg-gray-200 rounded-full h-2'>

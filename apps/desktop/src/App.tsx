@@ -3,7 +3,7 @@ import Overview from './pages/Overview'
 import {
 	DashboardLayout,
 	OverviewDashboard,
-	EvolutionDashboard,
+	ProductivityDashboard,
 	QualityDashboard,
 	ContributorsDashboard
 } from './components/dashboards'
@@ -124,12 +124,19 @@ function App() {
 			try {
 				const local = await invoke<any>('get_project', { id: selectedProjectId })
 				const localProject = {
-					...(local || { id: selectedProjectId, user_id: 'local', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), visibility: 'private', settings: {} }),
+					...(local || {
+						id: selectedProjectId,
+						user_id: 'local',
+						created_at: new Date().toISOString(),
+						updated_at: new Date().toISOString(),
+						visibility: 'private',
+						settings: {}
+					}),
 					id: selectedProjectId,
 					name: editName?.trim() || undefined,
 					description: editDescription?.trim() || '',
 					visibility: editVisibility,
-					updated_at: new Date().toISOString(),
+					updated_at: new Date().toISOString()
 				}
 				await invoke('upsert_project', { project: localProject })
 			} catch {}
@@ -589,9 +596,9 @@ function App() {
 																projectPath={scanPath}
 															/>
 														)
-													case 'evolution':
+													case 'productivity':
 														return (
-															<EvolutionDashboard
+															<ProductivityDashboard
 																projectPath={scanPath}
 																hasGit={hasGit}
 																scanResult={scanResult}

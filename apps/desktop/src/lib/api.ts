@@ -330,5 +330,5 @@ export const api = {
 	getUserSummary,
 
 	// Request
-	request,
+	request
 }

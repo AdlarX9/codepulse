@@ -73,7 +73,9 @@ export function ScanSettingsForm({
 			}
 		}
 		loadLangs()
-		return () => { cancelled = true }
+		return () => {
+			cancelled = true
+		}
 	}, [])
 
 	async function saveSettings() {
