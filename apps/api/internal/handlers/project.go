@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"codepulse-api/internal/database"
 	"codepulse-api/internal/middleware"
@@ -20,95 +19,6 @@ type CreateProjectRequest struct {
 	Path        *string         `json:"path"`
 	Visibility  *string         `json:"visibility"`
 	Settings    *models.JSONMap `json:"settings"`
-}
-
-// TransferOwnership handles POST /me/projects/:id/transfer
-// Only the current owner can transfer ownership to another user
-func (h *ProjectHandler) TransferOwnership(c *gin.Context) {
-	projectID := c.Param("id")
-	userID, exists := middleware.GetCurrentUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	type Req struct {
-		NewOwnerUserID string `json:"new_owner_user_id" binding:"required"`
-	}
-	var req Req
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body", "details": err.Error()})
-		return
-	}
-	if req.NewOwnerUserID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "new_owner_user_id is required"})
-		return
-	}
-	if req.NewOwnerUserID == userID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Cannot transfer to yourself"})
-		return
-	}
-
-	var project models.Project
-	if err := h.db.DB.Where("id = ?", projectID).First(&project).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-	if project.UserID != userID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Only the owner can transfer ownership"})
-		return
-	}
-
-	tx := h.db.DB.Begin()
-	// Update project owner
-	if err := tx.Model(&models.Project{}).Where("id = ?", projectID).Update("user_id", req.NewOwnerUserID).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to transfer ownership"})
-		return
-	}
-
-	// Ensure previous owner becomes admin collaborator
-	var collab models.Collaborator
-	err := tx.Where("project_id = ? AND user_id = ?", projectID, userID).First(&collab).Error
-	if err == gorm.ErrRecordNotFound {
-		uid := userID
-		newCollab := models.Collaborator{ProjectID: projectID, UserID: &uid, GitUsername: "", Role: "admin"}
-		if err := tx.Create(&newCollab).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add previous owner as admin"})
-			return
-		}
-	} else if err == nil {
-		if collab.Role != "admin" {
-			if err := tx.Model(&collab).Update("role", "admin").Error; err != nil {
-				tx.Rollback()
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update collaborator role"})
-				return
-			}
-		}
-	} else {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
-		return
-	}
-
-	// Remove any collaborator row for the new owner to avoid duplication
-	if err := tx.Where("project_id = ? AND user_id = ?", projectID, req.NewOwnerUserID).Delete(&models.Collaborator{}).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cleanup collaborators"})
-		return
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to finalize transfer"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Ownership transferred"})
 }
 
 // CreateProject handles POST /me/projects
@@ -150,7 +60,6 @@ func (h *ProjectHandler) CreateProject(c *gin.Context) {
 		Name:           req.Name,
 		Description:    req.Description,
 		Visibility:     "private", // Default to private
-		Settings:       req.Settings,
 	}
 
 	if req.Visibility != nil {
@@ -182,32 +91,6 @@ func (h *ProjectHandler) isProjectOwner(userID, projectID string) (bool, error) 
 	return count > 0, nil
 }
 
-func (h *ProjectHandler) isProjectCollaborator(userID, projectID string) (bool, error) {
-	var count int64
-	if err := h.db.DB.Model(&models.Collaborator{}).
-		Where("project_id = ? AND user_id = ?", projectID, userID).
-		Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
-func (h *ProjectHandler) isProjectAdmin(userID, projectID string) (bool, error) {
-	// Owner is implicitly admin
-	if ok, err := h.isProjectOwner(userID, projectID); err != nil {
-		return false, err
-	} else if ok {
-		return true, nil
-	}
-	var count int64
-	if err := h.db.DB.Model(&models.Collaborator{}).
-		Where("project_id = ? AND user_id = ? AND role = ?", projectID, userID, "admin").
-		Count(&count).Error; err != nil {
-		return false, err
-	}
-	return count > 0, nil
-}
-
 type UpdateProjectRequest struct {
 	Name        *string         `json:"name"`
 	Description *string         `json:"description"`
@@ -224,11 +107,7 @@ func (h *ProjectHandler) GetProjects(c *gin.Context) {
 	}
 
 	var projects []models.Project
-	sub := h.db.DB.Model(&models.Collaborator{}).Select("project_id").Where("user_id = ?", userID)
-	query := h.db.DB.Where("user_id = ? OR id IN (?)", userID, sub).
-		Preload("Scans", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(1)
-		}).
+	query := h.db.DB.Where("user_id = ?", userID).
 		Preload("GitHubLinks").
 		Order("created_at DESC")
 
@@ -265,15 +144,8 @@ func (h *ProjectHandler) GetProject(c *gin.Context) {
 			return
 		}
 		if !permitted {
-			permitted, err = h.isProjectCollaborator(userID, projectID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
-				return
-			}
-			if !permitted {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
-				return
-			}
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
+			return
 		}
 	}
 
@@ -308,10 +180,7 @@ func (h *ProjectHandler) UpdateProject(c *gin.Context) {
 		return
 	}
 
-	if ok, err := h.isProjectAdmin(userID, projectID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
-		return
-	} else if !ok {
+	if project.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
 		return
 	}
@@ -365,21 +234,9 @@ func (h *ProjectHandler) DeleteProject(c *gin.Context) {
 		return
 	}
 	if project.Visibility != "public" {
-		permitted, err := h.isProjectOwner(userID, projectID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
+		if project.UserID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
 			return
-		}
-		if !permitted {
-			permitted, err = h.isProjectCollaborator(userID, projectID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Permission check failed"})
-				return
-			}
-			if !permitted {
-				c.JSON(http.StatusForbidden, gin.H{"error": "Not authorized"})
-				return
-			}
 		}
 	}
 
@@ -428,79 +285,4 @@ func (h *ProjectHandler) GetPublicProject(c *gin.Context) {
 func (h *ProjectHandler) GetProjectStats(c *gin.Context) {
 	// This function is deprecated - use GetProjectDetails instead
 	c.Redirect(http.StatusMovedPermanently, "/me/projects/"+c.Param("id")+"/details")
-}
-
-// GetProjectDetails handles GET /me/projects/:id/details
-func (h *ProjectHandler) GetProjectDetails(c *gin.Context) {
-	projectID := c.Param("id")
-	userID, exists := middleware.GetCurrentUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return
-	}
-
-	// Verify project ownership and get basic project info
-	var project models.Project
-	if err := h.db.DB.Where("id = ? AND user_id = ?", projectID, userID).
-		Preload("GitHubLinks").
-		First(&project).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
-		return
-	}
-
-	// Get scan count
-	var scanCount int64
-	h.db.DB.Model(&models.Scan{}).Where("project_id = ?", projectID).Count(&scanCount)
-
-	// Get latest scan
-	var latestScan models.Scan
-	latestScanExists := h.db.DB.Where("project_id = ?", projectID).
-		Order("created_at DESC").
-		First(&latestScan).Error == nil
-
-	// Get language distribution from latest scan
-	var languageStats []models.ScanLang
-	if latestScanExists {
-		h.db.DB.Where("scan_id = ?", latestScan.ID).
-			Order("total DESC").
-			Find(&languageStats)
-	}
-
-	// Get all scans with pagination
-	var scans []models.Scan
-	query := h.db.DB.Where("project_id = ?", projectID).
-		Preload("ScanLangs").
-		Order("created_at DESC")
-
-	// Add pagination
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset := (page - 1) * limit
-
-	if err := query.Offset(offset).Limit(limit).Find(&scans).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch scans"})
-		return
-	}
-
-	// Build response combining project info, scans, and statistics
-	response := gin.H{
-		"project": project,
-		"scans":   scans,
-		"stats": gin.H{
-			"total_scans":    scanCount,
-			"has_scans":      scanCount > 0,
-			"language_stats": languageStats,
-			"latest_scan":    nil,
-		},
-		"pagination": gin.H{
-			"page":  page,
-			"limit": limit,
-		},
-	}
-
-	if latestScanExists {
-		response["stats"].(gin.H)["latest_scan"] = latestScan
-	}
-
-	c.JSON(http.StatusOK, response)
 }

@@ -5,7 +5,7 @@ import { Button } from './ui/Button'
 import { Card } from './ui/Card'
 import { Autocomplete } from './ui/Autocomplete'
 import type { ScanSettings } from '../types'
-import { ALL_LANGUAGES, COMMON_EXCLUDED_LANGUAGES } from '../constants/languages'
+// Languages are sourced from Rust via Tauri commands
 
 interface ScanSettingsProps {
 	onBack?: () => void
@@ -35,6 +35,8 @@ export function ScanSettingsForm({
 		allowed_languages: []
 	})
 	const [isSaving, setIsSaving] = useState(false)
+	const [allLanguages, setAllLanguages] = useState<string[]>([])
+	const [commonExcluded, setCommonExcluded] = useState<string[]>([])
 
 	// inputs
 	const [newExcludedLanguage, setNewExcludedLanguage] = useState('')
@@ -55,6 +57,24 @@ export function ScanSettingsForm({
 			}
 		)
 	}, [initial])
+
+	useEffect(() => {
+		let cancelled = false
+		async function loadLangs() {
+			try {
+				const langs = await invoke<string[]>('list_supported_languages')
+				const common = await invoke<string[]>('get_common_excluded_languages')
+				if (!cancelled) {
+					setAllLanguages(langs || [])
+					setCommonExcluded(common || [])
+				}
+			} catch (e) {
+				console.error('Failed to load languages', e)
+			}
+		}
+		loadLangs()
+		return () => { cancelled = true }
+	}, [])
 
 	async function saveSettings() {
 		setIsSaving(true)
@@ -116,7 +136,7 @@ export function ScanSettingsForm({
 									Common Languages
 								</label>
 								<div className='flex flex-wrap gap-2'>
-									{COMMON_EXCLUDED_LANGUAGES.map(lang => {
+									{commonExcluded.map((lang: string) => {
 										const isSelected =
 											settings.excluded_languages.includes(lang)
 										return (
@@ -152,7 +172,7 @@ export function ScanSettingsForm({
 										addToList('excluded_languages', newExcludedLanguage.trim())
 										setNewExcludedLanguage('')
 									}}
-									suggestions={ALL_LANGUAGES.filter(
+									suggestions={allLanguages.filter(
 										l => !settings.excluded_languages.includes(l)
 									)}
 									placeholder='Type to search languages...'
@@ -211,7 +231,7 @@ export function ScanSettingsForm({
 										addToList('allowed_languages', newAllowedLanguage.trim())
 										setNewAllowedLanguage('')
 									}}
-									suggestions={ALL_LANGUAGES.filter(
+									suggestions={allLanguages.filter(
 										l => !settings.allowed_languages.includes(l)
 									)}
 									placeholder='Type to search languages...'

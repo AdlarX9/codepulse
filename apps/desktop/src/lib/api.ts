@@ -1,4 +1,3 @@
-import { ApiScanLang, Project } from '@/types'
 import { invoke } from '@tauri-apps/api/tauri'
 
 export interface User {
@@ -8,7 +7,7 @@ export interface User {
 	created_at?: string
 }
 
-// --- Membership & Summary helpers ---
+// --- Summary helpers ---
 async function getUserSummary(): Promise<any> {
 	const headers = await getAuthHeaders()
 	const endpoint = `${API_BASE}/me/summary`
@@ -18,158 +17,6 @@ async function getUserSummary(): Promise<any> {
 		return res.json()
 	} catch (error) {
 		logNetworkError(error, 'GET /me/summary')
-		throw error
-	}
-}
-
-async function listInvites(projectId: string): Promise<any[]> {
-	const headers = await getAuthHeaders()
-	const endpoint = `${API_BASE}/me/projects/${projectId}/invites`
-	try {
-		const res = await fetch(endpoint, { headers })
-		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${projectId}/invites`)
-		const data = await res.json()
-		return data.invites || []
-	} catch (error) {
-		logNetworkError(error, `GET /me/projects/${projectId}/invites`)
-		throw error
-	}
-}
-
-async function createInvite(
-	projectId: string,
-	payload: {
-		email?: string
-		git_username?: string
-		role?: 'admin' | 'collaborator'
-		expires_in_days?: number
-	}
-): Promise<any> {
-	const headers = await getAuthHeaders()
-	headers['Content-Type'] = 'application/json'
-	const endpoint = `${API_BASE}/me/projects/${projectId}/invites`
-	try {
-		const res = await fetch(endpoint, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify(payload)
-		})
-		if (!res.ok) await logAndThrowApiError(res, `POST /me/projects/${projectId}/invites`)
-		return res.json()
-	} catch (error) {
-		logNetworkError(error, `POST /me/projects/${projectId}/invites`)
-		throw error
-	}
-}
-
-async function revokeInvite(projectId: string, inviteId: string): Promise<void> {
-	const headers = await getAuthHeaders()
-	const endpoint = `${API_BASE}/me/projects/${projectId}/invites/${inviteId}`
-	try {
-		const res = await fetch(endpoint, { method: 'DELETE', headers })
-		if (!res.ok)
-			await logAndThrowApiError(res, `DELETE /me/projects/${projectId}/invites/${inviteId}`)
-	} catch (error) {
-		logNetworkError(error, `DELETE /me/projects/${projectId}/invites/${inviteId}`)
-		throw error
-	}
-}
-
-async function transferOwnership(projectId: string, newOwnerUserId: string): Promise<void> {
-	const headers = await getAuthHeaders()
-	headers['Content-Type'] = 'application/json'
-	const endpoint = `${API_BASE}/me/projects/${projectId}/transfer`
-	try {
-		const res = await fetch(endpoint, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify({ new_owner_user_id: newOwnerUserId })
-		})
-		if (!res.ok) await logAndThrowApiError(res, `POST /me/projects/${projectId}/transfer`)
-	} catch (error) {
-		logNetworkError(error, `POST /me/projects/${projectId}/transfer`)
-		throw error
-	}
-}
-
-async function getCollaborators(projectId: string): Promise<any[]> {
-	const headers = await getAuthHeaders()
-	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators`
-	try {
-		const res = await fetch(endpoint, { headers })
-		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${projectId}/collaborators`)
-		const data = await res.json()
-		return data.collaborators || []
-	} catch (error) {
-		logNetworkError(error, `GET /me/projects/${projectId}/collaborators`)
-		throw error
-	}
-}
-
-async function addCollaborator(
-	projectId: string,
-	payload: {
-		user_id?: string
-		git_username?: string
-		git_email?: string
-		role?: 'admin' | 'collaborator'
-	}
-): Promise<any> {
-	const headers = await getAuthHeaders()
-	headers['Content-Type'] = 'application/json'
-	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators`
-	try {
-		const res = await fetch(endpoint, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify(payload)
-		})
-		if (!res.ok) await logAndThrowApiError(res, `POST /me/projects/${projectId}/collaborators`)
-		return res.json()
-	} catch (error) {
-		logNetworkError(error, `POST /me/projects/${projectId}/collaborators`)
-		throw error
-	}
-}
-
-async function updateCollaborator(
-	projectId: string,
-	collabId: string,
-	payload: { role?: 'admin' | 'collaborator' }
-): Promise<any> {
-	const headers = await getAuthHeaders()
-	headers['Content-Type'] = 'application/json'
-	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators/${collabId}`
-	try {
-		const res = await fetch(endpoint, {
-			method: 'PATCH',
-			headers,
-			body: JSON.stringify(payload)
-		})
-		if (!res.ok)
-			await logAndThrowApiError(
-				res,
-				`PATCH /me/projects/${projectId}/collaborators/${collabId}`
-			)
-		return res.json()
-	} catch (error) {
-		logNetworkError(error, `PATCH /me/projects/${projectId}/collaborators/${collabId}`)
-		throw error
-	}
-}
-
-async function removeCollaborator(projectId: string, collabId: string): Promise<void> {
-	const headers = await getAuthHeaders()
-	const endpoint = `${API_BASE}/me/projects/${projectId}/collaborators/${collabId}`
-	try {
-		const res = await fetch(endpoint, { method: 'DELETE', headers })
-		if (!res.ok)
-			await logAndThrowApiError(
-				res,
-				`DELETE /me/projects/${projectId}/collaborators/${collabId}`
-			)
-	} catch (error) {
-		logNetworkError(error, `DELETE /me/projects/${projectId}/collaborators/${collabId}`)
 		throw error
 	}
 }
@@ -361,19 +208,6 @@ async function getProject(id: string): Promise<any> {
 	}
 }
 
-async function getProjectDetails(id: string): Promise<any> {
-	const headers = await getAuthHeaders()
-	const endpoint = `${API_BASE}/me/projects/${id}/details`
-	try {
-		const res = await fetch(endpoint, { headers })
-		if (!res.ok) await logAndThrowApiError(res, `GET /me/projects/${id}/details`)
-		return res.json()
-	} catch (error) {
-		logNetworkError(error, `GET /me/projects/${id}/details`)
-		throw error
-	}
-}
-
 async function getProfile(): Promise<any> {
 	const headers = await getAuthHeaders()
 	const endpoint = `${API_BASE}/me/profile`
@@ -425,7 +259,6 @@ async function createProject(projectData: {
 	description?: string
 	path?: string
 	visibility?: string
-	settings?: any
 }): Promise<any> {
 	const headers = await getAuthHeaders()
 	headers['Content-Type'] = 'application/json'
@@ -441,117 +274,6 @@ async function createProject(projectData: {
 	} catch (error) {
 		logNetworkError(error, 'POST /me/projects')
 		throw error
-	}
-}
-
-async function rescanProject(
-	projectId: string,
-	scanData: {
-		project_key_hash: string
-		totals: {
-			total: number
-			code: number
-			comment: number
-			blank: number
-			core_code_lines: number
-			info_lines: number
-		}
-		median_lines?: number
-		gap_lines?: number
-		per_language: Array<{
-			language: string
-			files: number
-			total: number
-			code: number
-			comment: number
-			blank: number
-			median_lines?: number
-			gap_lines?: number
-		}>
-		device_id: string
-		app_version?: string
-		scanned_at: string
-	}
-): Promise<any> {
-	const headers = await getAuthHeaders()
-	headers['Content-Type'] = 'application/json'
-	// Use project-scoped snapshot endpoint to ensure scan attaches to the existing project
-	const endpoint = `${API_BASE}/me/projects/${projectId}/snapshot`
-	try {
-		const res = await fetch(endpoint, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify(scanData)
-		})
-		if (!res.ok) await logAndThrowApiError(res, 'POST /me/projects/:id/snapshot')
-		return res.json()
-	} catch (error) {
-		logNetworkError(error, 'POST /me/projects/:id/snapshot')
-		throw error
-	}
-}
-
-async function exportProject(projectId: string, format: 'csv' | 'pdf' | 'html'): Promise<Blob> {
-	const headers = await getAuthHeaders()
-	const backendFormat = format === 'html' ? 'pdf' : format
-	const endpoint = `${API_BASE}/export?project_id=${encodeURIComponent(projectId)}&format=${encodeURIComponent(backendFormat)}`
-	try {
-		const accept =
-			format === 'csv' ? 'text/csv' : format === 'html' ? 'text/html' : 'application/pdf'
-		const res = await fetch(endpoint, {
-			method: 'GET',
-			headers: { ...headers, Accept: accept }
-		})
-		if (!res.ok) await logAndThrowApiError(res, 'GET /api/export')
-		return res.blob()
-	} catch (error) {
-		logNetworkError(error, 'GET /api/export')
-		throw error
-	}
-}
-
-async function loadProjects(): Promise<Project[]> {
-	try {
-		const data = await api.getProjects()
-		const details = await Promise.all(data.map((p: any) => api.getProjectDetails(p.id)))
-		const mapped: Project[] = (details || []).map((p: any) => {
-			const hasScans = p?.stats?.has_scans
-			const langs: ApiScanLang[] = (p?.stats?.language_stats as ApiScanLang[]) || []
-			const totalLines = langs.reduce((sum, l: ApiScanLang) => sum + (l.total ?? 0), 0)
-			const totalFiles = langs.reduce((sum, l: ApiScanLang) => sum + (l.files ?? 0), 0)
-			const languagesCount = langs.filter(l => (l.total ?? 0) > 0).length
-			const topLanguage = langs.length
-				? [...langs].sort((a, b) => (b.total ?? 0) - (a.total ?? 0))[0]?.language ||
-					undefined
-				: undefined
-			const totalCode = langs.reduce(
-				(sum, l: ApiScanLang) =>
-					sum + Math.max((l.total ?? 0) - (l.comment ?? 0) - (l.blank ?? 0), 0),
-				0
-			)
-			const codePercent =
-				totalLines > 0 ? Math.round((totalCode / totalLines) * 100) : undefined
-			return {
-				id: p.project.id,
-				name: p.project.name || 'Project',
-				description: p.project.description || undefined,
-				createdAt: p.project.created_at,
-				settings: p.project.settings || {},
-				latestScan: hasScans
-					? {
-							totalFiles,
-							totalLines
-						}
-					: undefined,
-				topLanguage,
-				languagesCount,
-				codePercent
-			}
-		})
-		return mapped
-	} catch (err) {
-		console.error('Error loading projects:', err)
-		return []
 	}
 }
 
@@ -580,34 +302,33 @@ async function request<T = any>(endpoint: string, options: RequestInit = {}): Pr
 }
 
 export const api = {
+	// URL
 	API_BASE,
 	WEB_BASE,
+
+	// Auth
 	getToken,
 	setToken,
 	clearToken,
+	deleteAccount,
+	logout,
 	getCurrentUser,
+
+	// CRUD Projects
 	getProjects,
 	getProject,
-	getProjectDetails,
 	createProject,
 	updateProject,
 	deleteProject,
-	rescanProject,
+
+	// CRUD Profile
 	getProfile,
 	updateProfile,
 	checkHandleAvailability,
-	logout,
-	deleteAccount,
-	exportProject,
-	request,
-	loadProjects,
-	getCollaborators,
-	addCollaborator,
-	updateCollaborator,
-	removeCollaborator,
+
+	// Gamification
 	getUserSummary,
-	listInvites,
-	createInvite,
-	revokeInvite,
-	transferOwnership
+
+	// Request
+	request,
 }

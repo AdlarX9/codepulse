@@ -188,8 +188,10 @@ format_code() {
 	echo -e "${BLUE}🎨 Formatage du code...${NC}"
 	npm run format
 	cd apps/api
-	gofmt -s -w ./*/*/*.go
-	cd ../..
+	gofmt -tabs=true -tabWidth=4 -s -w ./*/*/*.go
+	cd ../desktop/src-tauri
+	cargo fmt
+	cd ../../../
 }
 
 launch_docker() {

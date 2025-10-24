@@ -1,27 +1,28 @@
--- Extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgcrypto"; -- needed for gen_random_uuid()
+-- Enable required extensions for UUID generation
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- =========================
--- Core (users, profiles, projects, scans, etc.)
+-- Users
 -- =========================
-
--- Create users table (with gamification fields)
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
     premium_until TIMESTAMP WITH TIME ZONE,
-    current_streak INT DEFAULT 0,
-    longest_streak INT DEFAULT 0,
+    current_streak INTEGER DEFAULT 0,
+    longest_streak INTEGER DEFAULT 0,
     last_activity_date TIMESTAMP WITH TIME ZONE,
-    total_commit_scans INT DEFAULT 0,
+    total_commit_scans INTEGER DEFAULT 0,
     badges JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE
 );
+CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 
--- Create profiles table
+-- =========================
+-- Profiles
+-- =========================
 CREATE TABLE profiles (
     user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     handle VARCHAR(50) UNIQUE NOT NULL,
@@ -29,259 +30,159 @@ CREATE TABLE profiles (
     avatar_url TEXT,
     bio TEXT,
     links JSONB,
-    visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private','public')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create projects table (with Git integration fields)
+-- =========================
+-- Projects
+-- =========================
 CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    project_key_hash VARCHAR(255) NOT NULL,
+    project_key_hash VARCHAR(255),
     name VARCHAR(255),
     description TEXT,
-    visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private', 'public')),
+    visibility VARCHAR(10) DEFAULT 'private' CHECK (visibility IN ('private','public')),
     git_repo_url TEXT,
     git_provider VARCHAR(20),
     last_commit_sha VARCHAR(255),
     last_synced_at TIMESTAMP WITH TIME ZONE,
-    current_streak INT DEFAULT 0,
-    longest_streak INT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    current_streak INTEGER DEFAULT 0,
+    longest_streak INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE,
-    UNIQUE(user_id, project_key_hash)
+    UNIQUE (user_id, project_key_hash)
 );
+CREATE INDEX idx_projects_user_id ON projects(user_id);
+CREATE INDEX idx_projects_visibility ON projects(visibility);
+CREATE INDEX idx_projects_deleted_at ON projects(deleted_at);
 
--- Create scans table
--- Aggregate stats are computed from scan_langs
-CREATE TABLE scans (
+-- Optionally constrain git_provider values (comment out if not desired)
+-- ALTER TABLE projects ADD CONSTRAINT chk_projects_git_provider CHECK (git_provider IN ('github','gitlab','local'));
+
+-- =========================
+-- Challenges
+-- =========================
+CREATE TABLE challenges (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    device_id VARCHAR(255),
-    version_tag VARCHAR(50),
-    median_lines FLOAT DEFAULT 0,
-    gap_lines FLOAT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
+    type VARCHAR(255) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    target JSONB NOT NULL,
+    progress JSONB,
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active','completed','failed','expired')),
+    starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    reward VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_challenges_user_id ON challenges(user_id);
+CREATE INDEX idx_challenges_project_id ON challenges(project_id);
+CREATE INDEX idx_challenges_status ON challenges(status);
 
--- Create scan_langs table
--- Code is computed as: total - comment - blank
-CREATE TABLE scan_langs (
-    scan_id UUID NOT NULL REFERENCES scans(id) ON DELETE CASCADE,
-    language VARCHAR(50) NOT NULL,
-    files INTEGER NOT NULL,
-    total INTEGER NOT NULL,
-    comment INTEGER NOT NULL,
-    blank INTEGER NOT NULL,
-    median_lines FLOAT DEFAULT 0,
-    gap_lines FLOAT DEFAULT 0,
-    PRIMARY KEY (scan_id, language)
-);
-
--- Create github_links table
+-- =========================
+-- GitHub Links
+-- =========================
 CREATE TABLE github_links (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     repo_full_name VARCHAR(255) NOT NULL,
     installation_id INTEGER,
-    repo_data JSONB,
-    latest_release JSONB,
-    last_commit JSONB,
-    stars_count INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(project_id)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_github_links_user_id ON github_links(user_id);
+CREATE INDEX idx_github_links_project_id ON github_links(project_id);
+CREATE INDEX idx_github_links_repo_full_name ON github_links(repo_full_name);
 
--- Create downloads table
-CREATE TABLE downloads (
+-- =========================
+-- Invites
+-- =========================
+CREATE TABLE invites (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    platform VARCHAR(50) NOT NULL,
-    version VARCHAR(50) NOT NULL,
-    country VARCHAR(2),
-    region VARCHAR(100),
-    city VARCHAR(100),
-    referrer TEXT,
-    user_agent TEXT,
-    ip_hash VARCHAR(64),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    inviter_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    invitee_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    email VARCHAR(255),
+    git_username VARCHAR(255),
+    role VARCHAR(20) DEFAULT 'collaborator' CHECK (role IN ('admin','collaborator')),
+    token VARCHAR(255) UNIQUE NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending','accepted','revoked','expired')),
+    expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
+CREATE INDEX idx_invites_project_id ON invites(project_id);
+CREATE INDEX idx_invites_inviter_user_id ON invites(inviter_user_id);
+CREATE INDEX idx_invites_invitee_user_id ON invites(invitee_user_id);
+CREATE INDEX idx_invites_status ON invites(status);
+CREATE INDEX idx_invites_deleted_at ON invites(deleted_at);
 
--- Create sessions table for JWT token management
+-- =========================
+-- Sessions
+-- =========================
 CREATE TABLE sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token VARCHAR(500) UNIQUE NOT NULL,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-
--- =========================
--- Git & Gamification Tables
--- =========================
-
--- Create commit_scans table (Git-based scans)
-CREATE TABLE commit_scans (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    commit_sha VARCHAR(255) NOT NULL,
-    branch VARCHAR(255),
-    commit_message TEXT,
-    commit_author VARCHAR(255),
-    commit_date TIMESTAMP WITH TIME ZONE NOT NULL,
-    
-    -- Scan metadata
-    device_id VARCHAR(255),
-    version_tag VARCHAR(50),
-    median_lines FLOAT DEFAULT 0,
-    gap_lines FLOAT DEFAULT 0,
-    
-    -- Git diff metrics
-    files_changed INT DEFAULT 0,
-    lines_added INT DEFAULT 0,
-    lines_deleted INT DEFAULT 0,
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create commit_scan_langs table
-CREATE TABLE commit_scan_langs (
-    commit_scan_id UUID NOT NULL REFERENCES commit_scans(id) ON DELETE CASCADE,
-    language VARCHAR(100) NOT NULL,
-    files INT NOT NULL,
-    total INT NOT NULL,
-    comment INT NOT NULL,
-    blank INT NOT NULL,
-    median_lines FLOAT DEFAULT 0,
-    gap_lines FLOAT DEFAULT 0,
-    
-    -- Git diff metrics per language
-    lines_added INT DEFAULT 0,
-    lines_deleted INT DEFAULT 0,
-    
-    PRIMARY KEY (commit_scan_id, language)
-);
-
--- Create collaborators table
-CREATE TABLE collaborators (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    git_username VARCHAR(255) NOT NULL,
-    git_email VARCHAR(255),
-    role VARCHAR(20) DEFAULT 'contributor' CHECK (role IN ('owner', 'contributor')),
-    commits_count INT DEFAULT 0,
-    lines_added INT DEFAULT 0,
-    lines_deleted INT DEFAULT 0,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Create challenges table
-CREATE TABLE challenges (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    type VARCHAR(50) NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    target JSONB NOT NULL,
-    progress JSONB,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'completed', 'failed', 'expired')),
-    starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    reward VARCHAR(100),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- =========================
--- Indexes
--- =========================
-
--- users
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_deleted_at ON users(deleted_at);
-
--- profiles
-CREATE INDEX idx_profiles_handle ON profiles(handle);
-CREATE INDEX idx_profiles_visibility ON profiles(visibility);
-
--- projects
-CREATE INDEX idx_projects_user_id ON projects(user_id);
-CREATE INDEX idx_projects_project_key_hash ON projects(project_key_hash);
-CREATE INDEX idx_projects_visibility ON projects(visibility);
-CREATE INDEX idx_projects_deleted_at ON projects(deleted_at);
-
--- scans
-CREATE INDEX idx_scans_project_id ON scans(project_id);
-CREATE INDEX idx_scans_created_at ON scans(created_at);
-
--- scan_langs
-CREATE INDEX idx_scan_langs_scan_id ON scan_langs(scan_id);
-CREATE INDEX idx_scan_langs_language ON scan_langs(language);
-
--- github_links
-CREATE INDEX idx_github_links_user_id ON github_links(user_id);
-CREATE INDEX idx_github_links_project_id ON github_links(project_id);
-CREATE INDEX idx_github_links_repo_full_name ON github_links(repo_full_name);
-
--- downloads
-CREATE INDEX idx_downloads_platform ON downloads(platform);
-CREATE INDEX idx_downloads_version ON downloads(version);
-CREATE INDEX idx_downloads_created_at ON downloads(created_at);
-
--- sessions
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_token ON sessions(token);
 CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
 
--- commit_scans
-CREATE INDEX idx_commit_scans_project ON commit_scans(project_id);
-CREATE INDEX idx_commit_scans_sha ON commit_scans(commit_sha);
-CREATE INDEX idx_commit_scans_date ON commit_scans(commit_date);
-
--- collaborators
-CREATE INDEX idx_collaborators_project ON collaborators(project_id);
-CREATE INDEX idx_collaborators_user ON collaborators(user_id);
-
--- challenges
-CREATE INDEX idx_challenges_user ON challenges(user_id);
-CREATE INDEX idx_challenges_project ON challenges(project_id);
-CREATE INDEX idx_challenges_status ON challenges(status);
-CREATE INDEX idx_challenges_ends_at ON challenges(ends_at);
+-- =========================
+-- Device Login Sessions
+-- =========================
+CREATE TABLE device_login_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code VARCHAR(255) UNIQUE NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    token VARCHAR(500),
+    completed BOOLEAN DEFAULT FALSE,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_device_login_sessions_user_id ON device_login_sessions(user_id);
 
 -- =========================
 -- updated_at trigger function + triggers
 -- =========================
-
--- Update updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = NOW();
+    NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Create triggers for updated_at (core tables)
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_users_updated_at BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_profiles_updated_at BEFORE UPDATE ON profiles
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_projects_updated_at BEFORE UPDATE ON projects
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_scans_updated_at BEFORE UPDATE ON scans
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_challenges_updated_at BEFORE UPDATE ON challenges
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_github_links_updated_at BEFORE UPDATE ON github_links
-    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_github_links_updated_at BEFORE UPDATE ON github_links
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_invites_updated_at BEFORE UPDATE ON invites
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_device_login_sessions_updated_at BEFORE UPDATE ON device_login_sessions
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

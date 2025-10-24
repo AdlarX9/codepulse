@@ -83,9 +83,17 @@
 			"targets": "all",
 			"identifier": "com.codepulse.app",
 			"icon": [
+				"icons/16x16.png",
 				"icons/32x32.png",
+				"icons/32x32@2x.png",
+				"icons/64x64.png",				
 				"icons/128x128.png",
 				"icons/128x128@2x.png",
+				"icons/256x256.png",
+				"icons/256x256@2x.png",
+				"icons/512x512.png",
+				"icons/512x512@2x.png",
+				"icons/1024x1024.png",
 				"icons/icon.icns",
 				"icons/icon.ico"
 			],
@@ -97,9 +105,9 @@
 			"longDescription": "Beautiful, privacy-first code analysis tool for developers",
 			"macOS": {
 				"entitlements": null,
-				"exceptionDomain": "",
+				"exceptionDomain": "CodePulse",
 				"frameworks": [],
-				"providerShortName": null,
+				"providerShortName": "CodePulse",
 				"signingIdentity": null
 			},
 			"windows": {

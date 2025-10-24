@@ -9,21 +9,19 @@ interface ChallengesListProps {
 	showCompleted?: boolean
 }
 
-export default function ChallengesList({ projectId, showCompleted = false }: ChallengesListProps) {
+export default function ChallengesList({ projectId: _projectId, showCompleted = false }: ChallengesListProps) {
 	const [challenges, setChallenges] = useState<gamification.Challenge[]>([])
 	const [loading, setLoading] = useState(true)
 	const [filter, setFilter] = useState<'active' | 'completed'>('active')
 
 	useEffect(() => {
 		loadChallenges()
-	}, [projectId, filter])
+	}, [filter])
 
 	async function loadChallenges() {
 		try {
 			setLoading(true)
-			const data = projectId
-				? await gamification.getProjectChallenges(projectId)
-				: await gamification.getChallenges(filter)
+			const data = await gamification.getChallenges(filter)
 			setChallenges(data)
 		} catch (error) {
 			console.error('Failed to load challenges:', error)

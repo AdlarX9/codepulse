@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { Button } from '../components/ui/Button'
 import { ArrowLeft } from 'lucide-react'
 import { api } from '../lib/api'
-import CollaboratorsManager from '../components/projects/CollaboratorsManager'
-import InvitesManager from '../components/projects/InvitesManager'
 import { ScanSettingsForm } from '../components/ScanSettings'
 import type { ScanSettings } from '../types'
 
@@ -31,8 +29,6 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 	const [pinned, setPinned] = useState<boolean>(false)
 	const [tagsInput, setTagsInput] = useState<string>('')
 	const [notes, setNotes] = useState<string>('')
-	const [transferUserId, setTransferUserId] = useState<string>('')
-	const [transferError, setTransferError] = useState<string>('')
 
 	useEffect(() => {
 		load()
@@ -210,50 +206,7 @@ export default function ProjectSettings({ projectId, onBack }: ProjectSettingsPr
 				</div>
 			)}
 
-			<div className='mt-6'>
-				<CollaboratorsManager projectId={projectId} />
-			</div>
-
-			<div className='mt-6'>
-				<InvitesManager projectId={projectId} />
-			</div>
-
-			{/* Ownership Transfer */}
-			<div className='mt-6 p-4 border rounded-md'>
-				<h3 className='font-semibold mb-3'>Transfer Ownership</h3>
-				<p className='text-sm text-muted-foreground mb-3'>
-					Transfer this project to another user by their user ID. You will be kept as an
-					admin collaborator.
-				</p>
-				{transferError && <div className='mb-3 text-red-600 text-sm'>{transferError}</div>}
-				<div className='flex items-center gap-2'>
-					<input
-						type='text'
-						value={transferUserId}
-						onChange={e => setTransferUserId(e.target.value)}
-						placeholder='New owner user ID (UUID)'
-						className='flex-1 px-3 py-2 border rounded'
-					/>
-					<Button
-						disabled={saving || !transferUserId.trim()}
-						onClick={async () => {
-							try {
-								setSaving(true)
-								setTransferError('')
-								await api.transferOwnership(projectId, transferUserId.trim())
-								setTransferUserId('')
-								setMessage('Ownership transferred')
-							} catch (e: any) {
-								setTransferError(e?.message || 'Failed to transfer ownership')
-							} finally {
-								setSaving(false)
-							}
-						}}
-					>
-						Transfer
-					</Button>
-				</div>
-			</div>
+			{/* Collaborators, invites, transfer ownership removed in local-only mode */}
 		</div>
 	)
 }

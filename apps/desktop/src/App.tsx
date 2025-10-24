@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Projects from './components/Projects'
+import Overview from './pages/Overview'
 import {
 	DashboardLayout,
 	OverviewDashboard,
@@ -8,7 +8,6 @@ import {
 	ContributorsDashboard
 } from './components/dashboards'
 import ExportButton from './components/export/ExportButton'
-import GitSyncStatus from './components/sync/GitSyncStatus'
 import { ensureDefaultChallenges } from './lib/gamification'
 import ExportCenter from './components/export/ExportCenter'
 import WelcomePage from './pages/Welcome'
@@ -17,7 +16,7 @@ import ProfileManagement from './pages/ProfileManagement'
 import { api, type User as ApiUser } from './lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
-import type { Project, ScanResult, ScanSettings } from './types'
+import type { ApiProject, ScanResult, ScanSettings } from './types'
 import ScanSettingsPage from './components/ScanSettings'
 import UserSettingsPage from './components/UserSettings'
 import AuthPage from './pages/Auth'
@@ -68,7 +67,7 @@ function App() {
 	const [scanPath, setScanPath] = useState<string>('')
 	const [hasGit, setHasGit] = useState<boolean>(false)
 	const [selectedProjectName, setSelectedProjectName] = useState<string | null>(null)
-	const [projects, setProjects] = useState<Project[]>([])
+	const [projects, setProjects] = useState<ApiProject[]>([])
 	const [showEditProjectModal, setShowEditProjectModal] = useState<boolean>(false)
 	const [editName, setEditName] = useState<string>('')
 	const [editDescription, setEditDescription] = useState<string>('')
@@ -100,8 +99,9 @@ function App() {
 	async function openEditProjectModal() {
 		if (!selectedProjectId) return
 		try {
-			const details = await api.getProjectDetails(selectedProjectId)
-			const p = details.project || details
+			setSavingEdit(true)
+			const details = await api.getProject(selectedProjectId)
+			const p = (details as any).project || details
 			setEditName(p.name || '')
 			setEditDescription(p.description || '')
 			setEditVisibility((p.visibility as 'private' | 'public') || 'private')
@@ -120,6 +120,19 @@ function App() {
 				description: editDescription?.trim() || '',
 				visibility: editVisibility
 			})
+			// Also update local storage copy to keep in sync
+			try {
+				const local = await invoke<any>('get_project', { id: selectedProjectId })
+				const localProject = {
+					...(local || { id: selectedProjectId, user_id: 'local', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), visibility: 'private', settings: {} }),
+					id: selectedProjectId,
+					name: editName?.trim() || undefined,
+					description: editDescription?.trim() || '',
+					visibility: editVisibility,
+					updated_at: new Date().toISOString(),
+				}
+				await invoke('upsert_project', { project: localProject })
+			} catch {}
 			setSelectedProjectName(editName || selectedProjectName)
 			await loadProjects()
 			setShowEditProjectModal(false)
@@ -135,15 +148,15 @@ function App() {
 	}
 
 	async function loadProjects() {
-		const mapped = await api.loadProjects()
-		setProjects(mapped)
+		const list = await api.getProjects()
+		setProjects(list)
 	}
 
 	async function openProject(projectId: string) {
 		try {
 			// Load details (for name and settings)
-			const details = await api.getProjectDetails(projectId)
-			const p = details.project || details
+			const details = await api.getProject(projectId)
+			const p = (details as any).project || details
 			setSelectedProjectId(projectId)
 			setSelectedProjectName(p.name || 'Project')
 
@@ -161,9 +174,10 @@ function App() {
 				boundPath = selected
 			}
 
-			// Merge settings (project overrides)
+			// Merge settings (local project overrides)
 			const settings = await invoke<ScanSettings>('get_scan_settings')
-			const ps = (p.settings as any) || {}
+			const local = await invoke<any>('get_project', { id: projectId })
+			const ps = (local && (local as any).settings) || {}
 			const overrideKeys: (keyof ScanSettings)[] = [
 				'excluded_dirs',
 				'excluded_extensions',
@@ -390,10 +404,10 @@ function App() {
 										/>
 									</SidebarSection>
 									<SidebarSection title='Projects'>
-										{projects.map((project: Project) => (
+										{projects.map((project: ApiProject) => (
 											<SidebarItem
 												key={project.id}
-												label={project.name}
+												label={project.name || 'Project'}
 												onClick={() => openProject(project.id)}
 												active={
 													currentView === 'analysis' &&
@@ -447,7 +461,7 @@ function App() {
 							</Sidebar>
 							<div className='flex-1 overflow-y-auto'>
 								{currentView === 'projects' && (
-									<Projects
+									<Overview
 										onProjectSelect={(proj: any) => openProject(proj.id)}
 										onOpenProjectSettings={(id: string) => {
 											setSelectedProjectId(id)
@@ -548,12 +562,6 @@ function App() {
 											headerRight={
 												scanResult ? (
 													<div className='flex items-center gap-2'>
-														{selectedProjectId && (
-															<GitSyncStatus
-																projectId={selectedProjectId}
-																compact
-															/>
-														)}
 														<ExportButton
 															scanResult={scanResult}
 															projectName={

@@ -44,14 +44,8 @@ func main() {
 			&models.User{},
 			&models.Profile{},
 			&models.Project{},
-			&models.Scan{},
-			&models.ScanLang{},
-			&models.CommitScan{},
-			&models.CommitScanLang{},
-			&models.Collaborator{},
 			&models.Challenge{},
 			&models.GitHubLink{},
-			&models.Download{},
 			&models.Session{},
 			&models.DeviceLoginSession{},
 			&models.Invite{},
@@ -64,14 +58,8 @@ func main() {
 	healthHandler := handlers.NewHealthHandler(db, cfg.AppVersion)
 	authHandler := handlers.NewAuthHandler(db, cfg)
 	projectHandler := handlers.NewProjectHandler(db)
-	scanHandler := handlers.NewScanHandler(db)
-	exportHandler := handlers.NewExportHandler(db)
 	ogHandler := handlers.NewOGHandler(db)
-	githubHandler := handlers.NewGitHubHandler(db, cfg.GitHubAppID, cfg.GitHubPrivateKey, cfg.GitHubWebhookSecret)
-	statsHandler := handlers.NewStatsHandler(db)
-	gitHandler := handlers.NewGitHandler(db)
 	gamificationHandler := handlers.NewGamificationHandler(db)
-	inviteHandler := handlers.NewInviteHandler(db)
 	userHandler := handlers.NewUserHandler(db)
 
 	// Initialize middleware
@@ -98,12 +86,6 @@ func main() {
 	// Backward compatibility routes (mirror Next.js API structure)
 	api := router.Group("/api")
 	{
-		// Map old Next.js routes to new handlers
-		api.POST("/sync/scan", authMiddleware.RequireAuth(), scanHandler.SyncScan)
-
-		// Export routes
-		api.GET("/export", authMiddleware.RequireAuth(), exportHandler.ExportProjectData)
-
 		// Open Graph routes
 		og := api.Group("/og")
 		{
@@ -120,29 +102,7 @@ func main() {
 			me.POST("/projects", projectHandler.CreateProject)
 			me.GET("/projects/:id", projectHandler.GetProject)
 			me.PATCH("/projects/:id", projectHandler.UpdateProject)
-			me.POST("/projects/:id/transfer", projectHandler.TransferOwnership)
 			me.DELETE("/projects/:id", projectHandler.DeleteProject)
-
-			// Project Details
-			me.GET("/projects/:id/details", projectHandler.GetProjectDetails)
-
-			// Project Scans (snapshot)
-			me.POST("/projects/:id/snapshot", scanHandler.CreateSnapshot)
-
-			// Git Integration
-			me.PATCH("/projects/:id/git", gitHandler.LinkGitRepo)
-			me.DELETE("/projects/:id/git", gitHandler.UnlinkGitRepo)
-			me.GET("/projects/:id/commits", gitHandler.GetCommitScans)
-			me.POST("/projects/:id/commits/sync", gitHandler.SyncCommit)
-			me.GET("/projects/:id/collaborators", gitHandler.GetCollaborators)
-			me.POST("/projects/:id/collaborators", gitHandler.AddCollaborator)
-			me.PATCH("/projects/:id/collaborators/:collab_id", gitHandler.UpdateCollaborator)
-			me.DELETE("/projects/:id/collaborators/:collab_id", gitHandler.RemoveCollaborator)
-
-			// Invites
-			me.GET("/projects/:id/invites", inviteHandler.ListInvites)
-			me.POST("/projects/:id/invites", inviteHandler.CreateInvite)
-			me.DELETE("/projects/:id/invites/:invite_id", inviteHandler.RevokeInvite)
 
 			// Read/Update Profile
 			me.GET("/profile", authHandler.GetProfile)
@@ -179,28 +139,6 @@ func main() {
 		{
 			public.GET("/:handle/:project_id", projectHandler.GetPublicProject)
 		}
-
-		// Invite public routes
-		inv := api.Group("/invites")
-		{
-			inv.GET("/:token", inviteHandler.GetInvitePublic)
-			inv.POST("/:token/accept", authMiddleware.RequireAuth(), inviteHandler.AcceptInvite)
-		}
-
-		// GitHub routes
-		github := api.Group("/github")
-		{
-			github.POST("/webhook", githubHandler.HandleWebhook) // Public, HMAC verified
-			github.GET("/install/callback", githubHandler.InstallCallback)
-		}
-
-		// Stats routes
-		stats := api.Group("/stats")
-		stats.Use(authMiddleware.RequireAuth())
-		{
-			stats.GET("/projects/:id", statsHandler.GetProjectStats)
-		}
-
 	}
 
 	// Create HTTP server

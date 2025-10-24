@@ -1,340 +1,260 @@
-mod language;
 mod counter;
 mod filter;
+#[path = "../models/languages.rs"]
+mod languages;
 
 use rayon::prelude::*;
-use serde::{Serialize};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use walkdir::{WalkDir};
+use std::time::Instant;
+use walkdir::WalkDir;
 
-pub use language::detect_language;
 pub use crate::scan_settings::ScanSettings;
 pub use filter::count_files;
+pub use languages::detect_language;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileStats {
-    pub path: String,
-    pub language: String,
-    pub total: u32,
-    pub blank: u32,
-    pub comment: u32,
-    pub code: u32,
+	pub path: String,
+	pub language: String,
+	pub total: u32,
+	pub blank: u32,
+	pub comment: u32,
+	pub code: u32,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct LanguageStats {
-    pub files: u32,
-    pub total: u32,
-    pub blank: u32,
-    pub comment: u32,
-    pub code: u32,
-    pub percentage: f64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct SnapshotLang {
-    pub language: String,
-    pub files: u32,
-    pub total: u32,
-    pub code: u32,
-    pub comment: u32,
-    pub blank: u32,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ScanSnapshot {
-    pub total: u32,
-    pub code: u32,
-    pub comment: u32,
-    pub blank: u32,
-    pub comment_ratio: f64,
-    pub core_code_lines: u32,
-    pub info_lines: u32,
-    pub per_language: Vec<SnapshotLang>,
-    pub duration_ms: u64,
+	pub files: u32,
+	pub total: u32,
+	pub blank: u32,
+	pub comment: u32,
+	pub code: u32,
+	pub percentage: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ScanResult {
-    pub total_files: u32,
-    pub total_lines: u32,
-    pub total_code: u32,
-    pub total_comments: u32,
-    pub total_blank: u32,
-    pub comment_percentage: f64,
-    pub code_percentage: f64,
-    pub languages: HashMap<String, LanguageStats>,
-    pub files: Vec<FileStats>,
-    pub duration_ms: u64,
-    pub mean: f64,
-    pub median: f64,
-    pub std_dev: f64,
-}
-
-pub fn to_snapshot(result: &ScanResult) -> ScanSnapshot {
-    let mut per_language: Vec<SnapshotLang> = Vec::with_capacity(result.languages.len());
-    let mut lang_totals: Vec<(String, u32)> = Vec::with_capacity(result.languages.len());
-    
-    for (lang, stats) in &result.languages {
-        per_language.push(SnapshotLang {
-            language: lang.clone(),
-            files: stats.files,
-            total: stats.total,
-            code: stats.code,
-            comment: stats.comment,
-            blank: stats.blank,
-        });
-        lang_totals.push((lang.clone(), stats.total));
-    }
-
-    // Sort languages by total lines desc for a stable order
-    per_language.sort_by(|a, b| b.total.cmp(&a.total));
-
-    let comment_ratio = if result.total_lines > 0 {
-        result.total_comments as f64 / result.total_lines as f64
-    } else {
-        0.0
-    };
-
-    // Calculate core vs info lines using categories
-    let (core_code_lines, info_lines) = crate::categories::aggregate_by_category(&lang_totals);
-
-    ScanSnapshot {
-        total: result.total_lines,
-        code: result.total_code,
-        comment: result.total_comments,
-        blank: result.total_blank,
-        comment_ratio,
-        core_code_lines,
-        info_lines,
-        per_language,
-        duration_ms: result.duration_ms,
-    }
+	pub total_files: u32,
+	pub total_lines: u32,
+	pub total_code: u32,
+	pub total_comments: u32,
+	pub total_blank: u32,
+	pub comment_percentage: f64,
+	pub code_percentage: f64,
+	pub languages: HashMap<String, LanguageStats>,
+	pub files: Vec<FileStats>,
+	pub duration_ms: u64,
+	pub mean: f64,
+	pub median: f64,
+	pub std_dev: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
 struct ProgressEvent {
-    files_scanned: u32,
-    current_file: String,
+	files_scanned: u32,
+	current_file: String,
 }
 
 pub async fn scan_path(
-    path: &str,
-    settings: ScanSettings,
-    window: tauri::Window,
-    cancel_flag: Arc<AtomicBool>,
+	path: &str,
+	settings: ScanSettings,
+	window: tauri::Window,
+	cancel_flag: Arc<AtomicBool>,
 ) -> Result<ScanResult, String> {
-    let start = Instant::now();
-    let root = Path::new(path);
+	let start = Instant::now();
+	let root = Path::new(path);
 
-    if !root.exists() {
-        return Err("Path does not exist".to_string());
-    }
+	if !root.exists() {
+		return Err("Path does not exist".to_string());
+	}
 
-    // Collecte des fichiers — on ne traverse que les dossiers non exclus
-    let mut file_paths: Vec<PathBuf> = Vec::new();
-    let walker = WalkDir::new(root)
-        .follow_links(settings.follow_symlinks)
-        .into_iter()
-        .filter_entry(|e| {
-            // Vérifier l'annulation pendant la traversée
-            if cancel_flag.load(Ordering::Relaxed) {
-                return false;
-            }
-            
-            return count_files(e, settings.clone())
-        });
+	// Collecte des fichiers — on ne traverse que les dossiers non exclus
+	let mut file_paths: Vec<PathBuf> = Vec::new();
+	let walker =
+		WalkDir::new(root).follow_links(settings.follow_symlinks).into_iter().filter_entry(|e| {
+			// Vérifier l'annulation pendant la traversée
+			if cancel_flag.load(Ordering::Relaxed) {
+				return false;
+			}
 
-    for entry in walker {
-        if cancel_flag.load(Ordering::Relaxed) {
-            return Err("Scan cancelled".to_string());
-        }
+			return count_files(e, settings.clone());
+		});
 
-        match entry {
-            Ok(entry) => {
-                if entry.path().is_file() {
-                    // filter_entry() cannot exclude files, only controls directory descent.
-                    // Re-apply file-level filter here to ensure only allowed files are queued.
-                    if count_files(&entry, settings.clone()) {
-                        file_paths.push(entry.path().to_path_buf());
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error walking directory: {}", e);
-            }
-        }
-    }
+	for entry in walker {
+		if cancel_flag.load(Ordering::Relaxed) {
+			return Err("Scan cancelled".to_string());
+		}
 
-    // Traitement en parallèle avec rayon
-    // Le filtrage a déjà été fait pendant la traversée, donc ici on ne fait que lire et compter
-    let files_scanned = Arc::new(Mutex::new(0u32));
-    let files: Vec<FileStats> = file_paths
-        .par_iter()
-        .filter_map(|path| {
-            // Vérifier l'annulation
-            if cancel_flag.load(Ordering::Relaxed) {
-                return None;
-            }
+		match entry {
+			Ok(entry) => {
+				if entry.path().is_file() {
+					// filter_entry() cannot exclude files, only controls directory descent.
+					// Re-apply file-level filter here to ensure only allowed files are queued.
+					if count_files(&entry, settings.clone()) {
+						file_paths.push(entry.path().to_path_buf());
+					}
+				}
+			}
+			Err(e) => {
+				eprintln!("Error walking directory: {}", e);
+			}
+		}
+	}
 
-            // Traiter le fichier (lecture + comptage des lignes)
-            let stats = process_file(path)?;
+	// Traitement en parallèle avec rayon
+	// Le filtrage a déjà été fait pendant la traversée, donc ici on ne fait que lire et compter
+	let files_scanned = Arc::new(Mutex::new(0u32));
+	let files: Vec<FileStats> = file_paths
+		.par_iter()
+		.filter_map(|path| {
+			// Vérifier l'annulation
+			if cancel_flag.load(Ordering::Relaxed) {
+				return None;
+			}
 
-            // Mise à jour de la progression
-            let mut count = files_scanned.lock().unwrap();
-            *count += 1;
-            let current_count = *count;
-            drop(count);
+			// Traiter le fichier (lecture + comptage des lignes)
+			let stats = process_file(path)?;
 
-            // Émettre un événement de progression toutes les 10 fichiers
-            if current_count % 10 == 0 {
-                let _ = window.emit(
-                    "scan:progress",
-                    ProgressEvent {
-                        files_scanned: current_count,
-                        current_file: path.display().to_string(),
-                    },
-                );
-            }
+			// Mise à jour de la progression
+			let mut count = files_scanned.lock().unwrap();
+			*count += 1;
+			let current_count = *count;
+			drop(count);
 
-            Some(stats)
-        })
-        .collect();
+			// Émettre un événement de progression toutes les 10 fichiers
+			if current_count % 10 == 0 {
+				let _ = window.emit(
+					"scan:progress",
+					ProgressEvent {
+						files_scanned: current_count,
+						current_file: path.display().to_string(),
+					},
+				);
+			}
 
-    if cancel_flag.load(Ordering::Relaxed) {
-        return Err("Scan cancelled".to_string());
-    }
+			Some(stats)
+		})
+		.collect();
 
-    // Agrégation
-    let mut languages: HashMap<String, LanguageStats> = HashMap::new();
-    let mut total_lines = 0u32;
-    let mut total_code = 0u32;
-    let mut total_comments = 0u32;
-    let mut total_blank = 0u32;
+	if cancel_flag.load(Ordering::Relaxed) {
+		return Err("Scan cancelled".to_string());
+	}
 
-    for file in &files {
-        total_lines += file.total;
-        total_code += file.code;
-        total_comments += file.comment;
-        total_blank += file.blank;
+	// Agrégation
+	let mut languages: HashMap<String, LanguageStats> = HashMap::new();
+	let mut total_lines = 0u32;
+	let mut total_code = 0u32;
+	let mut total_comments = 0u32;
+	let mut total_blank = 0u32;
 
-        let lang_stats = languages.entry(file.language.clone()).or_insert(LanguageStats {
-            files: 0,
-            total: 0,
-            blank: 0,
-            comment: 0,
-            code: 0,
-            percentage: 0.0,
-        });
+	for file in &files {
+		total_lines += file.total;
+		total_code += file.code;
+		total_comments += file.comment;
+		total_blank += file.blank;
 
-        lang_stats.files += 1;
-        lang_stats.total += file.total;
-        lang_stats.blank += file.blank;
-        lang_stats.comment += file.comment;
-        lang_stats.code += file.code;
-    }
+		let lang_stats = languages.entry(file.language.clone()).or_insert(LanguageStats {
+			files: 0,
+			total: 0,
+			blank: 0,
+			comment: 0,
+			code: 0,
+			percentage: 0.0,
+		});
 
-    for lang_stats in languages.values_mut() {
-        lang_stats.percentage = if total_lines > 0 {
-            (lang_stats.total as f64 / total_lines as f64) * 100.0
-        } else {
-            0.0
-        };
-    }
+		lang_stats.files += 1;
+		lang_stats.total += file.total;
+		lang_stats.blank += file.blank;
+		lang_stats.comment += file.comment;
+		lang_stats.code += file.code;
+	}
 
-    let comment_percentage = if total_lines > 0 {
-        (total_comments as f64 / total_lines as f64) * 100.0
-    } else {
-        0.0
-    };
+	for lang_stats in languages.values_mut() {
+		lang_stats.percentage = if total_lines > 0 {
+			(lang_stats.total as f64 / total_lines as f64) * 100.0
+		} else {
+			0.0
+		};
+	}
 
-    let code_percentage = if total_lines > 0 {
-        (total_code as f64 / total_lines as f64) * 100.0
-    } else {
-        0.0
-    };
+	let comment_percentage =
+		if total_lines > 0 { (total_comments as f64 / total_lines as f64) * 100.0 } else { 0.0 };
 
-    let (mean, median, std_dev) = calculate_statistics(&files);
-    let duration_ms = start.elapsed().as_millis() as u64;
+	let code_percentage =
+		if total_lines > 0 { (total_code as f64 / total_lines as f64) * 100.0 } else { 0.0 };
 
-    Ok(ScanResult {
-        total_files: files.len() as u32,
-        total_lines,
-        total_code,
-        total_comments,
-        total_blank,
-        comment_percentage,
-        code_percentage,
-        languages,
-        files,
-        duration_ms,
-        mean,
-        median,
-        std_dev,
-    })
+	let (mean, median, std_dev) = calculate_statistics(&files);
+	let duration_ms = start.elapsed().as_millis() as u64;
+
+	Ok(ScanResult {
+		total_files: files.len() as u32,
+		total_lines,
+		total_code,
+		total_comments,
+		total_blank,
+		comment_percentage,
+		code_percentage,
+		languages,
+		files,
+		duration_ms,
+		mean,
+		median,
+		std_dev,
+	})
 }
 
 fn process_file(path: &Path) -> Option<FileStats> {
-    let filename = path.file_name()?.to_str()?;
-    let language = detect_language(filename);
+	let filename = path.file_name()?.to_str()?;
+	let language = detect_language(filename);
 
-    // Lecture avec fallback d'encodage
-    let content = match std::fs::read_to_string(path) {
-        Ok(content) => content,
-        Err(_) => {
-            match std::fs::read(path) {
-                Ok(bytes) => {
-                    let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);
-                    decoded.to_string()
-                }
-                Err(_) => return None,
-            }
-        }
-    };
+	// Lecture avec fallback d'encodage
+	let content = match std::fs::read_to_string(path) {
+		Ok(content) => content,
+		Err(_) => match std::fs::read(path) {
+			Ok(bytes) => {
+				let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&bytes);
+				decoded.to_string()
+			}
+			Err(_) => return None,
+		},
+	};
 
-    let (total, blank, comment, code) = counter::count_lines(&content, &language);
+	let (total, blank, comment, code) = counter::count_lines(&content, &language);
 
-    Some(FileStats {
-        path: path.display().to_string(),
-        language,
-        total,
-        blank,
-        comment,
-        code,
-    })
+	Some(FileStats { path: path.display().to_string(), language, total, blank, comment, code })
 }
 
 fn calculate_statistics(files: &[FileStats]) -> (f64, f64, f64) {
-    if files.is_empty() {
-        return (0.0, 0.0, 0.0);
-    }
+	if files.is_empty() {
+		return (0.0, 0.0, 0.0);
+	}
 
-    let mut totals: Vec<u32> = files.iter().map(|f| f.total).collect();
-    totals.sort_unstable();
+	let mut totals: Vec<u32> = files.iter().map(|f| f.total).collect();
+	totals.sort_unstable();
 
-    let mean = totals.iter().sum::<u32>() as f64 / totals.len() as f64;
+	let mean = totals.iter().sum::<u32>() as f64 / totals.len() as f64;
 
-    let median = if totals.len() % 2 == 0 {
-        let mid = totals.len() / 2;
-        (totals[mid - 1] + totals[mid]) as f64 / 2.0
-    } else {
-        totals[totals.len() / 2] as f64
-    };
+	let median = if totals.len() % 2 == 0 {
+		let mid = totals.len() / 2;
+		(totals[mid - 1] + totals[mid]) as f64 / 2.0
+	} else {
+		totals[totals.len() / 2] as f64
+	};
 
-    let variance = totals
-        .iter()
-        .map(|&x| {
-            let diff = x as f64 - mean;
-            diff * diff
-        })
-        .sum::<f64>()
-        / totals.len() as f64;
+	let variance = totals
+		.iter()
+		.map(|&x| {
+			let diff = x as f64 - mean;
+			diff * diff
+		})
+		.sum::<f64>()
+		/ totals.len() as f64;
 
-    let std_dev = variance.sqrt();
+	let std_dev = variance.sqrt();
 
-    (mean, median, std_dev)
+	(mean, median, std_dev)
 }
