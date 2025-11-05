@@ -30,9 +30,9 @@ const TABS: DashboardTab[] = [
 	},
 	{
 		id: 'quality',
-		label: 'Quality & Productivity',
+		label: 'Quality',
 		icon: <Target className='h-4 w-4' />,
-		description: 'Throughput, complexity, technical debt'
+		description: 'Code coverage, complexity, technical debt'
 	},
 	{
 		id: 'contributors',

@@ -2,7 +2,7 @@
 node_modules/
 .pnpm-store/
 pnpm-lock.yaml
-apps/desktop/src-tauri/Cargo.lock
+desktop/src-tauri/Cargo.lock
 postgres_data_dev/
 redis_data_dev/
 
@@ -11,6 +11,7 @@ dist/
 .next/
 .turbo/
 out/
+target/
 
 # Tauri
 **/src-tauri/target/
@@ -24,7 +25,7 @@ out/
 nginx/certificates/*.pem
 
 # OS
-.DS_Store
+*.DS_Store
 Thumbs.db
 
 # IDE
@@ -39,7 +40,7 @@ Thumbs.db
 *.log
 npm-debug.log*
 pnpm-debug.log*
-apps/web/tsconfig.tsbuildinfo
+web/tsconfig.tsbuildinfo
 
 # Testing
 coverage/
@@ -49,5 +50,5 @@ coverage/
 secret-place/
 
 # Icons
-apps/desktop/src-tauri/icons/*.png
-apps/web/public/favicon.ico
+desktop/src-tauri/icons/*.png
+web/public/favicon.ico

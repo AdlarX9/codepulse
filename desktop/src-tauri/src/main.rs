@@ -322,11 +322,11 @@ fn main() {
 			// Scan
 			scan_directory,
 			cancel_scan,
-			scan_repo_history_cmd,
-			compute_github_metrics_for_path,
-			compute_quality_metrics,
-			compute_quality_metrics_for_branch,
-			compute_branch_quality_deltas,
+			scan_repo_history_cmd, // Overview
+			compute_github_metrics_for_path, // Productivity
+			compute_quality_metrics, // Quality
+			compute_quality_metrics_for_branch, // Quality
+			compute_branch_quality_deltas, // Quality
 
 			// Storage
 			get_user_settings,
