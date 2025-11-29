@@ -14,7 +14,7 @@ if [ ! -f "package.json" ]; then
 fi
 
 # Vérifier que les icônes existent
-if [ ! -f "apps/desktop/src-tauri/icons/32x32.png" ]; then
+if [ ! -f "desktop/src-tauri/icons/32x32.png" ]; then
 	echo "⚠️  Icônes manquantes. Génération..."
 	./scripts/create-dev-icons.sh
 	echo ""
@@ -44,5 +44,5 @@ echo "⏳ Première compilation peut prendre 2-5 minutes..."
 echo ""
 
 # Lancer Tauri
-cd apps/desktop
+cd desktop
 pnpm tauri dev

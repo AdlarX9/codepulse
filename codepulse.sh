@@ -79,17 +79,17 @@ setup_project() {
 	bash scripts/create-dev-icons.sh
 		
 	# Setup web env if needed
-	if [ ! -f "apps/web/.env.local" ]; then
+	if [ ! -f "web/.env.local" ]; then
 		echo -e "${BLUE}⚙️  Configuration de l'environnement web...${NC}"
-		cp apps/web/.env.example apps/web/.env.local
-		echo -e "${YELLOW}⚠️  Éditez apps/web/.env.local avec vos credentials${NC}"
+		cp web/.env.example web/.env.local
+		echo -e "${YELLOW}⚠️  Éditez web/.env.local avec vos credentials${NC}"
 	fi
 
 	# Setup desktop env if needed
-	if [ ! -f "apps/desktop/.env.local" ]; then
+	if [ ! -f "desktop/.env.local" ]; then
 		echo -e "${BLUE}⚙️  Configuration de l'environnement desktop...${NC}"
-		cp apps/desktop/.env.example apps/desktop/.env.local
-		echo -e "${YELLOW}⚠️  Éditez apps/desktop/.env.local avec vos credentials${NC}"
+		cp desktop/.env.example desktop/.env.local
+		echo -e "${YELLOW}⚠️  Éditez desktop/.env.local avec vos credentials${NC}"
 	fi
 
 	echo -e "${GREEN}✅ Configuration terminée !${NC}"
@@ -145,7 +145,7 @@ run_tests() {
 		
 	# Rust tests
 	echo -e "${BLUE}▶️  Tests Rust...${NC}"
-	cd apps/desktop/src-tauri
+	cd desktop/src-tauri
 	cargo test
 	cd ../../..
 		
@@ -169,9 +169,9 @@ clean_project() {
 	find . -name "node_modules" -type d -prune -exec rm -rf {} +
 		
 	# Clean build artifacts
-	rm -rf apps/desktop/dist
-	rm -rf apps/web/.next
-	rm -rf apps/desktop/src-tauri/target
+	rm -rf desktop/dist
+	rm -rf web/.next
+	rm -rf desktop/src-tauri/target
 		
 	# Clean packages
 	rm -rf packages/*/dist
@@ -187,7 +187,7 @@ generate_icons() {
 format_code() {
 	echo -e "${BLUE}🎨 Formatage du code...${NC}"
 	npm run format
-	cd apps/api
+	cd api
 	gofmt -tabs=true -tabWidth=4 -s -w ./*/*/*.go
 	cd ../desktop/src-tauri
 	cargo fmt

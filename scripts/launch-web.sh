@@ -21,13 +21,13 @@ if [ ! -d "node_modules" ]; then
 fi
 
 # Vérifier que .env.local existe
-if [ ! -f "apps/web/.env.local" ]; then
+if [ ! -f "web/.env.local" ]; then
 	echo "⚠️  Fichier .env.local manquant"
 	echo ""
 	echo "Création du fichier .env.local..."
-	cp apps/web/.env.example apps/web/.env.local
+	cp web/.env.example web/.env.local
 	echo ""
-	echo "⚠️  IMPORTANT: Éditez apps/web/.env.local avec vos credentials Supabase"
+	echo "⚠️  IMPORTANT: Éditez web/.env.local avec vos credentials Supabase"
 	echo ""
 	echo "Vous devez configurer:"
 	echo "  - SUPABASE_URL"
@@ -46,5 +46,5 @@ echo "   - Next.js sur http://localhost:3000"
 echo ""
 
 # Lancer Next.js
-cd apps/web
+cd web
 pnpm dev

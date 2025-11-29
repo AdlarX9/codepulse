@@ -28,21 +28,21 @@ node_modules/
 .yarn
 
 # Per-app node modules and build outputs
-apps/**/node_modules/
-apps/**/dist/
-apps/**/build/
-apps/**/.next/
-apps/**/.turbo/
-apps/**/.cache/
-apps/**/.parcel-cache/
-apps/**/.eslintcache
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/.turbo/
+**/.cache/
+**/.parcel-cache/
+**/.eslintcache
 
 # Tauri/Rust heavy build artifacts
-apps/desktop/src-tauri/target/
-apps/desktop/target/
-apps/desktop/**/Cargo.lock
-apps/desktop/**/.cargo/
-apps/desktop/**/*.rs.bk
+desktop/src-tauri/target/
+desktop/target/
+desktop/**/Cargo.lock
+desktop/**/.cargo/
+desktop/**/*.rs.bk
 
 # Logs and temporary files
 *.log
@@ -91,7 +91,7 @@ backup_*.sql
 *.msi
 
 # Lock files (except root ones)
-apps/**/pnpm-lock.yaml
+**/pnpm-lock.yaml
 packages/**/pnpm-lock.yaml
 
 # Git LFS
