@@ -196,26 +196,6 @@ pub fn get_common_excluded_languages() -> Vec<String> {
     .collect()
 }
 
-pub fn get_language_category(language: &str) -> &'static str {
-	LANGUAGE_CATEGORIES.get(language).unwrap_or(&"info")
-}
-
-pub fn aggregate_by_category(per_language: &[(String, u32)]) -> (u32, u32) {
-	let mut core_lines = 0u32;
-	let mut info_lines = 0u32;
-
-	for (lang, total) in per_language {
-		let category = get_language_category(lang);
-		if category == "core" {
-			core_lines += total;
-		} else {
-			info_lines += total;
-		}
-	}
-
-	(core_lines, info_lines)
-}
-
 pub fn detect_language(filename: &str) -> String {
     if let Some(&lang) = SPECIAL_FILES.get(filename) {
         return lang.to_string();

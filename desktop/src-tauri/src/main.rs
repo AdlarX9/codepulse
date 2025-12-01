@@ -1,37 +1,26 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-#[path = "./app/auth.rs"]
-mod auth;
-#[path = "./models/languages.rs"]
-mod languages;
-mod git;
-#[path = "./models/projects.rs"]
-mod projects;
-#[path = "./app/storage.rs"]
-mod storage;
-#[path = "./models/scan_settings.rs"]
-mod scan_settings;
-mod scanner;
-#[path = "./github/mod.rs"]
-mod github;
-#[path = "./quality/mod.rs"]
+// Core modules
+mod contributors;
+mod models;
+mod overview;
+mod productivity;
 mod quality;
-#[path = "./app/updater.rs"]
-mod updater;
-#[path = "./models/user_settings.rs"]
-mod user_settings;
+mod utils;
 
-use auth::{clear_token, get_token, set_token};
-use scan_settings::{load_scan_settings, save_scan_settings, ScanSettings};
-use scanner::{ScanResult};
-use scanner::history::{scan_repo_history, CommitScan};
+// Use statements
+use models::general_settings::{load_general_settings, save_general_settings, GeneralSettings};
+use models::languages;
+use models::projects;
+use models::scan_settings::{load_scan_settings, save_scan_settings, ScanSettings};
+use overview::ScanResult;
+use productivity::scan_history;
+use serde_json::Value as JsonValue;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{State, Window};
-use serde_json::Value as JsonValue;
-use user_settings::{load_user_settings, save_user_settings, UserSettings};
-// Tauri commands for GitHub/quality are defined below, we don't import functions from modules here
+use utils::{git_ops, storage, updater};
 
 struct AppState {
 	cancel_flag: Arc<AtomicBool>,
@@ -39,65 +28,65 @@ struct AppState {
 
 #[tauri::command]
 async fn compute_github_metrics_for_path(
-    path: String,
-    weeks: usize,
-    github_token: Option<String>,
-) -> Result<github::metrics::GitHubMetrics, String> {
-    let info = git::repo::get_repo_info(&path).map_err(|e| e.to_string())?;
-    let slug = match info.remote_url.and_then(|u| github::parse_repo_slug(&u)) {
-        Some(s) => s,
-        None => return Err("No GitHub remote detected".into()),
-    };
-    github::metrics::compute_metrics_for_repo(&slug, weeks, github_token.as_deref()).await
+	path: String,
+	weeks: usize,
+	github_token: Option<String>,
+) -> Result<quality::github_metrics::GitHubMetrics, String> {
+	let info = git_ops::get_repo_info(&path).map_err(|e| e.to_string())?;
+	let slug = match info.remote_url.and_then(|u| quality::parse_repo_slug(&u)) {
+		Some(s) => s,
+		None => return Err("No GitHub remote detected".into()),
+	};
+	quality::github_metrics::compute_metrics_for_repo(&slug, weeks, github_token.as_deref()).await
 }
 
 #[tauri::command]
 async fn compute_quality_metrics(
-    path: String,
-    settings: ScanSettings,
+	path: String,
+	settings: ScanSettings,
 ) -> Result<quality::QualityMetrics, String> {
-    quality::compute_quality_metrics(&path, &settings).await
+	quality::compute_quality_metrics(&path, &settings).await
 }
 
 #[tauri::command]
 async fn compute_quality_metrics_for_branch(
-    path: String,
-    branch: String,
-    settings: ScanSettings,
+	path: String,
+	branch: String,
+	settings: ScanSettings,
 ) -> Result<quality::QualityMetrics, String> {
-    quality::compute_quality_metrics_for_branch(&path, &branch, &settings).await
+	quality::compute_quality_metrics_for_branch(&path, &branch, &settings).await
 }
 
 #[tauri::command]
 async fn compute_branch_quality_deltas(
-    path: String,
-    base_branch: String,
-    branches: Vec<String>,
-    settings: ScanSettings,
+	path: String,
+	base_branch: String,
+	branches: Vec<String>,
+	settings: ScanSettings,
 ) -> Result<Vec<quality::BranchQualityDelta>, String> {
-    quality::compute_branch_quality_deltas(&path, &base_branch, &branches, &settings).await
+	quality::compute_branch_quality_deltas(&path, &base_branch, &branches, &settings).await
 }
 
 #[tauri::command]
 async fn scan_repo_history_cmd(
-    path: &str,
-    scan_settings: ScanSettings,
-    limit: usize,
-    window: Window,
-    state: State<'_, AppState>,
-) -> Result<Vec<CommitScan>, String> {
-    state.cancel_flag.store(false, Ordering::Relaxed);
-    scan_repo_history(path, scan_settings, limit, window, state.cancel_flag.clone()).await
+	path: &str,
+	scan_settings: ScanSettings,
+	limit: usize,
+	window: Window,
+	state: State<'_, AppState>,
+) -> Result<Vec<overview::history::CommitScan>, String> {
+	state.cancel_flag.store(false, Ordering::Relaxed);
+	scan_history(path, scan_settings, limit, window, state.cancel_flag.clone()).await
 }
 
 #[tauri::command]
 async fn list_supported_languages() -> Result<Vec<String>, String> {
-    Ok(languages::get_supported_languages())
+	Ok(languages::get_supported_languages())
 }
 
 #[tauri::command]
 async fn get_common_excluded_languages() -> Result<Vec<String>, String> {
-    Ok(languages::get_common_excluded_languages())
+	Ok(languages::get_common_excluded_languages())
 }
 
 #[tauri::command]
@@ -110,7 +99,7 @@ async fn scan_directory(
 	// Reset cancel flag
 	state.cancel_flag.store(false, Ordering::Relaxed);
 
-	scanner::scan_path(&path, scan_settings, window, state.cancel_flag.clone())
+	overview::scan_path(&path, scan_settings, window, state.cancel_flag.clone())
 		.await
 		.map_err(|e| e.to_string())
 }
@@ -122,13 +111,13 @@ async fn cancel_scan(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn get_user_settings() -> Result<UserSettings, String> {
-	load_user_settings()
+async fn get_general_settings() -> Result<GeneralSettings, String> {
+	load_general_settings()
 }
 
 #[tauri::command]
-async fn update_user_settings(settings: UserSettings) -> Result<(), String> {
-	save_user_settings(&settings)
+async fn update_general_settings(settings: GeneralSettings) -> Result<(), String> {
+	save_general_settings(&settings)
 }
 
 #[tauri::command]
@@ -143,23 +132,8 @@ async fn update_scan_settings(settings: ScanSettings) -> Result<(), String> {
 
 #[tauri::command]
 async fn check_for_updates() -> Result<updater::UpdateCheck, String> {
-	let mut settings = load_user_settings()?;
+	let mut settings = load_general_settings()?;
 	updater::check_for_updates(&mut settings).await
-}
-
-#[tauri::command]
-async fn get_auth_token() -> Result<Option<String>, String> {
-	get_token()
-}
-
-#[tauri::command]
-async fn set_auth_token(token: Option<String>) -> Result<(), String> {
-	set_token(token)
-}
-
-#[tauri::command]
-async fn clear_auth_token() -> Result<(), String> {
-	clear_token()
 }
 
 #[tauri::command]
@@ -209,7 +183,9 @@ async fn get_project(id: &str) -> Result<Option<JsonValue>, String> {
 async fn upsert_project(project: JsonValue) -> Result<(), String> {
 	let mut list = load_projects().await.unwrap_or_default();
 	let pid = project.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-	if pid.is_empty() { return Err("project.id required".into()); }
+	if pid.is_empty() {
+		return Err("project.id required".into());
+	}
 	let mut replaced = false;
 	for p in &mut list {
 		let id = p.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -219,7 +195,9 @@ async fn upsert_project(project: JsonValue) -> Result<(), String> {
 			break;
 		}
 	}
-	if !replaced { list.push(project); }
+	if !replaced {
+		list.push(project);
+	}
 	save_projects(list).await
 }
 
@@ -236,17 +214,17 @@ async fn delete_project(id: &str) -> Result<(), String> {
 // Git commands
 #[tauri::command]
 async fn git_is_repository(path: String) -> Result<bool, String> {
-	Ok(git::repo::is_git_repository(&path))
+	Ok(git_ops::is_git_repository(&path))
 }
 
 #[tauri::command]
-async fn git_get_repo_info(path: String) -> Result<git::GitRepoInfo, String> {
-	git::repo::get_repo_info(&path).map_err(|e| e.to_string())
+async fn git_get_repo_info(path: String) -> Result<git_ops::GitRepoInfo, String> {
+	git_ops::get_repo_info(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn git_get_branches(path: String) -> Result<Vec<String>, String> {
-	git::repo::get_branches(&path).map_err(|e| e.to_string())
+	git_ops::get_branches(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -254,8 +232,8 @@ async fn git_get_commits(
 	path: String,
 	branch: Option<String>,
 	limit: usize,
-) -> Result<Vec<git::GitCommitInfo>, String> {
-	git::commits::get_commits(&path, branch.as_deref(), limit).map_err(|e| e.to_string())
+) -> Result<Vec<git_ops::GitCommitInfo>, String> {
+	git_ops::get_commits(&path, branch.as_deref(), limit).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -263,47 +241,47 @@ async fn git_get_commits_since(
 	path: String,
 	since_sha: String,
 	branch: Option<String>,
-) -> Result<Vec<git::GitCommitInfo>, String> {
-	git::commits::get_commits_since(&path, &since_sha, branch.as_deref()).map_err(|e| e.to_string())
+) -> Result<Vec<git_ops::GitCommitInfo>, String> {
+	git_ops::get_commits_since(&path, &since_sha, branch.as_deref()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn git_get_commit_by_sha(path: String, sha: String) -> Result<git::GitCommitInfo, String> {
-	git::commits::get_commit_by_sha(&path, &sha).map_err(|e| e.to_string())
+async fn git_get_commit_by_sha(path: String, sha: String) -> Result<git_ops::GitCommitInfo, String> {
+	git_ops::get_commit_by_sha(&path, &sha).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn git_get_commit_diff_stats(
 	path: String,
 	commit_sha: String,
-) -> Result<git::GitDiffStats, String> {
-	git::diff::get_commit_diff_stats(&path, &commit_sha).map_err(|e| e.to_string())
+) -> Result<git_ops::GitDiffStats, String> {
+	git_ops::get_commit_diff_stats(&path, &commit_sha).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn git_get_commit_file_changes(
 	path: String,
 	commit_sha: String,
-) -> Result<Vec<git::GitFileChange>, String> {
-	git::diff::get_commit_file_changes(&path, &commit_sha).map_err(|e| e.to_string())
+) -> Result<Vec<git_ops::GitFileChange>, String> {
+	git_ops::get_commit_file_changes(&path, &commit_sha).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn git_fetch_from_remote(path: String, remote_name: String) -> Result<(), String> {
-	git::repo::fetch_from_remote(&path, &remote_name).map_err(|e| e.to_string())
+	git_ops::fetch_from_remote(&path, &remote_name).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn git_has_uncommitted_changes(path: String) -> Result<bool, String> {
-	git::repo::has_uncommitted_changes(&path).map_err(|e| e.to_string())
+	git_ops::has_uncommitted_changes(&path).map_err(|e| e.to_string())
 }
 
 fn main() {
-	// Load user settings for background tasks
-	let user_settings = load_user_settings().expect("Failed to load user settings");
+	// Load general settings for background tasks
+	let general_settings = load_general_settings().expect("Failed to load general settings");
 
 	// Start update checker in background
-	let user_settings_clone = user_settings.clone();
+	let general_settings_clone = general_settings.clone();
 
 	tauri::Builder::default()
 		.manage(AppState { cancel_flag: Arc::new(AtomicBool::new(false)) })
@@ -313,7 +291,7 @@ fn main() {
 
 			// Update checker
 			tauri::async_runtime::spawn(async move {
-				crate::updater::start_update_checker(user_settings_clone).await;
+				updater::start_update_checker(general_settings_clone).await;
 			});
 
 			Ok(())
@@ -322,26 +300,20 @@ fn main() {
 			// Scan
 			scan_directory,
 			cancel_scan,
-			scan_repo_history_cmd, // Overview
-			compute_github_metrics_for_path, // Productivity
-			compute_quality_metrics, // Quality
+			scan_repo_history_cmd,              // Overview
+			compute_github_metrics_for_path,    // Productivity
+			compute_quality_metrics,            // Quality
 			compute_quality_metrics_for_branch, // Quality
-			compute_branch_quality_deltas, // Quality
-
+			compute_branch_quality_deltas,      // Quality
 			// Storage
-			get_user_settings,
-			update_user_settings,
+			get_general_settings,
+			update_general_settings,
 			get_scan_settings,
 			update_scan_settings,
 			list_supported_languages,
 			get_common_excluded_languages,
-
 			// Auth
 			check_for_updates,
-			get_auth_token,
-			set_auth_token,
-			clear_auth_token,
-
 			// Projects
 			get_project_binding,
 			set_project_binding,
@@ -353,7 +325,6 @@ fn main() {
 			get_project,
 			upsert_project,
 			delete_project,
-
 			// Git
 			git_is_repository,
 			git_get_repo_info,

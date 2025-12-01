@@ -1,6 +1,6 @@
 'use client'
 
-import { Code2, BarChart3, Shield, Zap, Download, User } from 'lucide-react'
+import { Code2, BarChart3, Shield, Zap, Download } from 'lucide-react'
 import Header from '@/components/Header'
 
 export default function Home() {
@@ -141,42 +141,6 @@ export default function Home() {
 				</div>
 			</section>
 
-			{/* Gamification Section */}
-			<section className='container mx-auto px-4 py-16'>
-				<div className='max-w-6xl mx-auto'>
-					<h2 className='text-3xl md:text-4xl font-bold text-center mb-4'>
-						Stay Motivated with Gamification
-					</h2>
-					<p className='text-center text-gray-600 mb-12 text-lg'>
-						Streaks, challenges, and badges to keep you coding daily
-					</p>
-
-					<div className='grid md:grid-cols-3 gap-6'>
-						<div className='bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-200 rounded-xl p-6 text-center'>
-							<div className='text-5xl mb-4'>🔥</div>
-							<h3 className='text-xl font-semibold mb-2'>Commit Streaks</h3>
-							<p className='text-gray-600 text-sm'>
-								Track your daily coding consistency and build momentum
-							</p>
-						</div>
-						<div className='bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6 text-center'>
-							<div className='text-5xl mb-4'>🎯</div>
-							<h3 className='text-xl font-semibold mb-2'>Weekly Challenges</h3>
-							<p className='text-gray-600 text-sm'>
-								Complete challenges and push yourself to improve
-							</p>
-						</div>
-						<div className='bg-gradient-to-br from-yellow-50 to-amber-50 border-2 border-yellow-200 rounded-xl p-6 text-center'>
-							<div className='text-5xl mb-4'>🏆</div>
-							<h3 className='text-xl font-semibold mb-2'>Unlock Badges</h3>
-							<p className='text-gray-600 text-sm'>
-								Earn achievements and showcase your progress
-							</p>
-						</div>
-					</div>
-				</div>
-			</section>
-
 			{/* CTA Section */}
 			<section className='container mx-auto px-4 py-16'>
 				<div className='max-w-4xl mx-auto text-center'>
@@ -185,18 +149,12 @@ export default function Home() {
 							Ready to Get Started?
 						</h3>
 						<p className='text-lg text-gray-600 mb-6'>
-							Download CodePulse Desktop and start analyzing your codebase today. No
-							account required for basic features.
+							Download CodePulse Desktop and start analyzing your codebase instantly.
+							No account required - completely free and offline.
 						</p>
 						<div className='flex flex-col sm:flex-row gap-4 justify-center'>
-							<a href='/auth/signup'>
-								<button className='bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 rounded-md font-medium flex items-center gap-2'>
-									<User className='h-5 w-5' />
-									Create Account for Sync
-								</button>
-							</a>
 							<a href={downloadUrl('mac')}>
-								<button className='border border-gray-300 bg-white hover:bg-gray-50 px-8 py-3 rounded-md font-medium flex items-center gap-2'>
+								<button className='bg-blue-600 text-white hover:bg-blue-700 px-8 py-3 rounded-md font-medium flex items-center gap-2'>
 									<Download className='h-5 w-5' />
 									Download Desktop App
 								</button>

@@ -214,7 +214,7 @@ export async function getDeliveryKpis(projectPath: string): Promise<DeliveryKpis
 		let ghToken: string | undefined = (import.meta as any).env?.VITE_GITHUB_TOKEN
 		let glToken: string | undefined = (import.meta as any).env?.VITE_GITLAB_TOKEN
 		try {
-			const settings = await invoke<UserSettings>('get_user_settings')
+			const settings = await invoke<GeneralSettings>('get_general_settings')
 			if (settings?.github_token) ghToken = settings.github_token
 			if (settings?.gitlab_token) glToken = settings.gitlab_token
 		} catch (e) {

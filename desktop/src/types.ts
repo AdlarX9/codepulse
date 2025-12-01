@@ -58,7 +58,7 @@ export interface Project extends ApiProject {
 
 // Settings models (shared with Rust backend)
 
-export interface UserSettings {
+export interface GeneralSettings {
 	device_id: string
 	local_salt: string
 	update_channel: string

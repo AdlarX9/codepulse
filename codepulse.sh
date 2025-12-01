@@ -23,7 +23,6 @@ print_help() {
 	echo "  web				  Lancer l'application web"
 	echo "  dev				  Lancer desktop + web simultanément"
 	echo "  docker			   Lancer avec Docker Compose (production)"
-	echo "  docker-dev		   Lancer avec Docker Compose (développement)"
 	echo ""
 	echo -e "${YELLOW}Développement:${NC}"
 	echo "  setup				Configuration initiale du projet"
@@ -41,9 +40,8 @@ print_help() {
 	echo ""
 	echo "Exemples:"
 	echo "  $0 desktop		   # Lancer l'app desktop"
-	echo "  $0 web			   # Lancer l'app web"
+	echo "  $0 web			   # Lancer la landing page"
 	echo "  $0 docker			# Lancer avec Docker (prod)"
-	echo "  $0 docker-dev		# Lancer avec Docker (dev)"
 	echo "  $0 release v1.2.3	# Créer release v1.2.3"
 }
 
@@ -152,16 +150,6 @@ run_tests() {
 	echo -e "${GREEN}✅ Tous les tests passent !${NC}"
 }
 
-create_release() {
-	if [ -z "$1" ]; then
-		echo -e "${RED}❌ Version requise. Usage: $0 release v1.0.0${NC}"
-		exit 1
-	fi
-		
-	echo -e "${BLUE}🏷️  Création de la release $1...${NC}"
-	node scripts/release-tag.js $1
-}
-
 clean_project() {
 	echo -e "${BLUE}🧹 Nettoyage des fichiers temporaires...${NC}"
 		
@@ -199,11 +187,6 @@ launch_docker() {
 	docker compose -f compose.yaml up --build
 }
 
-launch_docker_dev() {
-	echo -e "${BLUE}🐳 Lancement avec Docker Compose (développement)...${NC}"
-	docker compose -f compose.dev.yaml up --build
-}
-
 # Main command handling
 case "$1" in
 	"desktop")
@@ -220,10 +203,6 @@ case "$1" in
 		
 	"docker")
 		launch_docker
-		;;
-		
-	"docker-dev")
-		launch_docker_dev
 		;;
 		
 	"setup")

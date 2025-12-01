@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, GitCommit, Calendar, Activity, Flame } from 'lucide-react'
+import { TrendingUp, GitCommit, Calendar, Activity } from 'lucide-react'
 import { Card } from '../ui/Card'
 import {
 	LineChart,
@@ -19,7 +19,6 @@ import * as git from '@/lib/git'
 import type { GitCommitInfo } from '@/lib/git'
 import type { ScanResult } from '@/types'
 import { invoke } from '@tauri-apps/api/tauri'
-import LocalStreakWidget from '../gamification/LocalStreakWidget'
 import { getDeliveryKpis, getFallbackKpis } from '@/lib/devops'
 import type { DeliveryKpis, FallbackKpis } from '@/lib/devops'
 
@@ -213,15 +212,6 @@ export default function ProductivityDashboard({
 		<>
 			<div className='space-y-6'>
 				<div className='grid md:grid-cols-2 gap-4 w-full'>
-					<Card className='p-4'>
-						<div className='flex items-center justify-between'>
-							<div className='text-sm font-medium text-gray-600'>Streak</div>
-							<Flame className='h-4 w-4 text-orange-500' />
-						</div>
-						<div className='mt-2'>
-							<LocalStreakWidget />
-						</div>
-					</Card>
 					{/* Stats Cards */}
 					<div className='grid grid-cols-2 gap-4'>
 						<Card className='p-4 border bg-white rounded-md'>

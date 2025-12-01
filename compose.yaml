@@ -1,68 +1,6 @@
 version: '3.8'
 
 services:
-    # PostgreSQL Database
-    postgres:
-        image: postgres:15-alpine
-        container_name: codepulse-postgres
-        environment:
-            POSTGRES_DB: ${DB_NAME}
-            POSTGRES_USER: ${DB_USER}
-            POSTGRES_PASSWORD: ${DB_PASSWORD}
-        volumes:
-            - postgres_data:/var/lib/postgresql/data
-            - ./api/migrations:/docker-entrypoint-initdb.d
-        networks:
-            - backend
-        restart: unless-stopped
-        healthcheck:
-            test: ['CMD-SHELL', 'pg_isready -U ${DB_USER} -d ${DB_NAME}']
-            interval: 10s
-            timeout: 5s
-            retries: 5
-
-    # Redis for caching
-    redis:
-        image: redis:7-alpine
-        container_name: codepulse-redis
-        command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-        volumes:
-            - redis_data:/data
-        networks:
-            - backend
-        restart: unless-stopped
-
-    # Go API
-    api:
-        build:
-            context: ./api
-            dockerfile: Dockerfile
-        container_name: codepulse-api
-        environment:
-            - ENV=production
-            - DB_HOST=postgres
-            - DB_PORT=5432
-            - DB_USER=${DB_USER}
-            - DB_PASSWORD=${DB_PASSWORD}
-            - DB_NAME=${DB_NAME}
-            - REDIS_URL=redis:6379
-            - REDIS_PASSWORD=${REDIS_PASSWORD}
-            - JWT_SECRET=${JWT_SECRET}
-            - PORT=8080
-        networks:
-            - backend
-        depends_on:
-            postgres:
-                condition: service_healthy
-            redis:
-                condition: service_started
-        restart: unless-stopped
-        healthcheck:
-            test: ['CMD', 'curl', '-f', 'http://localhost:8080/health']
-            interval: 30s
-            timeout: 10s
-            retries: 3
-
     # Next.js Web App
     web:
         build:

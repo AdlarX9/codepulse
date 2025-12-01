@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::user_settings::load_user_settings;
+use crate::models::general_settings::load_general_settings;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProjectBindings {
@@ -83,7 +83,7 @@ pub fn clear_binding(project_id: &str) -> Result<(), String> {
 }
 
 pub fn compute_project_key_hash(base_path: &str) -> Result<String, String> {
-	let settings = load_user_settings()?;
+	let settings = load_general_settings()?;
 	let combined = format!("{}::{}", base_path, settings.local_salt);
 	let mut hasher = Sha256::new();
 	hasher.update(combined.as_bytes());
