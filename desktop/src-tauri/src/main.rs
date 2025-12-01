@@ -246,7 +246,10 @@ async fn git_get_commits_since(
 }
 
 #[tauri::command]
-async fn git_get_commit_by_sha(path: String, sha: String) -> Result<git_ops::GitCommitInfo, String> {
+async fn git_get_commit_by_sha(
+	path: String,
+	sha: String,
+) -> Result<git_ops::GitCommitInfo, String> {
 	git_ops::get_commit_by_sha(&path, &sha).map_err(|e| e.to_string())
 }
 

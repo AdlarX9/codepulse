@@ -241,3 +241,9 @@ export async function computeBranchQualityDeltas(
 		settings
 	})
 }
+
+export interface GitProject {
+	id: string
+	path: string
+	lastCommitSha: string | null
+}

@@ -1,6 +1,5 @@
 // Export utilities for different formats
 import type { ScanResult } from '@/types'
-import type { GitCommitInfo, GitRepoInfo } from './git'
 
 export type ExportFormat = 'json' | 'csv' | 'markdown' | 'html'
 
@@ -225,47 +224,6 @@ export function exportToHTML(data: ScanResult, projectName?: string): string {
     </div>
 </body>
 </html>`
-}
-
-/**
- * Export Git commit history to Markdown
- */
-export function exportCommitsToMarkdown(commits: GitCommitInfo[], repoInfo?: GitRepoInfo): string {
-	const lines: string[] = []
-
-	lines.push('# Git Commit History')
-	lines.push('')
-
-	if (repoInfo) {
-		lines.push(`**Repository**: ${repoInfo.path}`)
-		lines.push(`**Branch**: ${repoInfo.current_branch}`)
-		if (repoInfo.remote_url) {
-			lines.push(`**Remote**: ${repoInfo.remote_url}`)
-		}
-		lines.push('')
-	}
-
-	lines.push(`Generated: ${new Date().toLocaleString()}`)
-	lines.push('')
-	lines.push(`Total Commits: ${commits.length}`)
-	lines.push('')
-
-	// Commits table
-	lines.push('## Commits')
-	lines.push('')
-	lines.push('| SHA | Author | Date | Message |')
-	lines.push('|-----|--------|------|---------|')
-
-	commits.forEach(commit => {
-		const shortSha = commit.sha.substring(0, 7)
-		const date = new Date(commit.timestamp * 1000).toLocaleDateString()
-		const message = commit.message.split('\n')[0].replace(/\|/g, '\\|')
-		lines.push(`| \`${shortSha}\` | ${commit.author_name} | ${date} | ${message} |`)
-	})
-
-	lines.push('')
-
-	return lines.join('\n')
 }
 
 /**

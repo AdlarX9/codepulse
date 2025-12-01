@@ -175,11 +175,9 @@ generate_icons() {
 format_code() {
 	echo -e "${BLUE}🎨 Formatage du code...${NC}"
 	npm run format
-	cd api
-	gofmt -tabs=true -tabWidth=4 -s -w ./*/*/*.go
-	cd ../desktop/src-tauri
+	cd desktop/src-tauri
 	cargo fmt
-	cd ../../../
+	cd ../../
 }
 
 launch_docker() {

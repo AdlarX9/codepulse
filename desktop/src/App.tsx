@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Code2, Settings, FolderOpen } from 'lucide-react'
+import { open as openDialog } from '@tauri-apps/api/dialog'
+import { invoke } from '@tauri-apps/api/tauri'
+
 import {
 	DashboardLayout,
 	OverviewDashboard,
@@ -6,13 +10,6 @@ import {
 	QualityDashboard,
 	ContributorsDashboard
 } from './components/dashboards'
-import ExportButton from './components/export/ExportButton'
-import ExportCenter from './components/export/ExportCenter'
-import { open as openDialog } from '@tauri-apps/api/dialog'
-import { invoke } from '@tauri-apps/api/tauri'
-import type { ScanResult, ScanSettings } from './types'
-import ScanSettingsPage from './components/ScanSettings'
-import * as git from './lib/git'
 import {
 	Sidebar,
 	SidebarHeader,
@@ -21,9 +18,11 @@ import {
 	SidebarItem,
 	SidebarSection
 } from './components/ui/Sidebar'
+import { ExportButton, ExportCenter } from './components/Export'
+import type { ScanResult, ScanSettings } from './types'
+import ScanSettingsPage from './components/ScanSettings'
+import * as git from './lib/git'
 import logo from './assets/icon.png'
-import { Code2, Settings, FolderOpen } from 'lucide-react'
-import Titlebar from './components/ui/TitleBar'
 
 // Interface pour les projets locaux stockés
 interface LocalProject {
@@ -79,10 +78,7 @@ function App() {
 			}
 
 			// Ajouter au début et garder max 10 projets
-			const updated = [
-				project,
-				...recentProjects.filter(p => p.path !== path)
-			].slice(0, 10)
+			const updated = [project, ...recentProjects.filter(p => p.path !== path)].slice(0, 10)
 
 			setRecentProjects(updated)
 			localStorage.setItem('recent-projects', JSON.stringify(updated))
@@ -160,7 +156,6 @@ function App() {
 
 	return (
 		<div className='min-h-screen bg-background'>
-			<Titlebar />
 			<main className='flex h-screen'>
 				<Sidebar>
 					<SidebarHeader>
@@ -198,8 +193,7 @@ function App() {
 										label={project.name}
 										onClick={() => openRecentProject(project)}
 										active={
-											currentView === 'analysis' &&
-											scanPath === project.path
+											currentView === 'analysis' && scanPath === project.path
 										}
 										icon={<Code2 />}
 									/>

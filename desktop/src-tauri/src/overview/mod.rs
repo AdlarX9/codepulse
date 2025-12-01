@@ -11,10 +11,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use walkdir::WalkDir;
 
-pub use crate::models::scan_settings::ScanSettings;
 pub use crate::models::languages::detect_language;
-pub use filter::count_files;
+pub use crate::models::scan_settings::ScanSettings;
 pub use counter::count_lines;
+pub use filter::count_files;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileStats {

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Button } from './ui/Button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/Card'
 import { Plus, Folder, Calendar, Settings, Trash2 } from 'lucide-react'
-import { api } from '../lib/api'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api/tauri'
 import type { ScanResult, ScanSettings, ApiProject } from '../types'
@@ -38,7 +37,7 @@ export default function Projects({
 
 	async function loadProjects() {
 		setLoading(true)
-		const list = await api.getProjects()
+		const list = await invoke<ApiProject[]>('get_projects')
 		setProjects(list)
 		setLoading(false)
 	}

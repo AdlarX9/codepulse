@@ -135,7 +135,8 @@ pub fn get_branches(path: &str) -> Result<Vec<String>, GitError> {
 
 pub fn fetch_from_remote(path: &str, remote_name: &str) -> Result<(), GitError> {
 	let repo = open_repository(path)?;
-	let mut remote = repo.find_remote(remote_name).map_err(|e| GitError::RemoteError(e.to_string()))?;
+	let mut remote =
+		repo.find_remote(remote_name).map_err(|e| GitError::RemoteError(e.to_string()))?;
 	remote.fetch(&[] as &[&str], None, None).map_err(|e| GitError::RemoteError(e.to_string()))?;
 	Ok(())
 }
@@ -256,7 +257,8 @@ pub fn get_commit_diff_stats(repo_path: &str, commit_sha: &str) -> Result<GitDif
 	let commit = repo.find_commit(oid)?;
 	let tree = commit.tree()?;
 
-	let parent_tree = if commit.parent_count() > 0 { Some(commit.parent(0)?.tree()?) } else { None };
+	let parent_tree =
+		if commit.parent_count() > 0 { Some(commit.parent(0)?.tree()?) } else { None };
 
 	let mut diff_opts = DiffOptions::new();
 	let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;
@@ -279,7 +281,8 @@ pub fn get_commit_file_changes(
 	let commit = repo.find_commit(oid)?;
 	let tree = commit.tree()?;
 
-	let parent_tree = if commit.parent_count() > 0 { Some(commit.parent(0)?.tree()?) } else { None };
+	let parent_tree =
+		if commit.parent_count() > 0 { Some(commit.parent(0)?.tree()?) } else { None };
 
 	let mut diff_opts = DiffOptions::new();
 	let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut diff_opts))?;

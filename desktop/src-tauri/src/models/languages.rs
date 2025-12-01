@@ -179,43 +179,43 @@ lazy_static::lazy_static! {
 }
 
 pub fn get_common_excluded_languages() -> Vec<String> {
-    vec![
-        "JSON",
-        "YAML",
-        "XML",
-        "SQL",
-        "GraphQL",
-        "TOML",
-        "Markdown",
-        "MDX",
-        "LaTeX",
-        "reStructuredText",
-    ]
-    .into_iter()
-    .map(|s| s.to_string())
-    .collect()
+	vec![
+		"JSON",
+		"YAML",
+		"XML",
+		"SQL",
+		"GraphQL",
+		"TOML",
+		"Markdown",
+		"MDX",
+		"LaTeX",
+		"reStructuredText",
+	]
+	.into_iter()
+	.map(|s| s.to_string())
+	.collect()
 }
 
 pub fn detect_language(filename: &str) -> String {
-    if let Some(&lang) = SPECIAL_FILES.get(filename) {
-        return lang.to_string();
-    }
-    if let Some(ext_pos) = filename.rfind('.') {
-        let ext = &filename[ext_pos + 1..].to_lowercase();
-        if let Some(&lang) = LANGUAGE_MAP.get(ext.as_str()) {
-            return lang.to_string();
-        }
-    }
-    "Unknown".to_string()
+	if let Some(&lang) = SPECIAL_FILES.get(filename) {
+		return lang.to_string();
+	}
+	if let Some(ext_pos) = filename.rfind('.') {
+		let ext = &filename[ext_pos + 1..].to_lowercase();
+		if let Some(&lang) = LANGUAGE_MAP.get(ext.as_str()) {
+			return lang.to_string();
+		}
+	}
+	"Unknown".to_string()
 }
 
 pub fn get_supported_languages() -> Vec<String> {
-    let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for &lang in LANGUAGE_MAP.values() {
-        set.insert(lang.to_string());
-    }
-    for &lang in SPECIAL_FILES.values() {
-        set.insert(lang.to_string());
-    }
-    set.into_iter().collect()
+	let mut set: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+	for &lang in LANGUAGE_MAP.values() {
+		set.insert(lang.to_string());
+	}
+	for &lang in SPECIAL_FILES.values() {
+		set.insert(lang.to_string());
+	}
+	set.into_iter().collect()
 }

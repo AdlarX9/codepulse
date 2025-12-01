@@ -1,35 +1,35 @@
 import { invoke } from '@tauri-apps/api/tauri'
-import type { ApiProject } from '@/types'
+import type { Project } from '@/types'
 
-async function loadProjects(): Promise<ApiProject[]> {
+async function loadProjects(): Promise<Project[]> {
 	try {
 		const list = (await invoke('load_projects')) as any[]
-		return (list || []) as ApiProject[]
+		return (list || []) as Project[]
 	} catch {
 		return []
 	}
 }
 
-async function getProjects(): Promise<ApiProject[]> {
+async function getProjects(): Promise<Project[]> {
 	return loadProjects()
 }
 
-async function getProject(id: string): Promise<ApiProject | null> {
+async function getProject(id: string): Promise<Project | null> {
 	try {
 		const p = (await invoke('get_project', { id })) as any
-		return (p || null) as ApiProject | null
+		return (p || null) as Project | null
 	} catch {
 		return null
 	}
 }
 
-async function getProjectDetails(id: string): Promise<ApiProject | null> {
+async function getProjectDetails(id: string): Promise<Project | null> {
 	return getProject(id)
 }
 
 async function createProject(
-	projectData: Partial<ApiProject> & { path?: string }
-): Promise<{ project: ApiProject }> {
+	projectData: Partial<Project> & { path?: string }
+): Promise<{ project: Project }> {
 	const now = new Date().toISOString()
 	const project: any = {
 		id: (crypto as any)?.randomUUID
@@ -46,10 +46,7 @@ async function createProject(
 	return { project }
 }
 
-async function updateProject(
-	id: string,
-	body: Partial<ApiProject>
-): Promise<{ project: ApiProject }> {
+async function updateProject(id: string, body: Partial<Project>): Promise<{ project: Project }> {
 	const current =
 		(await getProject(id)) ||
 		({

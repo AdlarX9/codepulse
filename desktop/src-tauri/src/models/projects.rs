@@ -44,9 +44,7 @@ pub fn load_bindings() -> Result<ProjectBindings, String> {
 			if let Some(bindings_obj) = value.get("bindings").and_then(|b| b.as_object()) {
 				for (project_id, base_path_val) in bindings_obj {
 					if let Some(base_path) = base_path_val.as_str() {
-						sanitized
-							.bindings
-							.insert(project_id.to_string(), base_path.to_string());
+						sanitized.bindings.insert(project_id.to_string(), base_path.to_string());
 					}
 				}
 			}

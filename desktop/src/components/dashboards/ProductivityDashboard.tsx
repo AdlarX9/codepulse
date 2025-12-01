@@ -19,8 +19,6 @@ import * as git from '@/lib/git'
 import type { GitCommitInfo } from '@/lib/git'
 import type { ScanResult } from '@/types'
 import { invoke } from '@tauri-apps/api/tauri'
-import { getDeliveryKpis, getFallbackKpis } from '@/lib/devops'
-import type { DeliveryKpis, FallbackKpis } from '@/lib/devops'
 
 interface ProductivityDashboardProps {
 	projectPath: string
@@ -42,10 +40,6 @@ export default function ProductivityDashboard({
 	const [addsDelsSeries, setAddsDelsSeries] = useState<
 		Array<{ date: string; additions: number; deletions: number }>
 	>([])
-	const [hotFiles, setHotFiles] = useState<Array<{ path: string; changes: number }>>([])
-	const [kpis, setKpis] = useState<DeliveryKpis | null>(null)
-	const [loadingKpis, setLoadingKpis] = useState(false)
-	const [fallback, setFallback] = useState<FallbackKpis | null>(null)
 
 	useEffect(() => {
 		if (!hasGit) {
@@ -107,38 +101,8 @@ export default function ProductivityDashboard({
 	}, [hasGit, scanResult, commits])
 
 	useEffect(() => {
-		let cancelled = false
-		async function load() {
-			if (!hasGit || !projectPath) {
-				setKpis(null)
-				setFallback(null)
-				return
-			}
-			setLoadingKpis(true)
-			try {
-				const d = await getDeliveryKpis(projectPath)
-				if (cancelled) return
-				setKpis(d)
-				if (!d) {
-					const fb = await getFallbackKpis(projectPath)
-					if (!cancelled) setFallback(fb)
-				} else {
-					setFallback(null)
-				}
-			} finally {
-				if (!cancelled) setLoadingKpis(false)
-			}
-		}
-		load()
-		return () => {
-			cancelled = true
-		}
-	}, [projectPath, hasGit])
-
-	useEffect(() => {
 		if (!hasGit || commits.length === 0) {
 			setAddsDelsSeries([])
-			setHotFiles([])
 			return
 		}
 		;(async () => {
@@ -164,11 +128,6 @@ export default function ProductivityDashboard({
 					deletions: daily[d].deletions
 				}))
 			setAddsDelsSeries(series)
-			const top = Object.entries(filesAgg)
-				.sort((a, b) => b[1] - a[1])
-				.slice(0, 30)
-				.map(([path, changes]) => ({ path, changes }))
-			setHotFiles(top)
 		})()
 	}, [hasGit, projectPath, commits])
 
@@ -420,101 +379,6 @@ export default function ProductivityDashboard({
 					)}
 				</Card>
 			</div>
-
-			<Card className='p-6'>
-				<h3 className='text-lg font-semibold text-gray-900 mb-4'>Delivery KPIs (Weekly)</h3>
-				{loadingKpis ? (
-					<div className='h-72 flex items-center justify-center text-gray-500'>
-						Building series...
-					</div>
-				) : kpis ? (
-					<div className='h-72'>
-						<ResponsiveContainer width='100%' height='100%'>
-							<LineChart
-								data={(kpis?.throughput.byWeek || []).map((d: any) => ({
-									date: d.weekStart,
-									throughput: d.count,
-									cycle:
-										kpis?.cycleTime.byWeekMedianDays?.find(
-											x => x.weekStart === d.weekStart
-										)?.medianDays ?? null,
-									lead:
-										kpis?.leadTime.byWeekMedianDays?.find(
-											x => x.weekStart === d.weekStart
-										)?.medianDays ?? null
-								}))}
-							>
-								<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
-								<XAxis dataKey='date' tick={{ fontSize: 12 }} />
-								<YAxis yAxisId='left' tick={{ fontSize: 12 }} />
-								<YAxis
-									yAxisId='right'
-									orientation='right'
-									tick={{ fontSize: 12 }}
-								/>
-								<Tooltip />
-								<Legend />
-								<Line
-									yAxisId='left'
-									type='monotone'
-									dataKey='throughput'
-									stroke='#3B82F6'
-									name='Throughput'
-								/>
-								<Line
-									yAxisId='right'
-									type='monotone'
-									dataKey='cycle'
-									stroke='#10B981'
-									name='Cycle (days)'
-								/>
-								<Line
-									yAxisId='right'
-									type='monotone'
-									dataKey='lead'
-									stroke='#F59E0B'
-									name='Lead (days)'
-								/>
-							</LineChart>
-						</ResponsiveContainer>
-					</div>
-				) : fallback ? (
-					<div className='h-72 flex items-center justify-center text-gray-500'>
-						Not enough data
-					</div>
-				) : (
-					<div className='h-72 flex items-center justify-center text-gray-500'>
-						No data available
-					</div>
-				)}
-			</Card>
-
-			{/* Active Files Heatmap-like */}
-			{hasGit && hotFiles.length > 0 && (
-				<Card className='p-6'>
-					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Most Active Files</h3>
-					<div className='space-y-2'>
-						{hotFiles.map((f, idx) => (
-							<div key={f.path} className='text-xs'>
-								<div className='flex justify-between mb-1'>
-									<span className='truncate max-w-[70%]' title={f.path}>
-										{idx + 1}. {f.path}
-									</span>
-									<span className='text-gray-600'>{f.changes}</span>
-								</div>
-								<div className='w-full bg-gray-200 rounded h-2'>
-									<div
-										className='h-2 rounded bg-gradient-to-r from-blue-400 to-red-500'
-										style={{
-											width: `${Math.min(100, (f.changes / (hotFiles[0]?.changes || 1)) * 100)}%`
-										}}
-									/>
-								</div>
-							</div>
-						))}
-					</div>
-				</Card>
-			)}
 		</>
 	)
 }

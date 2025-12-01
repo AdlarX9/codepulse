@@ -51,29 +51,37 @@ src/
 ## Responsabilités des Modules
 
 ### `models/`
+
 Contient toutes les structures de données et leur logique de persistance :
+
 - **general_settings.rs** : Paramètres généraux de l'application (device_id, update_channel)
 - **scan_settings.rs** : Configuration des scans (langages exclus, répertoires exclus, etc.)
 - **languages.rs** : Détection de langages, catégorisation, liste des langages supportés
 - **projects.rs** : Gestion des projets locaux et de leurs bindings
 
 ### `scanner/`
+
 Module principal d'analyse de code, correspond au **OverviewDashboard** :
+
 - **counter.rs** : Compte les lignes de code, commentaires, blancs par langage
 - **filter.rs** : Applique les filtres de scan (exclusions, inclusions)
 - **history.rs** : Scan historique des commits pour analyser l'évolution du code
 - Expose : `scan_directory()`, `scan_repo_history()`
 
 ### `productivity/`
+
 Module pour le **ProductivityDashboard** :
+
 - Actuellement wrapper léger autour de `scanner::history::scan_repo_history`
 - Pourra être étendu avec d'autres métriques de productivité
 - Expose : `scan_history()`
 
 ### `quality/`
+
 Module pour le **QualityDashboard**, organisé en deux sous-modules :
 
 #### `quality_metrics.rs`
+
 - Calcule les métriques de qualité du code (commentaires %, complexité, etc.)
 - Supporte l'analyse par branche
 - Compare les branches (deltas de qualité)
@@ -81,30 +89,39 @@ Module pour le **QualityDashboard**, organisé en deux sous-modules :
 - Expose : `compute_quality_metrics()`, `compute_quality_metrics_for_branch()`, `compute_branch_quality_deltas()`
 
 #### `github_metrics.rs`
+
 - Récupère les métriques GitHub via l'API REST
 - Calcule throughput, lead time, cycle time par semaine
 - Gère les pull requests et leurs commits
 - Expose : `compute_metrics_for_repo()` (utilisé via main.rs)
 
 ### `contributors/`
+
 Module pour le **ContributorsDashboard** :
+
 - Actuellement placeholder car l'analyse est faite côté TypeScript
 - Pourra être développé pour faire l'analyse en backend Rust si nécessaire
 
 ### `git/`
+
 Module de bas niveau pour les opérations Git :
+
 - **repo.rs** : Ouverture de dépôt, informations générales, branches, fetch
 - **commits.rs** : Liste des commits, récupération par SHA, commits depuis un SHA
 - **diff.rs** : Calcul des statistiques de diff, changements de fichiers par commit
 - Utilisé par scanner, productivity et quality
 
 ### `utils/`
+
 Utilitaires transversaux :
+
 - **app/storage.rs** : Lecture/écriture de fichiers JSON dans le répertoire de config
 - **app/updater.rs** : Vérification automatique des mises à jour depuis GitHub Releases
 
 ### `main.rs`
+
 Point d'entrée de l'application Tauri :
+
 - Déclare tous les `#[tauri::command]` exposés au frontend TypeScript
 - Configure l'invoke_handler avec toutes les fonctions disponibles
 - Lance les tâches de fond (update checker)
@@ -113,26 +130,31 @@ Point d'entrée de l'application Tauri :
 ## Principes d'Architecture
 
 ### 1. Séparation des Responsabilités
+
 - **Backend (Rust)** : Analyse des données, calculs, accès au système de fichiers/Git
 - **Frontend (TypeScript)** : Affichage, interactions utilisateur, graphiques
 - Pas de mélange des rôles : chaque couche a sa responsabilité bien définie
 
 ### 2. Modularité
+
 - Chaque dashboard a son module dédié
 - Les modules partagés (git, utils, models) sont réutilisables
 - Facilite l'ajout de nouvelles fonctionnalités sans impacter le code existant
 
 ### 3. API Minimale
+
 - `main.rs` expose uniquement les fonctions nécessaires au frontend
 - Les fonctions internes restent privées aux modules
 - Garantit une surface d'API propre et maintenable
 
 ### 4. Performance
+
 - Utilisation de `rayon` pour le parallélisme (scan de fichiers)
 - Opérations Git optimisées via `git2`
 - Cache et réutilisation des données quand possible
 
 ### 5. Typage Fort
+
 - Toutes les structures sont typées avec `serde::Serialize`
 - Garantit la cohérence entre Rust et TypeScript
 - Détection des erreurs à la compilation
@@ -140,6 +162,7 @@ Point d'entrée de l'application Tauri :
 ## Flux de Données
 
 ### Scan de Répertoire
+
 ```
 User Action (TypeScript)
   ↓
@@ -161,6 +184,7 @@ TypeScript Frontend (affichage)
 ```
 
 ### Quality Metrics
+
 ```
 User Action (TypeScript)
   ↓
@@ -184,12 +208,14 @@ TypeScript Frontend (affichage)
 ## Migration et Évolution
 
 ### Changements Récents
+
 1. **Renommage** : `user_settings` → `general_settings`
 2. **Restructuration** : Module `app` déplacé dans `utils/app`
 3. **Consolidation** : Module `github` intégré dans `quality/github_metrics`
 4. **Nettoyage** : Suppression du code mort (fonctions Git inutilisées, module auth)
 
 ### Prochaines Étapes Possibles
+
 - Migrer l'analyse des contributeurs du frontend vers `contributors/`
 - Ajouter des métriques de complexité cyclomatique dans `quality/`
 - Implémenter un cache pour les scans fréquents
@@ -198,17 +224,20 @@ TypeScript Frontend (affichage)
 ## Conventions de Code
 
 ### Nommage
+
 - Modules : snake_case (`quality_metrics`)
 - Fonctions : snake_case (`compute_quality_metrics`)
 - Structures : PascalCase (`QualityMetrics`)
 - Constantes : SCREAMING_SNAKE_CASE (`LOCAL_PROJECTS_STORAGE_KEY`)
 
 ### Organisation des Fichiers
+
 - Un fichier `mod.rs` par module pour exposer l'API publique
 - Sous-modules dans des fichiers séparés
 - Réexportation des types principaux dans `mod.rs`
 
 ### Documentation
+
 - Commentaires `///` pour les fonctions publiques
 - Documentation des structures avec exemples si complexe
 - README dans chaque module majeur si nécessaire
@@ -225,4 +254,4 @@ TypeScript Frontend (affichage)
 
 ---
 
-*Document mis à jour le 2024 - CodePulse v1.0.0*
+_Document mis à jour le 2024 - CodePulse v1.0.0_

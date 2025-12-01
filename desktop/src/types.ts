@@ -1,16 +1,3 @@
-// API models (Go+Gin)
-
-export interface ApiProject {
-	id: string
-	user_id: string
-	project_key_hash?: string
-	name?: string
-	description?: string
-	visibility: 'private' | 'public'
-	created_at: string
-	updated_at: string
-}
-
 // Scan models (from Rust backend)
 
 export interface FileStats {
@@ -52,7 +39,15 @@ export interface ScanProgress {
 	current_file: string
 }
 
-export interface Project extends ApiProject {
+export interface Project {
+	id: string
+	user_id: string
+	project_key_hash?: string
+	name?: string
+	description?: string
+	visibility: 'private' | 'public'
+	created_at: string
+	updated_at: string
 	settings: Record<string, any>
 }
 
@@ -79,14 +74,4 @@ export interface ScanSettings {
 	excluded_dirs: string[]
 	excluded_extensions: string[]
 	follow_symlinks: boolean
-}
-
-// "Check for updates" model
-
-export interface UpdateCheck {
-	available: boolean
-	version?: string
-	current_version: string
-	notes?: string
-	url?: string
 }

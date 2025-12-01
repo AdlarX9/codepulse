@@ -1,6 +1,6 @@
 use crate::models::general_settings::{save_general_settings, GeneralSettings};
 use reqwest::Client;
-use serde::{Serialize};
+use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Serialize)]
