@@ -130,7 +130,8 @@ launch_desktop() {
 
 launch_web() {
 	echo -e "${BLUE}🌐 Lancement de l'application web...${NC}"
-	bash scripts/launch-web.sh
+	npx tailwindcss -i ./web/assets/tailwind.css -o ./web/assets/tailwind.generated.css --minify --content './**/*.{php,html,js}'
+	php -S 127.0.0.1:8080 -t web
 }
 
 build_all() {

@@ -14,7 +14,7 @@ set -u
 # Usage: ./create-dev-icons.sh
 LOGO_NAME="FullLogo_Transparent.png"
 ICON_DIR="desktop/src-tauri/icons"
-WEB_PUBLIC_DIR="web/public"
+WEB_PUBLIC_DIR="web/assets"
 DESKTOP_ASSETS_DIR="desktop/src/assets"
 
 mkdir -p "$ICON_DIR"
