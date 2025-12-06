@@ -124,8 +124,8 @@
 				"fullscreen": false,
 				"resizable": true,
 				"title": "CodePulse",
-				"width": 1400,
-				"height": 900,
+				"width": 1600,
+				"height": 1100,
 				"minWidth": 800,
 				"minHeight": 600,
 				"transparent": true

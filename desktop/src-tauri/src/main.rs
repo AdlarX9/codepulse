@@ -10,9 +10,7 @@ mod quality;
 mod utils;
 
 // Use statements
-use models::general_settings::{load_general_settings, save_general_settings, GeneralSettings};
 use models::languages;
-use models::projects;
 use models::scan_settings::{load_scan_settings, save_scan_settings, ScanSettings};
 use overview::ScanResult;
 use productivity::scan_history;
@@ -20,24 +18,10 @@ use serde_json::Value as JsonValue;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{State, Window};
-use utils::{git_ops, storage, updater};
+use utils::{git_ops, storage};
 
 struct AppState {
 	cancel_flag: Arc<AtomicBool>,
-}
-
-#[tauri::command]
-async fn compute_github_metrics_for_path(
-	path: String,
-	weeks: usize,
-	github_token: Option<String>,
-) -> Result<quality::github_metrics::GitHubMetrics, String> {
-	let info = git_ops::get_repo_info(&path).map_err(|e| e.to_string())?;
-	let slug = match info.remote_url.and_then(|u| quality::parse_repo_slug(&u)) {
-		Some(s) => s,
-		None => return Err("No GitHub remote detected".into()),
-	};
-	quality::github_metrics::compute_metrics_for_repo(&slug, weeks, github_token.as_deref()).await
 }
 
 #[tauri::command]
@@ -46,15 +30,6 @@ async fn compute_quality_metrics(
 	settings: ScanSettings,
 ) -> Result<quality::QualityMetrics, String> {
 	quality::compute_quality_metrics(&path, &settings).await
-}
-
-#[tauri::command]
-async fn compute_quality_metrics_for_branch(
-	path: String,
-	branch: String,
-	settings: ScanSettings,
-) -> Result<quality::QualityMetrics, String> {
-	quality::compute_quality_metrics_for_branch(&path, &branch, &settings).await
 }
 
 #[tauri::command]
@@ -105,22 +80,6 @@ async fn scan_directory(
 }
 
 #[tauri::command]
-async fn cancel_scan(state: State<'_, AppState>) -> Result<(), String> {
-	state.cancel_flag.store(true, Ordering::Relaxed);
-	Ok(())
-}
-
-#[tauri::command]
-async fn get_general_settings() -> Result<GeneralSettings, String> {
-	load_general_settings()
-}
-
-#[tauri::command]
-async fn update_general_settings(settings: GeneralSettings) -> Result<(), String> {
-	save_general_settings(&settings)
-}
-
-#[tauri::command]
 async fn get_scan_settings() -> Result<ScanSettings, String> {
 	load_scan_settings()
 }
@@ -128,32 +87,6 @@ async fn get_scan_settings() -> Result<ScanSettings, String> {
 #[tauri::command]
 async fn update_scan_settings(settings: ScanSettings) -> Result<(), String> {
 	save_scan_settings(&settings)
-}
-
-#[tauri::command]
-async fn check_for_updates() -> Result<updater::UpdateCheck, String> {
-	let mut settings = load_general_settings()?;
-	updater::check_for_updates(&mut settings).await
-}
-
-#[tauri::command]
-async fn get_project_binding(project_id: &str) -> Result<Option<String>, String> {
-	projects::get_binding(project_id)
-}
-
-#[tauri::command]
-async fn set_project_binding(project_id: &str, base_path: &str) -> Result<(), String> {
-	projects::set_binding(project_id, base_path)
-}
-
-#[tauri::command]
-async fn clear_project_binding(project_id: &str) -> Result<(), String> {
-	projects::clear_binding(project_id)
-}
-
-#[tauri::command]
-async fn compute_project_key_hash(base_path: &str) -> Result<String, String> {
-	projects::compute_project_key_hash(base_path)
 }
 
 // Local projects storage (JSON persisted under user config dir)
@@ -218,11 +151,6 @@ async fn git_is_repository(path: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
-async fn git_get_repo_info(path: String) -> Result<git_ops::GitRepoInfo, String> {
-	git_ops::get_repo_info(&path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn git_get_branches(path: String) -> Result<Vec<String>, String> {
 	git_ops::get_branches(&path).map_err(|e| e.to_string())
 }
@@ -234,23 +162,6 @@ async fn git_get_commits(
 	limit: usize,
 ) -> Result<Vec<git_ops::GitCommitInfo>, String> {
 	git_ops::get_commits(&path, branch.as_deref(), limit).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn git_get_commits_since(
-	path: String,
-	since_sha: String,
-	branch: Option<String>,
-) -> Result<Vec<git_ops::GitCommitInfo>, String> {
-	git_ops::get_commits_since(&path, &since_sha, branch.as_deref()).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn git_get_commit_by_sha(
-	path: String,
-	sha: String,
-) -> Result<git_ops::GitCommitInfo, String> {
-	git_ops::get_commit_by_sha(&path, &sha).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -269,76 +180,31 @@ async fn git_get_commit_file_changes(
 	git_ops::get_commit_file_changes(&path, &commit_sha).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn git_fetch_from_remote(path: String, remote_name: String) -> Result<(), String> {
-	git_ops::fetch_from_remote(&path, &remote_name).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn git_has_uncommitted_changes(path: String) -> Result<bool, String> {
-	git_ops::has_uncommitted_changes(&path).map_err(|e| e.to_string())
-}
-
 fn main() {
-	// Load general settings for background tasks
-	let general_settings = load_general_settings().expect("Failed to load general settings");
-
-	// Start update checker in background
-	let general_settings_clone = general_settings.clone();
-
 	tauri::Builder::default()
 		.manage(AppState { cancel_flag: Arc::new(AtomicBool::new(false)) })
-		.setup(move |_app| {
-			// Spawn background tasks within Tauri runtime
-			// let app_handle = _app.handle(); // Unused for now
-
-			// Update checker
-			tauri::async_runtime::spawn(async move {
-				updater::start_update_checker(general_settings_clone).await;
-			});
-
-			Ok(())
-		})
 		.invoke_handler(tauri::generate_handler![
 			// Scan
 			scan_directory,
-			cancel_scan,
 			scan_repo_history_cmd,              // Overview
-			compute_github_metrics_for_path,    // Productivity
 			compute_quality_metrics,            // Quality
-			compute_quality_metrics_for_branch, // Quality
 			compute_branch_quality_deltas,      // Quality
 			// Storage
-			get_general_settings,
-			update_general_settings,
 			get_scan_settings,
 			update_scan_settings,
 			list_supported_languages,
 			get_common_excluded_languages,
-			// Auth
-			check_for_updates,
-			// Projects
-			get_project_binding,
-			set_project_binding,
-			clear_project_binding,
-			compute_project_key_hash,
 			// Local projects storage
 			load_projects,
-			save_projects,
 			get_project,
 			upsert_project,
 			delete_project,
 			// Git
 			git_is_repository,
-			git_get_repo_info,
 			git_get_branches,
 			git_get_commits,
-			git_get_commits_since,
-			git_get_commit_by_sha,
 			git_get_commit_diff_stats,
-			git_get_commit_file_changes,
-			git_fetch_from_remote,
-			git_has_uncommitted_changes,
+			git_get_commit_file_changes
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");

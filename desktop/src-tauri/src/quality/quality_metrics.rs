@@ -1,10 +1,10 @@
 use crate::models::scan_settings::ScanSettings;
 use crate::overview::{count_files, count_lines, detect_language};
 use encoding_rs;
-use git2::{DiffOptions, ObjectType, Oid, Repository, Tree};
+use git2::{DiffOptions, Oid, Repository};
 use rayon::prelude::*;
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone, Serialize)]
@@ -188,142 +188,6 @@ fn read_blob_text(repo: &Repository, oid: Oid) -> Option<String> {
 			Some(decoded.to_string())
 		}
 	}
-}
-
-fn traverse_tree_collect(
-	repo: &Repository,
-	tree: &Tree,
-	base: &Path,
-	settings: &ScanSettings,
-	file_totals: &mut Vec<u32>,
-	totals: &mut (u32, u32, u32, u32),
-) {
-	for entry in tree.iter() {
-		let name = match entry.name() {
-			Some(n) => n,
-			None => continue,
-		};
-		let full_path: PathBuf = base.join(name);
-		match entry.kind() {
-			Some(ObjectType::Tree) => {
-				if settings.excluded_dirs.iter().any(|d| d == name) {
-					continue;
-				}
-				if let Ok(next) = entry.to_object(repo).and_then(|o| o.peel_to_tree()) {
-					traverse_tree_collect(repo, &next, &full_path, settings, file_totals, totals);
-				}
-			}
-			Some(ObjectType::Blob) => {
-				let filename = name;
-				if !path_allowed_by_settings(
-					full_path.to_string_lossy().as_ref(),
-					filename,
-					settings,
-				) {
-					continue;
-				}
-				if let Some(text) = read_blob_text(repo, entry.id()) {
-					let lang = detect_language(filename);
-					let (total, blank, comment, code) = count_lines(&text, &lang);
-					file_totals.push(total);
-					totals.0 += total; // total lines
-					totals.1 += code;
-					totals.2 += comment;
-					totals.3 += blank;
-				}
-			}
-			_ => {}
-		}
-	}
-}
-
-fn compute_quality_metrics_for_tree(
-	repo: &Repository,
-	tree: &Tree,
-	settings: &ScanSettings,
-) -> Result<QualityMetrics, String> {
-	let mut file_totals: Vec<u32> = Vec::new();
-	let mut totals: (u32, u32, u32, u32) = (0, 0, 0, 0);
-	traverse_tree_collect(repo, tree, Path::new(""), settings, &mut file_totals, &mut totals);
-
-	let total_lines = totals.0;
-	let total_code = totals.1;
-	let total_comments = totals.2;
-	let total_blank = totals.3;
-
-	let mut sorted = file_totals.clone();
-	sorted.sort_unstable();
-	let avg = if sorted.is_empty() {
-		0.0
-	} else {
-		sorted.iter().sum::<u32>() as f64 / sorted.len() as f64
-	};
-	let median = if sorted.is_empty() {
-		0.0
-	} else if sorted.len() % 2 == 0 {
-		let m = sorted.len() / 2;
-		(sorted[m - 1] + sorted[m]) as f64 / 2.0
-	} else {
-		sorted[sorted.len() / 2] as f64
-	};
-	let var = if sorted.is_empty() {
-		0.0
-	} else {
-		sorted
-			.iter()
-			.map(|&x| {
-				let d = x as f64 - avg;
-				d * d
-			})
-			.sum::<f64>()
-			/ sorted.len() as f64
-	};
-	let stddev = var.sqrt();
-
-	Ok(QualityMetrics {
-		total_files: file_totals.len() as u32,
-		total_lines,
-		total_code,
-		total_comments,
-		total_blank,
-		comment_percentage: if total_lines > 0 {
-			(total_comments as f64 / total_lines as f64) * 100.0
-		} else {
-			0.0
-		},
-		code_percentage: if total_lines > 0 {
-			(total_code as f64 / total_lines as f64) * 100.0
-		} else {
-			0.0
-		},
-		avg_file_lines: avg,
-		median_file_lines: median,
-		stddev_file_lines: stddev,
-		dead_code_findings: 0,
-		test_coverage: None,
-		doc_coverage: None,
-	})
-}
-
-pub async fn compute_quality_metrics_for_branch(
-	path: &str,
-	branch: &str,
-	settings: &ScanSettings,
-) -> Result<QualityMetrics, String> {
-	let repo = Repository::open(path).map_err(|e| format!("Git open failed: {}", e))?;
-	let reference = repo
-		.find_reference(&format!("refs/heads/{}", branch))
-		.or_else(|_| -> Result<git2::Reference, git2::Error> {
-			let commit = repo.revparse_single(branch)?.peel_to_commit()?;
-			repo.find_reference(&commit.id().to_string())
-		})
-		.map_err(|_| "Branch not found".to_string())?;
-	let obj = reference
-		.peel(git2::ObjectType::Commit)
-		.map_err(|e| format!("Peel commit failed: {}", e))?;
-	let commit = obj.into_commit().map_err(|_| "Not a commit".to_string())?;
-	let tree = commit.tree().map_err(|e| format!("Tree failed: {}", e))?;
-	compute_quality_metrics_for_tree(&repo, &tree, settings)
 }
 
 pub async fn compute_branch_quality_deltas(
