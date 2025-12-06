@@ -1,10 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
-import './styles.css'
+import App from '@/navigation/App'
+import '@/styles.css'
+import { MainContextProvider } from './navigation/MainContext'
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
 	<React.StrictMode>
-		<App />
+		<MainContextProvider>
+			<App />
+		</MainContextProvider>
 	</React.StrictMode>
 )

@@ -51,27 +51,9 @@ export interface Project {
 	settings: Record<string, any>
 }
 
-// Settings models (shared with Rust backend)
-
-export interface GeneralSettings {
-	device_id: string
-	local_salt: string
-	update_channel: string
-	last_update_check: string
-	github_token?: string
-	gitlab_token?: string
-}
-
-/**
- * Scan settings is used to count lines of code
- * in a project not linked to a git repo.
- * Otherwise, .gitignore is used to exclude files.
- */
-export interface ScanSettings {
-	excluded_languages: string[]
-	allowed_languages: string[]
-	excluded_patterns: string[]
-	excluded_dirs: string[]
-	excluded_extensions: string[]
-	follow_symlinks: boolean
+export interface LocalProject {
+	id: string
+	name: string
+	path: string
+	lastScanned?: string
 }

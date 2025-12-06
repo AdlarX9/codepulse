@@ -21,8 +21,6 @@ print_help() {
 	echo -e "${YELLOW}Applications:${NC}"
 	echo "  desktop			  Lancer l'application desktop"
 	echo "  web				  Lancer l'application web"
-	echo "  dev				  Lancer desktop + web simultanément"
-	echo "  docker			   Lancer avec Docker Compose (production)"
 	echo ""
 	echo -e "${YELLOW}Développement:${NC}"
 	echo "  setup				Configuration initiale du projet"
@@ -31,9 +29,6 @@ print_help() {
 	echo "  build-desktop		Build l'application desktop seulement"
 	echo "  test				 Lancer tous les tests"
 	echo ""
-	echo -e "${YELLOW}Releases:${NC}"
-	echo "  release <version>	Créer un tag de release (ex: v1.0.0)"
-	echo ""
 	echo -e "${YELLOW}Utilitaires:${NC}"
 	echo "  clean				Nettoyer les fichiers temporaires"
 	echo "  help				 Afficher cette aide"
@@ -41,8 +36,6 @@ print_help() {
 	echo "Exemples:"
 	echo "  $0 desktop		   # Lancer l'app desktop"
 	echo "  $0 web			   # Lancer la landing page"
-	echo "  $0 docker			# Lancer avec Docker (prod)"
-	echo "  $0 release v1.2.3	# Créer release v1.2.3"
 }
 
 check_dependencies() {
@@ -97,43 +90,6 @@ setup_project() {
 	echo "  $0 web		# Lancer l'app web"
 }
 
-launch_desktop() {
-	echo -e "${BLUE}🚀 Lancement de l'application desktop...${NC}"
-	bash scripts/launch-desktop.sh
-}
-
-launch_web() {
-	echo -e "${BLUE}🌐 Lancement de l'application web...${NC}"
-	bash scripts/launch-web.sh
-}
-
-launch_both() {
-	echo -e "${BLUE}🚀 Lancement desktop + web...${NC}"
-	echo -e "${YELLOW}Appuyez sur Ctrl+C pour arrêter les deux applications${NC}"
-		
-	# Launch web in background
-	bash scripts/launch-web.sh &
-	WEB_PID=$!
-		
-	# Launch desktop in foreground
-	bash scripts/launch-desktop.sh &
-	DESKTOP_PID=$!
-		
-	# Wait for both processes
-	wait $WEB_PID $DESKTOP_PID
-}
-
-build_all() {
-	echo -e "${BLUE}📦 Build de toutes les applications...${NC}"
-	pnpm -w build
-	echo -e "${GREEN}✅ Build terminé !${NC}"
-}
-
-build_desktop() {
-	echo -e "${BLUE}🔨 Build de l'application desktop...${NC}"
-	bash scripts/build-tauri.sh
-}
-
 run_tests() {
 	echo -e "${BLUE}🧪 Lancement des tests...${NC}"
 		
@@ -167,6 +123,27 @@ clean_project() {
 	echo -e "${GREEN}✅ Nettoyage terminé !${NC}"
 }
 
+launch_desktop() {
+	echo -e "${BLUE}🚀 Lancement de l'application desktop...${NC}"
+	bash scripts/launch-desktop.sh
+}
+
+launch_web() {
+	echo -e "${BLUE}🌐 Lancement de l'application web...${NC}"
+	bash scripts/launch-web.sh
+}
+
+build_all() {
+	echo -e "${BLUE}📦 Build de toutes les applications...${NC}"
+	pnpm -w build
+	echo -e "${GREEN}✅ Build terminé !${NC}"
+}
+
+build_desktop() {
+	echo -e "${BLUE}🔨 Build de l'application desktop...${NC}"
+	bash scripts/build-tauri.sh
+}
+
 generate_icons() {
 	echo -e "${BLUE}🎨 Génération des icônes de développement...${NC}"
 	bash scripts/create-dev-icons.sh
@@ -178,11 +155,6 @@ format_code() {
 	cd desktop/src-tauri
 	cargo fmt
 	cd ../../
-}
-
-launch_docker() {
-	echo -e "${BLUE}🐳 Lancement avec Docker Compose (production)...${NC}"
-	docker compose -f compose.yaml up --build
 }
 
 # Main command handling
@@ -197,10 +169,6 @@ case "$1" in
 		
 	"dev")
 		launch_both
-		;;
-		
-	"docker")
-		launch_docker
 		;;
 		
 	"setup")
@@ -221,10 +189,6 @@ case "$1" in
 		
 	"test")
 		run_tests
-		;;
-		
-	"release")
-		create_release $2
 		;;
 		
 	"clean")

@@ -46,9 +46,6 @@ web/tsconfig.tsbuildinfo
 coverage/
 .nyc_output/
 
-# Secret Place hehe
-secret-place/
-
 # Icons
 desktop/src-tauri/icons/*.png
 web/public/favicon.ico
