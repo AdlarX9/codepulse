@@ -18,6 +18,7 @@
 	"devDependencies": {
 		"@types/node": "^20.14.0",
 		"autoprefixer": "^10.4.22",
+		"baseline-browser-mapping": "^2.10.0",
 		"postcss": "^8.5.6",
 		"prettier": "^3.3.0",
 		"tailwindcss": "^3.4.18",
@@ -27,7 +28,7 @@
 		"node": ">=20.0.0",
 		"pnpm": ">=9.0.0"
 	},
-	"packageManager": "pnpm@10.20.0",
+	"packageManager": "pnpm@10.32.1",
 	"pnpm": {
 		"overrides": {
 			"esbuild@<=0.24.2": ">=0.25.0",
