@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as exportLib from '@/features/export/functions'
 import { Download, FileText, FileJson, FileSpreadsheet, Code } from 'lucide-react'
-import { ExportFormat } from './types'
+import { ExportFormat } from '@/types'
 import { Button } from '@/components/Button'
 import { useMainContext } from '@/navigation/MainContext'
 
@@ -20,25 +20,31 @@ export default function ExportButton({ variant = 'outline', size = 'sm' }: Expor
 	}
 
 	async function handleExport(format: ExportFormat) {
+		if (!scanResult) {
+			return
+		}
+
+		const data = scanResult
+
 		try {
 			setExporting(true)
 			setShowMenu(false)
 
-			let content: string
+			let content = ''
 			const fileName = projectName || 'code-analysis'
 
 			switch (format) {
 				case 'json':
-					content = exportLib.exportToJSON(scanResult!)
+					content = exportLib.exportToJSON(data)
 					break
 				case 'csv':
-					content = exportLib.exportToCSV(scanResult!)
+					content = exportLib.exportToCSV(data)
 					break
 				case 'markdown':
-					content = exportLib.exportToMarkdown(scanResult!, projectName)
+					content = exportLib.exportToMarkdown(data, projectName)
 					break
 				case 'html':
-					content = exportLib.exportToHTML(scanResult!, projectName)
+					content = exportLib.exportToHTML(data, projectName)
 					break
 			}
 

@@ -1,22 +1,13 @@
 import { useState } from 'react'
-import {
-	LayoutDashboard,
-	TrendingUp,
-	Target,
-	Users,
-	Settings as SettingsIcon,
-	Download
-} from 'lucide-react'
+import { LayoutDashboard, TrendingUp, Download } from 'lucide-react'
 import ExportCenter from '@/features/export/ExportCenter'
 import ExportButton from '@/features/export/ExportButton'
 import OverviewDashboard from '@/features/overview/OverviewDashboard'
-import ProductivityDashboard from '@/features/productivity/ProductivityDashboard'
-import QualityDashboard from '@/features/quality/QualityDashboard'
-import ContributorsDashboard from '@/features/contributors/ContributorsDashboard'
+import EvolutionDashboard from '@/features/evolution/EvolutionDashboard'
 import { useMainContext } from './MainContext'
 
 interface DashboardTab {
-	id: 'overview' | 'productivity' | 'quality' | 'contributors' | 'settings' | 'exports'
+	id: 'overview' | 'evolution' | 'exports'
 	label: string
 	icon: React.ReactNode
 	description: string
@@ -30,46 +21,24 @@ const TABS: DashboardTab[] = [
 		description: 'Global state, lines, languages, structure'
 	},
 	{
-		id: 'productivity',
-		label: 'Productivity',
+		id: 'evolution',
+		label: 'Evolution',
 		icon: <TrendingUp className='h-4 w-4' />,
 		description: 'Growth over time, commits, trends'
-	},
-	{
-		id: 'quality',
-		label: 'Quality',
-		icon: <Target className='h-4 w-4' />,
-		description: 'Code coverage, complexity, technical debt'
-	},
-	{
-		id: 'contributors',
-		label: 'Contributors',
-		icon: <Users className='h-4 w-4' />,
-		description: 'Git-based contributor ranking'
 	},
 	{
 		id: 'exports',
 		label: 'Exports',
 		icon: <Download className='h-4 w-4' />,
 		description: 'Export data in multiple formats'
-	},
-	{
-		id: 'settings',
-		label: 'Settings',
-		icon: <SettingsIcon className='h-4 w-4' />,
-		description: 'Project-specific settings'
 	}
 ]
 
 export default function Dashboards() {
 	const [activeTab, setActiveTab] = useState<DashboardTab['id']>('overview')
-	const { scanResult, projectPath, projectName, hasGit } = useMainContext()
+	const { scanResult, projectName } = useMainContext()
 
-	// Filter tabs based on Git availability
-	let availableTabs = hasGit ? TABS : TABS.filter(tab => tab.id !== 'contributors')
-	if (!projectPath) {
-		availableTabs = availableTabs.filter(tab => tab.id !== 'settings')
-	}
+	const availableTabs = TABS
 
 	return (
 		<div className='h-full flex flex-col'>
@@ -126,9 +95,7 @@ export default function Dashboards() {
 				<div className='flex'>
 					<div className='flex-1 p-6'>
 						{activeTab === 'overview' && <OverviewDashboard />}
-						{activeTab === 'productivity' && <ProductivityDashboard />}
-						{activeTab === 'quality' && <QualityDashboard />}
-						{activeTab === 'contributors' && <ContributorsDashboard />}
+						{activeTab === 'evolution' && <EvolutionDashboard />}
 						{activeTab === 'exports' && <ExportCenter />}
 					</div>
 				</div>

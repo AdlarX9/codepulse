@@ -1,5 +1,5 @@
+import { ScanSettings } from '@/types'
 import { invoke } from '@tauri-apps/api'
-import { ScanSettings } from './types'
 
 export async function listSupportedLanguages(): Promise<string[]> {
 	const result: string[] = await invoke<string[]>('list_supported_languages')

@@ -1,6 +1,5 @@
 // Export utilities for different formats
-import type { ScanResult } from '@/types'
-import { ExportFormat } from './types'
+import type { ExportFormat, ScanResult } from '@/types'
 
 /**
  * Export scan results to JSON

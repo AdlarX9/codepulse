@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import type { ScanSettings } from '@/features/settings/types'
+import type { ScanSettings } from '@/types'
 import ScanSettingsForm from './ScanSettingsForm'
 import { getScanSettings, updateScanSettings } from './invokes'
 
@@ -9,12 +9,8 @@ interface ScanSettingsProps {
 
 export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 	const [settings, setSettings] = useState<ScanSettings>({
-		excluded_dirs: [],
-		excluded_extensions: [],
-		excluded_patterns: [],
-		follow_symlinks: false,
-		excluded_languages: [],
-		allowed_languages: []
+		excluded_expressions: [],
+		follow_symlinks: false
 	})
 	const [loading, setLoading] = useState(true)
 	const [saving, setSaving] = useState(false)

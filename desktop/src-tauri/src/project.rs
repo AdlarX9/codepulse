@@ -14,11 +14,12 @@ use chrono::{Datelike, Duration, TimeZone, Utc};
 use git2::{Oid};
 
 #[derive(Serialize)]
-pub struct LanguageStat {
+pub struct FileStats {
 	pub language: String,
 	pub lines: u64,
 	pub comments: u64,
 	pub blank: u64,
+	pub path: String,
 }
 
 #[allow(dead_code)]
@@ -194,7 +195,7 @@ impl Project {
 		files
 	}
 
-	fn scan_file(&self, file_path: String) -> LanguageStat {
+	fn scan_file(&self, file_path: String) -> FileStats {
 		let path = PathBuf::from(&file_path);
 		let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
 		let language = languages().detect_language(filename);
@@ -202,43 +203,30 @@ impl Project {
 		let content = fs::read_to_string(&file_path).unwrap_or_default();
 		let (total, blank, comment, _code) = languages().count_lines(&content, &language);
 
-		LanguageStat {
+		FileStats {
 			language,
 			lines: total as u64,
 			comments: comment as u64,
 			blank: blank as u64,
+			path: file_path,
 		}
 	}
 
-	pub async fn scan_directory(&self) -> Vec<LanguageStat> {
+	pub async fn scan_directory(&self) -> Vec<FileStats> {
 		let root = Path::new(&self.path);
 		if !root.exists() {
 			return vec![];
 		}
 
 		let files = self.get_files_to_scan();
-		let mut map: HashMap<String, LanguageStat> = HashMap::new();
+		let mut stats = Vec::new();
 
 		for f in files {
 			let stat = self.scan_file(f);
-
-			let entry = map.entry(stat.language.clone()).or_insert(LanguageStat {
-				language: stat.language.clone(),
-				lines: 0,
-				comments: 0,
-				blank: 0,
-			});
-
-			entry.lines += stat.lines;
-			entry.comments += stat.comments;
-			entry.blank += stat.blank;
+			stats.push(stat);
 		}
 
-		// Convertir en Vec et, si souhaité, trier (ex : par nombre de lignes décroissant)
-		let mut result: Vec<LanguageStat> = map.into_iter().map(|(_, v)| v).collect();
-		result.sort_by(|a, b| b.lines.cmp(&a.lines)); // tri optionnel
-
-		result
+		stats
 	}
 
 	fn count_tree_loc(&self, repo: &Repository, tree: &Tree) -> HashMap<String, u64> {

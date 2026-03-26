@@ -7,7 +7,7 @@ mod storage;
 mod user;
 
 use crate::languages::{LanguageDef, languages};
-use crate::project::{LanguageStat, Project};
+use crate::project::{FileStats, Project};
 use crate::user::{user, ScanSettings};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ async fn get_common_excluded_languages() -> Result<Vec<String>, String> {
 async fn scan_directory(
 	path: &str,
 	state: State<'_, AppState>,
-) -> Result<Vec<LanguageStat>, String> {
+) -> Result<Vec<FileStats>, String> {
 	state.cancel_flag.store(false, Ordering::Relaxed);
 	let project = Project::new(String::new(), path.to_string());
 	Ok(project.scan_directory().await)
@@ -90,21 +90,25 @@ fn main() {
 	tauri::Builder::default()
 		.manage(AppState { cancel_flag: Arc::new(AtomicBool::new(false)) })
 		.invoke_handler(tauri::generate_handler![
-			// Scan
+			// Project
+			// Actual features
 			scan_directory,
 			get_loc_evolution,
 			get_loc_diff,
-			// Storage
+			// Languages
+			// Facilitators
 			get_all_languages,
-			get_scan_settings,
-			update_scan_settings,
 			list_supported_languages,
 			get_common_excluded_languages,
-			// Local projects storage
+			// User
+			// CRUD Projects
 			load_projects,
 			get_project,
 			upsert_project,
 			delete_project,
+			// CRUD Scan Settings
+			update_scan_settings,
+			get_scan_settings,
 		])
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");

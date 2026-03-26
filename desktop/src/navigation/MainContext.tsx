@@ -1,8 +1,7 @@
 import { LocalProject, ScanResult } from '@/types'
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import * as git from '@/handles/git'
 import { open as openDialog } from '@tauri-apps/api/dialog'
-import { getScanSettings } from '@/features/settings/invokes'
+import { invoke } from '@tauri-apps/api'
 import { scanDirectory } from '@/handles/scan'
 
 interface ValueType {
@@ -30,29 +29,44 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 	const [projectName, setProjectName] = useState<string>('Project')
 	const [recentProjects, setRecentProjects] = useState<LocalProject[]>([])
 
-	// Charger les projets récents au démarrage
 	useEffect(() => {
-		loadRecentProjects()
+		void loadRecentProjects()
 	}, [])
 
-	// Vérifier si le projet a Git quand le chemin change
 	useEffect(() => {
-		if (projectPath) {
-			git.isGitRepository(projectPath)
-				.then(setHasGit)
-				.catch(() => setHasGit(false))
+		if (!projectPath) {
+			setHasGit(false)
+			return
 		}
+
+		void (async () => {
+			try {
+				const diff = await invoke<Record<string, [number, number]>>('get_loc_diff', {
+					path: projectPath
+				})
+				setHasGit(Object.keys(diff).length > 0)
+			} catch {
+				setHasGit(false)
+			}
+		})()
 	}, [projectPath])
 
 	async function loadRecentProjects() {
 		try {
-			// Charger les projets depuis le localStorage Tauri
-			const stored = localStorage.getItem('recent-projects')
-			if (stored) {
-				setRecentProjects(JSON.parse(stored))
-			}
+			const stored = await invoke<Array<Record<string, unknown>>>('load_projects')
+			const projects: LocalProject[] = (stored || [])
+				.map(item => ({
+					id: String(item.id ?? ''),
+					name: String(item.name ?? 'Project'),
+					path: String(item.path ?? ''),
+					lastScanned: item.lastScanned ? String(item.lastScanned) : undefined
+				}))
+				.filter(p => p.id && p.path)
+				.sort((a, b) => (b.lastScanned || '').localeCompare(a.lastScanned || ''))
+			setRecentProjects(projects)
 		} catch (e) {
 			console.error('Failed to load recent projects:', e)
+			setRecentProjects([])
 		}
 	}
 
@@ -64,12 +78,8 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 				path,
 				lastScanned: new Date().toISOString()
 			}
-
-			// Ajouter au début et garder max 10 projets
-			const updated = [project, ...recentProjects.filter(p => p.path !== path)].slice(0, 10)
-
-			setRecentProjects(updated)
-			localStorage.setItem('recent-projects', JSON.stringify(updated))
+			await invoke('upsert_project', { project })
+			await loadRecentProjects()
 		} catch (e) {
 			console.error('Failed to save recent project:', e)
 		}
@@ -92,30 +102,25 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 		setProjectPath(selected)
 		setProjectName(newProjectName)
 
-		// Charger les paramètres de scan et lancer l'analyse
-		const settings = await getScanSettings()
-		const result = await scanDirectory(selected, settings)
+		const result = await scanDirectory(selected)
 
 		setScanResult(result)
 		changeView('analysis')
 
-		// Sauvegarder dans les projets récents
-		await saveRecentProject(selected, projectName)
+		await saveRecentProject(selected, newProjectName)
 	}
 
 	async function openRecentProject(project: LocalProject) {
 		setProjectPath(project.path)
-		setProjectName(project.name)
+		setProjectName(project.name || 'Project')
 
 		try {
-			const settings = await getScanSettings()
-			const result = await scanDirectory(project.path, settings)
+			const result = await scanDirectory(project.path)
 
 			setScanResult(result)
 			changeView('analysis')
 
-			// Mettre à jour la date de dernier scan
-			await saveRecentProject(project.path, project.name)
+			await saveRecentProject(project.path, project.name || 'Project')
 		} catch (e) {
 			console.error('Failed to scan project:', e)
 		}
@@ -125,8 +130,7 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 		if (!projectPath) return
 
 		try {
-			const settings = await getScanSettings()
-			const result = await scanDirectory(projectPath, settings)
+			const result = await scanDirectory(projectPath)
 			setScanResult(result)
 		} catch (e) {
 			console.error('Failed to rescan:', e)

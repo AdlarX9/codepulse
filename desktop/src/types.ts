@@ -1,5 +1,3 @@
-// Scan models (from Rust backend)
-
 export interface FileStats {
 	path: string
 	language: string
@@ -34,26 +32,16 @@ export interface ScanResult {
 	std_dev: number
 }
 
-export interface ScanProgress {
-	files_scanned: number
-	current_file: string
-}
-
-export interface Project {
-	id: string
-	user_id: string
-	project_key_hash?: string
-	name?: string
-	description?: string
-	visibility: 'private' | 'public'
-	created_at: string
-	updated_at: string
-	settings: Record<string, any>
-}
-
 export interface LocalProject {
 	id: string
 	name: string
 	path: string
 	lastScanned?: string
+}
+
+export type ExportFormat = 'json' | 'csv' | 'markdown' | 'html'
+
+export interface ScanSettings {
+	excluded_expressions: string[]
+	follow_symlinks: boolean
 }
