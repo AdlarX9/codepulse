@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { LayoutDashboard, TrendingUp, Download } from 'lucide-react'
-import ExportCenter from '@/features/export/ExportCenter'
-import ExportButton from '@/features/export/ExportButton'
-import OverviewDashboard from '@/features/overview/OverviewDashboard'
-import EvolutionDashboard from '@/features/evolution/EvolutionDashboard'
+import ExportCenter from '@/export/ExportCenter'
+import ExportButton from '@/export/ExportButton'
+import OverviewDashboard from '@/overview/OverviewDashboard'
+import EvolutionDashboard from '@/evolution/EvolutionDashboard'
 import { useMainContext } from './MainContext'
 
 interface DashboardTab {

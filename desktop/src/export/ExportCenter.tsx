@@ -1,6 +1,6 @@
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
-import * as exportLib from '@/features/export/functions'
+import * as exportLib from '@/export/functions'
 import { useMainContext } from '@/navigation/MainContext'
 import { useMemo, useState } from 'react'
 

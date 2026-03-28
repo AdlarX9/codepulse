@@ -1,5 +1,5 @@
+import { useMainContext } from '@/navigation/MainContext'
 import { ButtonHTMLAttributes, forwardRef } from 'react'
-import { cn } from '@/handles/utils'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	variant?: 'default' | 'outline' | 'ghost' | 'destructive'
@@ -8,6 +8,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 	({ className, variant = 'default', size = 'default', ...props }, ref) => {
+		const { cn } = useMainContext()
 		return (
 			<button
 				className={cn(

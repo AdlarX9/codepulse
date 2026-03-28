@@ -1,17 +1,17 @@
-use std::collections::HashMap;
+use git2::{ObjectType, Repository, Sort, Tree, Error};
+use std::collections::{BTreeSet, HashMap};
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::ffi::OsStr;
-use git2::{Repository, Tree, ObjectType};
 
 use regex::Regex;
 use serde::Serialize;
 use walkdir::WalkDir;
 
-use crate::languages::{languages};
+use crate::languages::languages;
 use crate::user::{user, ScanSettings};
 use chrono::{Datelike, Duration, TimeZone, Utc};
-use git2::{Oid};
+use git2::Oid;
 
 #[derive(Serialize)]
 pub struct FileStats {
@@ -30,10 +30,7 @@ pub struct Project {
 
 impl Project {
 	pub fn new(name: String, path: String) -> Self {
-		Self {
-			name,
-			path,
-		}
+		Self { name, path }
 	}
 
 	// Given compiled patterns in order (regex, is_negation), determine if path is excluded
@@ -52,28 +49,35 @@ impl Project {
 	}
 
 	// Collect commit oids and timestamps in chronological order (oldest -> newest)
-	fn collect_commit_oids(&self, repo: &Repository) -> Result<Vec<(Oid, i64)>, git2::Error> {
-		let mut revwalk = repo.revwalk()?;
-		revwalk.push_head()?;
-
-		let mut oids: Vec<Oid> = Vec::new();
-		for oid_res in revwalk {
-			if let Ok(oid) = oid_res {
-				oids.push(oid);
-			}
-		}
-
-		oids.reverse();
-
-		let mut result: Vec<(Oid, i64)> = Vec::new();
-		for oid in oids {
-			if let Ok(commit) = repo.find_commit(oid) {
-				result.push((oid, commit.time().seconds()));
-			}
-		}
-
-		Ok(result)
-	}
+    fn collect_commit_oids(&self, repo: &Repository) -> Result<Vec<(Oid, i64)>, Error> {
+        let mut revwalk = repo.revwalk()?;
+        
+        // 1. Commencer l'itération à partir de HEAD (le bout de la branche principale)
+        revwalk.push_head()?;
+        
+        // 2. LA CORRECTION : Ignorer l'historique des branches fusionnées
+        // En activant ceci, on reste uniquement sur la ligne temporelle principale.
+        revwalk.simplify_first_parent()?;
+        
+        // 3. Trier topologiquement et inverser (REVERSE) 
+        // pour avoir l'évolution chronologique (du plus vieux commit au plus récent)
+        revwalk.set_sorting(Sort::TOPOLOGICAL | Sort::REVERSE)?;
+        
+        let mut commits = Vec::new();
+        
+        // Parcourir les OIDs trouvés
+        for id_result in revwalk {
+            let oid = id_result?;
+            
+            // Si vous avez besoin du timestamp, récupérez le commit
+            if let Ok(commit) = repo.find_commit(oid) {
+                let ts = commit.time().seconds();
+                commits.push((oid, ts));
+            }
+        }
+        
+        Ok(commits)
+    }
 
 	fn pattern_to_regex(&self, pat: &str) -> Result<Regex, regex::Error> {
 		let p = pat.replace('\\', "/");
@@ -195,21 +199,27 @@ impl Project {
 		files
 	}
 
-	fn scan_file(&self, file_path: String) -> FileStats {
+	fn scan_file(&self, file_path: String) -> Result<FileStats, String> {
 		let path = PathBuf::from(&file_path);
 		let filename = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
 		let language = languages().detect_language(filename);
 
-		let content = fs::read_to_string(&file_path).unwrap_or_default();
+		if language == "Unknown".to_string() {
+			return Err(format!("Unknown file type: {}", filename));
+		}
+
+		let content =
+			fs::read_to_string(&file_path).map_err(|e| format!("Failed to read file: {}", e))?;
+
 		let (total, blank, comment, _code) = languages().count_lines(&content, &language);
 
-		FileStats {
+		Ok(FileStats {
 			language,
 			lines: total as u64,
 			comments: comment as u64,
 			blank: blank as u64,
 			path: file_path,
-		}
+		})
 	}
 
 	pub async fn scan_directory(&self) -> Vec<FileStats> {
@@ -223,7 +233,10 @@ impl Project {
 
 		for f in files {
 			let stat = self.scan_file(f);
-			stats.push(stat);
+			if let Ok(stat) = stat {
+				stats.push(stat);
+			} else {
+			}
 		}
 
 		stats
@@ -251,6 +264,18 @@ impl Project {
 								.unwrap_or("Other")
 								.to_string();
 
+							// Skip unsupported and documentation languages
+							let is_documentation = matches!(
+								lang.as_str(),
+								"Markdown"
+									| "MDX" | "LaTeX" | "reStructuredText"
+									| "HTML" | "XML" | "YAML" | "TOML"
+									| "JSON"
+							);
+							if lang == "Other" || is_documentation {
+								continue;
+							}
+
 							// Read blob content and count lines (safe UTF-8 lossy)
 							if let Ok(blob) = repo.find_blob(entry.id()) {
 								let text = String::from_utf8_lossy(blob.content());
@@ -263,16 +288,8 @@ impl Project {
 								*map.entry(lang).or_insert(0) += lines;
 							}
 						} else {
-							// No valid name (non-UTF8) — treat as Other
-							if let Ok(blob) = repo.find_blob(entry.id()) {
-								let text = String::from_utf8_lossy(blob.content());
-								let lines = if text.is_empty() {
-									0u64
-								} else {
-									text.lines().count() as u64
-								};
-								*map.entry("Other".to_string()).or_insert(0) += lines;
-							}
+							// Ignore files without valid name
+							continue;
 						}
 					}
 					// skip submodules (Commit / Gitlink) and other kinds
@@ -304,6 +321,21 @@ impl Project {
 					let lang_map = self.count_tree_loc(&repo, &tree);
 					result.push(lang_map);
 				}
+			}
+		}
+
+		// Collect all languages across all commits to normalize keys
+		let mut all_languages: BTreeSet<String> = BTreeSet::new();
+		for lang_map in &result {
+			for lang in lang_map.keys() {
+				all_languages.insert(lang.clone());
+			}
+		}
+
+		// Ensure every commit has every language, filling missing ones with 0
+		for lang_map in &mut result {
+			for lang in &all_languages {
+				lang_map.entry(lang.clone()).or_insert(0);
 			}
 		}
 

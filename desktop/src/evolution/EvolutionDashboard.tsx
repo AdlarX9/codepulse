@@ -72,6 +72,7 @@ export default function EvolutionDashboard() {
 
 	const languageKeys = useMemo(() => {
 		const set = new Set<string>()
+		console.log(locSeries)
 		for (const point of locSeries) {
 			for (const key of Object.keys(point)) {
 				if (key !== 'commit') {

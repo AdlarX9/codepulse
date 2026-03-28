@@ -6,7 +6,7 @@ mod project;
 mod storage;
 mod user;
 
-use crate::languages::{LanguageDef, languages};
+use crate::languages::{languages, LanguageDef};
 use crate::project::{FileStats, Project};
 use crate::user::{user, ScanSettings};
 use serde_json::Value as JsonValue;
@@ -25,20 +25,7 @@ async fn get_all_languages() -> Result<Vec<LanguageDef>, String> {
 }
 
 #[tauri::command]
-async fn list_supported_languages() -> Result<Vec<String>, String> {
-	Ok(languages().get_supported_languages())
-}
-
-#[tauri::command]
-async fn get_common_excluded_languages() -> Result<Vec<String>, String> {
-	Ok(languages().get_common_excluded_languages())
-}
-
-#[tauri::command]
-async fn scan_directory(
-	path: &str,
-	state: State<'_, AppState>,
-) -> Result<Vec<FileStats>, String> {
+async fn scan_directory(path: &str, state: State<'_, AppState>) -> Result<Vec<FileStats>, String> {
 	state.cancel_flag.store(false, Ordering::Relaxed);
 	let project = Project::new(String::new(), path.to_string());
 	Ok(project.scan_directory().await)
@@ -98,8 +85,6 @@ fn main() {
 			// Languages
 			// Facilitators
 			get_all_languages,
-			list_supported_languages,
-			get_common_excluded_languages,
 			// User
 			// CRUD Projects
 			load_projects,

@@ -1,5 +1,5 @@
 import Dashboards from './Dashboards.tsx'
-import ScanSettingsPage from '@/features/settings/ScanSettingsPage.tsx'
+import ScanSettingsPage from '@/settings/ScanSettingsPage.tsx'
 import Sidebar from '@/navigation/Sidebar.tsx'
 import Home from './Home.tsx'
 import { useMainContext } from './MainContext.tsx'

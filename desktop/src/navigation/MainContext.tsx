@@ -3,6 +3,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api'
 import { scanDirectory } from '@/handles/scan'
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
 
 interface ValueType {
 	currentView: 'dashboard' | 'settings' | 'analysis'
@@ -15,6 +17,7 @@ interface ValueType {
 	selectAndScan: () => Promise<void>
 	openRecentProject: (project: LocalProject) => Promise<void>
 	rescan: () => Promise<void>
+	cn: (...inputs: ClassValue[]) => string
 }
 
 const MainContext = createContext<ValueType | undefined>(undefined)
@@ -136,6 +139,11 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 			console.error('Failed to rescan:', e)
 		}
 	}
+
+	const cn = (...inputs: ClassValue[]) => {
+		return twMerge(clsx(inputs))
+	}
+
 	return (
 		<MainContext.Provider
 			value={{
@@ -148,7 +156,8 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 				changeView,
 				selectAndScan,
 				openRecentProject,
-				rescan
+				rescan,
+				cn
 			}}
 		>
 			{children}

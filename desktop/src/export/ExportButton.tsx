@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import * as exportLib from '@/features/export/functions'
+import * as exportLib from '@/export/functions'
 import { Download, FileText, FileJson, FileSpreadsheet, Code } from 'lucide-react'
 import { ExportFormat } from '@/types'
 import { Button } from '@/components/Button'

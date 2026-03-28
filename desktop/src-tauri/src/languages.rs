@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 use serde::Serialize;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{HashMap};
 
 pub struct Languages;
 
@@ -521,32 +521,6 @@ impl Languages {
 		}
 
 		"Unknown".to_string()
-	}
-
-	pub fn get_supported_languages(&self) -> Vec<String> {
-		let mut set: BTreeSet<String> = BTreeSet::new();
-		for &lang in LANGUAGE_MAP.values() {
-			set.insert(lang.to_string());
-		}
-		for &lang in SPECIAL_FILES.values() {
-			set.insert(lang.to_string());
-		}
-		set.into_iter().collect()
-	}
-
-	pub fn get_common_excluded_languages(&self) -> Vec<String> {
-		vec![
-			"JSON".to_string(),
-			"YAML".to_string(),
-			"XML".to_string(),
-			"SQL".to_string(),
-			"GraphQL".to_string(),
-			"TOML".to_string(),
-			"Markdown".to_string(),
-			"MDX".to_string(),
-			"LaTeX".to_string(),
-			"reStructuredText".to_string(),
-		]
 	}
 
 	pub fn count_lines(&self, content: &str, language: &str) -> (u32, u32, u32, u32) {
