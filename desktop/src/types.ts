@@ -36,7 +36,6 @@ export interface LocalProject {
 	id: string
 	name: string
 	path: string
-	lastScanned?: string
 }
 
 export type ExportFormat = 'json' | 'csv' | 'markdown' | 'html'

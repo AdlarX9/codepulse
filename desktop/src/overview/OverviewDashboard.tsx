@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FileCode, FileText, Code2, MessageSquare, Layers, Search } from 'lucide-react'
 import { Card } from '@/components/Card'
 import {
@@ -13,8 +13,7 @@ import {
 	YAxis
 } from 'recharts'
 import { useMainContext } from '@/navigation/MainContext'
-
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6']
+import { getLanguageColors, resolveLanguageColor } from '@/handles/scan'
 
 function formatNumber(num: number): string {
 	return new Intl.NumberFormat('en-US').format(num)
@@ -23,7 +22,12 @@ function formatNumber(num: number): string {
 export default function OverviewDashboard() {
 	const [searchLang, setSearchLang] = useState<string>('')
 	const [searchQuery, setSearchQuery] = useState<string>('')
+	const [languageColors, setLanguageColors] = useState<Record<string, string>>({})
 	const { scanResult, projectPath } = useMainContext()
+
+	useEffect(() => {
+		void getLanguageColors().then(setLanguageColors)
+	}, [])
 
 	const languageData = useMemo(() => {
 		if (!scanResult) return []
@@ -140,10 +144,10 @@ export default function OverviewDashboard() {
 								fill='#8884d8'
 								dataKey='value'
 							>
-								{languageData.map((_, index) => (
+								{languageData.map(lang => (
 									<Cell
-										key={`cell-${index}`}
-										fill={COLORS[index % COLORS.length]}
+										key={lang.name}
+										fill={resolveLanguageColor(lang.name, languageColors)}
 									/>
 								))}
 							</Pie>
@@ -186,7 +190,7 @@ export default function OverviewDashboard() {
 							</tr>
 						</thead>
 						<tbody className='divide-y'>
-							{languageData.map((lang, index) => {
+							{languageData.map(lang => {
 								const stats = scanResult.languages[lang.name]
 								return (
 									<tr key={lang.name} className='text-sm hover:bg-gray-50'>
@@ -195,8 +199,10 @@ export default function OverviewDashboard() {
 												<div
 													className='w-3 h-3 rounded-full'
 													style={{
-														backgroundColor:
-															COLORS[index % COLORS.length]
+														backgroundColor: resolveLanguageColor(
+															lang.name,
+															languageColors
+														)
 													}}
 												/>
 												{lang.name}

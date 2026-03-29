@@ -73,6 +73,11 @@ async fn delete_project(id: &str) -> Result<(), String> {
 	user().delete_project(id)
 }
 
+#[tauri::command]
+async fn set_projects_order(projects: Vec<JsonValue>) -> Result<(), String> {
+	user().set_projects_order(projects)
+}
+
 fn main() {
 	tauri::Builder::default()
 		.manage(AppState { cancel_flag: Arc::new(AtomicBool::new(false)) })
@@ -91,6 +96,7 @@ fn main() {
 			get_project,
 			upsert_project,
 			delete_project,
+			set_projects_order,
 			// CRUD Scan Settings
 			update_scan_settings,
 			get_scan_settings,

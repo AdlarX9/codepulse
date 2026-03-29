@@ -17,6 +17,7 @@ interface ValueType {
 	selectAndScan: () => Promise<void>
 	openRecentProject: (project: LocalProject) => Promise<void>
 	rescan: () => Promise<void>
+	reorderRecentProjects: (draggedId: string, targetId: string) => Promise<void>
 	cn: (...inputs: ClassValue[]) => string
 }
 
@@ -61,11 +62,9 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 				.map(item => ({
 					id: String(item.id ?? ''),
 					name: String(item.name ?? 'Project'),
-					path: String(item.path ?? ''),
-					lastScanned: item.lastScanned ? String(item.lastScanned) : undefined
+					path: String(item.path ?? '')
 				}))
 				.filter(p => p.id && p.path)
-				.sort((a, b) => (b.lastScanned || '').localeCompare(a.lastScanned || ''))
 			setRecentProjects(projects)
 		} catch (e) {
 			console.error('Failed to load recent projects:', e)
@@ -78,13 +77,36 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 			const project: LocalProject = {
 				id: path,
 				name,
-				path,
-				lastScanned: new Date().toISOString()
+				path
 			}
 			await invoke('upsert_project', { project })
 			await loadRecentProjects()
 		} catch (e) {
 			console.error('Failed to save recent project:', e)
+		}
+	}
+
+	async function reorderRecentProjects(draggedId: string, targetId: string) {
+		if (!draggedId || !targetId || draggedId === targetId) {
+			return
+		}
+
+		const fromIndex = recentProjects.findIndex(p => p.id === draggedId)
+		const toIndex = recentProjects.findIndex(p => p.id === targetId)
+		if (fromIndex < 0 || toIndex < 0) {
+			return
+		}
+
+		const next = [...recentProjects]
+		const [moved] = next.splice(fromIndex, 1)
+		next.splice(toIndex, 0, moved)
+
+		setRecentProjects(next)
+		try {
+			await invoke('set_projects_order', { projects: next })
+		} catch (e) {
+			console.error('Failed to persist projects order:', e)
+			await loadRecentProjects()
 		}
 	}
 
@@ -122,8 +144,6 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 
 			setScanResult(result)
 			changeView('analysis')
-
-			await saveRecentProject(project.path, project.name || 'Project')
 		} catch (e) {
 			console.error('Failed to scan project:', e)
 		}
@@ -157,6 +177,7 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 				selectAndScan,
 				openRecentProject,
 				rescan,
+				reorderRecentProjects,
 				cn
 			}}
 		>

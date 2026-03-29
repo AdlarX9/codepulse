@@ -45,7 +45,7 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 
 	if (loading) {
 		return (
-			<div className='min-h-screen bg-background flex items-center justify-center'>
+			<div className='h-full bg-background flex items-center justify-center'>
 				<div className='text-muted-foreground'>Loading scan settings...</div>
 			</div>
 		)
@@ -55,7 +55,6 @@ export default function ScanSettingsPage({ onBack }: ScanSettingsProps) {
 		<ScanSettingsForm
 			initial={settings}
 			onSave={saveUserSettings}
-			onCancel={onBack}
 			saving={saving}
 			title='Scan Settings'
 		/>

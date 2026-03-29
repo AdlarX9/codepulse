@@ -13,10 +13,13 @@ import {
 	XAxis,
 	YAxis
 } from 'recharts'
-import { getLocDiff, getLocEvolution } from '@/handles/scan'
+import {
+	getLanguageColors,
+	getLocDiff,
+	getLocEvolution,
+	resolveLanguageColor
+} from '@/handles/scan'
 import { useMainContext } from '@/navigation/MainContext'
-
-const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
 
 type LocPoint = Record<string, number | string>
 type WeeklyPoint = { week: string; additions: number; deletions: number }
@@ -42,8 +45,13 @@ export default function EvolutionDashboard() {
 	const { projectPath, hasGit } = useMainContext()
 	const [locSeries, setLocSeries] = useState<LocPoint[]>([])
 	const [weeklySeries, setWeeklySeries] = useState<WeeklyPoint[]>([])
+	const [languageColors, setLanguageColors] = useState<Record<string, string>>({})
 	const [loading, setLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
+
+	useEffect(() => {
+		void getLanguageColors().then(setLanguageColors)
+	}, [])
 
 	useEffect(() => {
 		if (!projectPath || !hasGit) {
@@ -70,18 +78,42 @@ export default function EvolutionDashboard() {
 		})()
 	}, [projectPath, hasGit])
 
-	const languageKeys = useMemo(() => {
+	const languageKeysByAreaDesc = useMemo(() => {
 		const set = new Set<string>()
-		console.log(locSeries)
+		const areaByLanguage: Record<string, number> = {}
+
 		for (const point of locSeries) {
-			for (const key of Object.keys(point)) {
+			for (const [key, value] of Object.entries(point)) {
 				if (key !== 'commit') {
 					set.add(key)
+					if (typeof value === 'number') {
+						areaByLanguage[key] = (areaByLanguage[key] ?? 0) + Math.max(0, value)
+					}
 				}
 			}
 		}
-		return Array.from(set)
+
+		return Array.from(set).sort((a, b) => {
+			const areaDiff = (areaByLanguage[b] ?? 0) - (areaByLanguage[a] ?? 0)
+			if (areaDiff !== 0) {
+				return areaDiff
+			}
+			return a.localeCompare(b)
+		})
 	}, [locSeries])
+
+	const languageKeysForStack = useMemo(
+		() => [...languageKeysByAreaDesc].reverse(),
+		[languageKeysByAreaDesc]
+	)
+
+	const tooltipOrderRank = useMemo(() => {
+		const rank: Record<string, number> = {}
+		for (let i = 0; i < languageKeysByAreaDesc.length; i += 1) {
+			rank[languageKeysByAreaDesc[i]] = i
+		}
+		return rank
+	}, [languageKeysByAreaDesc])
 
 	if (!hasGit) {
 		return (
@@ -128,7 +160,9 @@ export default function EvolutionDashboard() {
 						<TrendingUp className='h-4 w-4' />
 						<span className='text-sm font-medium'>Tracked Languages</span>
 					</div>
-					<div className='text-3xl font-bold text-blue-600'>{languageKeys.length}</div>
+					<div className='text-3xl font-bold text-blue-600'>
+						{languageKeysByAreaDesc.length}
+					</div>
 				</Card>
 				<Card className='p-4'>
 					<div className='flex items-center gap-2 text-gray-600 mb-2'>
@@ -149,7 +183,9 @@ export default function EvolutionDashboard() {
 			</div>
 
 			<Card className='p-6'>
-				<h3 className='text-lg font-semibold text-gray-900 mb-4'>Lines of Code by Snapshot</h3>
+				<h3 className='text-lg font-semibold text-gray-900 mb-4'>
+					Lines of Code by Snapshot
+				</h3>
 				{locSeries.length === 0 ? (
 					<div className='h-64 flex items-center justify-center text-gray-500'>
 						No evolution data
@@ -160,16 +196,21 @@ export default function EvolutionDashboard() {
 							<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
 							<XAxis dataKey='commit' tick={{ fontSize: 12 }} />
 							<YAxis tick={{ fontSize: 12 }} />
-							<Tooltip />
+							<Tooltip
+								itemSorter={(item: any) => {
+									const name = String(item?.name ?? '')
+									return tooltipOrderRank[name] ?? Number.MAX_SAFE_INTEGER
+								}}
+							/>
 							<Legend />
-							{languageKeys.map((lang, idx) => (
+							{languageKeysForStack.map(lang => (
 								<Area
 									key={lang}
 									type='monotone'
 									dataKey={lang}
 									stackId='1'
-									stroke={COLORS[idx % COLORS.length]}
-									fill={COLORS[idx % COLORS.length]}
+									stroke={resolveLanguageColor(lang, languageColors)}
+									fill={resolveLanguageColor(lang, languageColors)}
 									fillOpacity={0.3}
 								/>
 							))}
@@ -179,7 +220,9 @@ export default function EvolutionDashboard() {
 			</Card>
 
 			<Card className='p-6'>
-				<h3 className='text-lg font-semibold text-gray-900 mb-4'>Weekly Additions / Deletions</h3>
+				<h3 className='text-lg font-semibold text-gray-900 mb-4'>
+					Weekly Additions / Deletions
+				</h3>
 				{weeklySeries.length === 0 ? (
 					<div className='h-64 flex items-center justify-center text-gray-500'>
 						No weekly diff data

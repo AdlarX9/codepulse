@@ -158,4 +158,17 @@ impl User {
 		self.sync_projects_from_json(&next);
 		Ok(())
 	}
+
+	pub fn set_projects_order(&self, projects: Vec<JsonValue>) -> Result<(), String> {
+		for project in &projects {
+			let id = project.get("id").and_then(|v| v.as_str()).unwrap_or("");
+			if id.is_empty() {
+				return Err("project.id required".into());
+			}
+		}
+
+		storage().write_json(LOCAL_PROJECTS_STORAGE_KEY, &projects)?;
+		self.sync_projects_from_json(&projects);
+		Ok(())
+	}
 }

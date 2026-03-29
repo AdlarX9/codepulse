@@ -9,6 +9,34 @@ type BackendFileStats = {
 	blank: number
 }
 
+type BackendLanguageDef = {
+	name: string
+	color: string
+}
+
+const FALLBACK_LANGUAGE_COLORS = [
+	'#3B82F6',
+	'#10B981',
+	'#F59E0B',
+	'#EF4444',
+	'#8B5CF6',
+	'#EC4899',
+	'#14B8A6',
+	'#06B6D4',
+	'#F97316',
+	'#84CC16'
+]
+
+let languageColorsPromise: Promise<Record<string, string>> | null = null
+
+function fallbackLanguageColor(language: string): string {
+	let hash = 0
+	for (let i = 0; i < language.length; i += 1) {
+		hash = (hash * 31 + language.charCodeAt(i)) >>> 0
+	}
+	return FALLBACK_LANGUAGE_COLORS[hash % FALLBACK_LANGUAGE_COLORS.length]
+}
+
 function toUiFileStats(raw: BackendFileStats): FileStats {
 	const total = Number(raw.lines) || 0
 	const comment = Number(raw.comments) || 0
@@ -109,4 +137,29 @@ export async function getLocEvolution(path: string): Promise<Array<Record<string
 
 export async function getLocDiff(path: string): Promise<Record<string, [number, number]>> {
 	return invoke<Record<string, [number, number]>>('get_loc_diff', { path })
+}
+
+export async function getLanguageColors(): Promise<Record<string, string>> {
+	if (!languageColorsPromise) {
+		languageColorsPromise = invoke<BackendLanguageDef[]>('get_all_languages')
+			.then(definitions => {
+				const map: Record<string, string> = {}
+				for (const definition of definitions || []) {
+					if (definition?.name && definition?.color) {
+						map[definition.name] = definition.color
+					}
+				}
+				return map
+			})
+			.catch(() => ({}))
+	}
+
+	return languageColorsPromise
+}
+
+export function resolveLanguageColor(
+	language: string,
+	languageColors: Record<string, string>
+): string {
+	return languageColors[language] || fallbackLanguageColor(language)
 }
