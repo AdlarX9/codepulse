@@ -12,6 +12,7 @@ type BackendFileStats = {
 type BackendLanguageDef = {
 	name: string
 	color: string
+	category: string
 }
 
 const FALLBACK_LANGUAGE_COLORS = [
@@ -27,7 +28,17 @@ const FALLBACK_LANGUAGE_COLORS = [
 	'#84CC16'
 ]
 
-let languageColorsPromise: Promise<Record<string, string>> | null = null
+let languageDefinitionsPromise: Promise<BackendLanguageDef[]> | null = null
+
+async function getLanguageDefinitions(): Promise<BackendLanguageDef[]> {
+	if (!languageDefinitionsPromise) {
+		languageDefinitionsPromise = invoke<BackendLanguageDef[]>('get_all_languages').catch(
+			() => []
+		)
+	}
+
+	return languageDefinitionsPromise
+}
 
 function fallbackLanguageColor(language: string): string {
 	let hash = 0
@@ -140,21 +151,29 @@ export async function getLocDiff(path: string): Promise<Record<string, [number, 
 }
 
 export async function getLanguageColors(): Promise<Record<string, string>> {
-	if (!languageColorsPromise) {
-		languageColorsPromise = invoke<BackendLanguageDef[]>('get_all_languages')
-			.then(definitions => {
-				const map: Record<string, string> = {}
-				for (const definition of definitions || []) {
-					if (definition?.name && definition?.color) {
-						map[definition.name] = definition.color
-					}
-				}
-				return map
-			})
-			.catch(() => ({}))
+	const definitions = await getLanguageDefinitions()
+	const map: Record<string, string> = {}
+
+	for (const definition of definitions) {
+		if (definition?.name && definition?.color) {
+			map[definition.name] = definition.color
+		}
 	}
 
-	return languageColorsPromise
+	return map
+}
+
+export async function getLanguageCategories(): Promise<Record<string, string>> {
+	const definitions = await getLanguageDefinitions()
+	const map: Record<string, string> = {}
+
+	for (const definition of definitions) {
+		if (definition?.name && definition?.category) {
+			map[definition.name] = definition.category
+		}
+	}
+
+	return map
 }
 
 export function resolveLanguageColor(

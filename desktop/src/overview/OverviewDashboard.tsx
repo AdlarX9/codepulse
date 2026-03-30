@@ -1,53 +1,232 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileCode, FileText, Code2, MessageSquare, Layers, Search } from 'lucide-react'
+import { Code2, FileCode, FileText, Trophy } from 'lucide-react'
 import { Card } from '@/components/Card'
-import {
-	PieChart,
-	Pie,
-	Cell,
-	ResponsiveContainer,
-	Tooltip,
-	BarChart,
-	Bar,
-	XAxis,
-	YAxis
-} from 'recharts'
 import { useMainContext } from '@/navigation/MainContext'
-import { getLanguageColors, resolveLanguageColor } from '@/handles/scan'
+import { getLanguageCategories, getLanguageColors } from '@/handles/scan'
+import { FileStats } from '@/types'
+import {
+	OverviewGlobalStatisticsSection,
+	SummaryRow
+} from '@/overview/sections/OverviewGlobalStatisticsSection'
+import { OverviewCodeChartsSection } from '@/overview/sections/OverviewCodeChartsSection'
+import { OverviewLanguagesBreakdownSection } from '@/overview/sections/OverviewLanguagesBreakdownSection'
+import { OverviewFilesExplorerSection } from '@/overview/sections/OverviewFilesExplorerSection'
+
+type CategoryKey = 'code' | 'config' | 'doc'
+
+type FileWithCategory = FileStats & {
+	category: CategoryKey
+}
 
 function formatNumber(num: number): string {
 	return new Intl.NumberFormat('en-US').format(num)
+}
+
+function getCategoryForLanguage(
+	language: string,
+	languageCategories: Record<string, string>
+): CategoryKey {
+	const category = languageCategories[language]
+	if (category === 'code' || category === 'config' || category === 'doc') {
+		return category
+	}
+	return 'doc'
+}
+
+function getMedian(values: number[]): number {
+	if (values.length === 0) return 0
+	const sorted = [...values].sort((a, b) => a - b)
+	const mid = Math.floor(sorted.length / 2)
+	return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid]
+}
+
+function getStdDeviation(values: number[]): number {
+	if (values.length === 0) return 0
+	const mean = values.reduce((acc, value) => acc + value, 0) / values.length
+	const variance =
+		values.reduce((acc, value) => acc + (value - mean) * (value - mean), 0) / values.length
+	return Math.sqrt(variance)
+}
+
+function buildSummaryRow(
+	key: SummaryRow['key'],
+	label: string,
+	files: FileWithCategory[]
+): SummaryRow {
+	const lines = files.map(file => file.total)
+	const totalFiles = files.length
+	const totalLines = lines.reduce((acc, value) => acc + value, 0)
+	const mean = totalFiles > 0 ? totalLines / totalFiles : 0
+
+	return {
+		key,
+		label,
+		totalFiles,
+		totalLines,
+		mean,
+		median: getMedian(lines),
+		stdDeviation: getStdDeviation(lines)
+	}
+}
+
+function getFileAlert(file: FileWithCategory): { level: 'high' | 'low'; label: string } | null {
+	if (file.category === 'code' && file.total > 500) {
+		return { level: 'high', label: 'Code file > 500 lines' }
+	}
+	if (file.category === 'config' && file.total > 1000) {
+		return { level: 'high', label: 'Config file > 1000 lines' }
+	}
+	if (file.category === 'doc' && file.total > 1500) {
+		return { level: 'high', label: 'Doc file > 1500 lines' }
+	}
+	if (file.category === 'code' && file.total < 20) {
+		return { level: 'low', label: 'Code file < 20 lines' }
+	}
+	return null
 }
 
 export default function OverviewDashboard() {
 	const [searchLang, setSearchLang] = useState<string>('')
 	const [searchQuery, setSearchQuery] = useState<string>('')
 	const [languageColors, setLanguageColors] = useState<Record<string, string>>({})
+	const [languageCategories, setLanguageCategories] = useState<Record<string, string>>({})
 	const { scanResult, projectPath } = useMainContext()
 
 	useEffect(() => {
-		void getLanguageColors().then(setLanguageColors)
+		void Promise.all([getLanguageColors(), getLanguageCategories()]).then(
+			([colors, categories]) => {
+				setLanguageColors(colors)
+				setLanguageCategories(categories)
+			}
+		)
 	}, [])
 
-	const languageData = useMemo(() => {
+	const categorizedFiles = useMemo<FileWithCategory[]>(() => {
+		if (!scanResult) return []
+		return scanResult.files.map(file => ({
+			...file,
+			category: getCategoryForLanguage(file.language, languageCategories)
+		}))
+	}, [scanResult, languageCategories])
+
+	const sectionOneRows = useMemo<SummaryRow[]>(() => {
+		if (!scanResult) return []
+
+		const codeFiles = categorizedFiles.filter(file => file.category === 'code')
+		const configFiles = categorizedFiles.filter(file => file.category === 'config')
+		const docFiles = categorizedFiles.filter(file => file.category === 'doc')
+
+		return [
+			buildSummaryRow('total', 'Total', categorizedFiles),
+			buildSummaryRow('code', 'Code', codeFiles),
+			buildSummaryRow('config', 'Config', configFiles),
+			buildSummaryRow('doc', 'Doc', docFiles)
+		]
+	}, [scanResult, categorizedFiles])
+
+	const codeLanguageData = useMemo(() => {
 		if (!scanResult) return []
 		return Object.entries(scanResult.languages)
+			.filter(([name]) => getCategoryForLanguage(name, languageCategories) === 'code')
 			.map(([name, stats]: [string, any]) => ({
 				name,
 				value: stats.code,
 				files: stats.files
 			}))
 			.sort((a, b) => b.value - a.value)
-			.slice(0, 7) // Top 7 languages
+			.slice(0, 7)
+	}, [scanResult, languageCategories])
+
+	const codeDistributionData = useMemo(() => {
+		if (!scanResult) return []
+
+		const codeFiles = categorizedFiles.filter(file => file.category === 'code')
+		const trueCode = codeFiles.reduce((acc, file) => acc + file.code, 0)
+		const comments = codeFiles.reduce((acc, file) => acc + file.comment, 0)
+		const blank = codeFiles.reduce((acc, file) => acc + file.blank, 0)
+		const total = trueCode + comments + blank
+
+		return [
+			{
+				name: 'True code',
+				value: trueCode,
+				percentage: total > 0 ? (trueCode / total) * 100 : 0,
+				color: '#2563EB'
+			},
+			{
+				name: 'Comments',
+				value: comments,
+				percentage: total > 0 ? (comments / total) * 100 : 0,
+				color: '#16A34A'
+			},
+			{
+				name: 'Blank',
+				value: blank,
+				percentage: total > 0 ? (blank / total) * 100 : 0,
+				color: '#9CA3AF'
+			}
+		]
+	}, [scanResult, categorizedFiles])
+
+	const languageBreakdownData = useMemo(() => {
+		if (!scanResult) return []
+		return Object.entries(scanResult.languages)
+			.map(([name, stats]: [string, any]) => ({
+				name,
+				stats
+			}))
+			.sort((a, b) => b.stats.total - a.stats.total)
 	}, [scanResult])
 
-	const distributionData = useMemo(() => {
+	const languageOptions = useMemo(() => {
 		if (!scanResult) return []
-		return [
-			{ name: 'Code', value: scanResult.total_code, color: '#3B82F6' },
-			{ name: 'Comments', value: scanResult.total_comments, color: '#10B981' },
-			{ name: 'Blank', value: scanResult.total_blank, color: '#9CA3AF' }
-		]
+		return Object.keys(scanResult.languages).sort((a, b) => a.localeCompare(b))
+	}, [scanResult])
+
+	const filteredFiles = useMemo(() => {
+		return categorizedFiles
+			.filter(file => !searchLang || file.language === searchLang)
+			.filter(
+				file => !searchQuery || file.path.toLowerCase().includes(searchQuery.toLowerCase())
+			)
+			.sort((a, b) => b.total - a.total)
+			.slice(0, 100)
+	}, [categorizedFiles, searchLang, searchQuery])
+
+	const fileExplorerRows = useMemo(
+		() =>
+			filteredFiles.map(file => ({
+				path: file.path,
+				language: file.language,
+				total: file.total,
+				code: file.code,
+				comment: file.comment,
+				blank: file.blank,
+				alert: getFileAlert(file)
+			})),
+		[filteredFiles]
+	)
+
+	const topMetrics = useMemo(() => {
+		if (!scanResult) {
+			return {
+				totalFiles: 0,
+				totalLines: 0,
+				totalCode: 0,
+				mainLanguage: 'N/A'
+			}
+		}
+
+		const mainLanguageEntry = Object.entries(scanResult.languages).sort(
+			(a, b) => b[1].code - a[1].code
+		)[0]
+
+		return {
+			totalFiles: scanResult.total_files,
+			totalLines: scanResult.total_lines,
+			totalCode: scanResult.total_code,
+			mainLanguage: mainLanguageEntry?.[0] ?? 'N/A'
+		}
 	}, [scanResult])
 
 	if (!scanResult) {
@@ -64,261 +243,79 @@ export default function OverviewDashboard() {
 
 	return (
 		<div className='space-y-6'>
-			{/* KPI Cards */}
-			<div className='grid grid-cols-2 md:grid-cols-5 gap-4'>
-				<Card className='p-4 rounded-md border bg-white'>
-					<div className='flex items-center gap-2 text-gray-600 mb-2'>
-						<FileCode className='h-4 w-4' />
-						<span className='text-sm font-medium'>Files</span>
+			<div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
+				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm'>
+					<div className='flex items-start justify-between mb-3'>
+						<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
+							Total Files
+						</p>
+						<FileCode className='h-4 w-4 text-slate-500' />
 					</div>
-					<div className='text-3xl font-bold text-gray-900'>
-						{formatNumber(scanResult.total_files)}
-					</div>
-				</Card>
-
-				<Card className='p-4 rounded-md border bg-white'>
-					<div className='flex items-center gap-2 text-gray-600 mb-2'>
-						<FileText className='h-4 w-4' />
-						<span className='text-sm font-medium'>Total Lines</span>
-					</div>
-					<div className='text-3xl font-bold text-gray-900'>
-						{formatNumber(scanResult.total_lines)}
+					<div className='text-3xl font-bold text-slate-900'>
+						{formatNumber(topMetrics.totalFiles)}
 					</div>
 				</Card>
 
-				<Card className='p-4 rounded-md border bg-white'>
-					<div className='flex items-center gap-2 text-gray-600 mb-2'>
-						<Code2 className='h-4 w-4' />
-						<span className='text-sm font-medium'>Code</span>
+				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm'>
+					<div className='flex items-start justify-between mb-3'>
+						<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
+							Total Lines
+						</p>
+						<FileText className='h-4 w-4 text-slate-500' />
 					</div>
-					<div className='text-3xl font-bold text-blue-600'>
-						{formatNumber(scanResult.total_code)}
-					</div>
-					<div className='text-xs text-gray-500 mt-1'>
-						{scanResult.code_percentage.toFixed(1)}% of total
-					</div>
-				</Card>
-
-				<Card className='p-4 rounded-md border bg-white'>
-					<div className='flex items-center gap-2 text-gray-600 mb-2'>
-						<MessageSquare className='h-4 w-4' />
-						<span className='text-sm font-medium'>Comments</span>
-					</div>
-					<div className='text-3xl font-bold text-green-600'>
-						{formatNumber(scanResult.total_comments)}
-					</div>
-					<div className='text-xs text-gray-500 mt-1'>
-						{scanResult.comment_percentage.toFixed(1)}% of total
+					<div className='text-3xl font-bold text-slate-900'>
+						{formatNumber(topMetrics.totalLines)}
 					</div>
 				</Card>
 
-				<Card className='p-4 rounded-md border bg-white'>
-					<div className='flex items-center gap-2 text-gray-600 mb-2'>
-						<Layers className='h-4 w-4' />
-						<span className='text-sm font-medium'>Languages</span>
+				<Card className='p-5 border bg-gradient-to-br from-blue-50 to-white shadow-sm'>
+					<div className='flex items-start justify-between mb-3'>
+						<p className='text-xs font-semibold uppercase tracking-wide text-blue-700'>
+							Lines Of Code
+						</p>
+						<Code2 className='h-4 w-4 text-blue-600' />
 					</div>
-					<div className='text-3xl font-bold text-purple-600'>
-						{Object.keys(scanResult.languages).length}
+					<div className='text-3xl font-bold text-blue-700'>
+						{formatNumber(topMetrics.totalCode)}
+					</div>
+				</Card>
+
+				<Card className='p-5 border bg-gradient-to-br from-amber-50 to-white shadow-sm'>
+					<div className='flex items-start justify-between mb-3'>
+						<p className='text-xs font-semibold uppercase tracking-wide text-amber-700'>
+							Main Language
+						</p>
+						<Trophy className='h-4 w-4 text-amber-600' />
+					</div>
+					<div className='text-2xl font-bold text-amber-700 truncate'>
+						{topMetrics.mainLanguage}
 					</div>
 				</Card>
 			</div>
 
-			{/* Charts Row */}
-			<div className='grid md:grid-cols-2 gap-6'>
-				{/* Language Distribution Pie Chart */}
-				<Card className='p-6'>
-					<h3 className='text-lg font-semibold text-gray-900 mb-4'>
-						Language Distribution
-					</h3>
-					<ResponsiveContainer width='100%' height={300}>
-						<PieChart>
-							<Pie
-								data={languageData}
-								cx='50%'
-								cy='50%'
-								labelLine={false}
-								label={({ name, percent }) =>
-									`${name} (${(percent * 100).toFixed(0)}%)`
-								}
-								outerRadius={80}
-								fill='#8884d8'
-								dataKey='value'
-							>
-								{languageData.map(lang => (
-									<Cell
-										key={lang.name}
-										fill={resolveLanguageColor(lang.name, languageColors)}
-									/>
-								))}
-							</Pie>
-							<Tooltip />
-						</PieChart>
-					</ResponsiveContainer>
-				</Card>
+			<OverviewCodeChartsSection
+				codeLanguageData={codeLanguageData}
+				codeDistributionData={codeDistributionData}
+				languageColors={languageColors}
+			/>
 
-				{/* Code Distribution */}
-				<Card className='p-6'>
-					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Line Distribution</h3>
-					<ResponsiveContainer width='100%' height={300}>
-						<BarChart data={distributionData}>
-							<XAxis dataKey='name' />
-							<YAxis />
-							<Tooltip formatter={value => formatNumber(value as number)} />
-							<Bar dataKey='value'>
-								{distributionData.map((entry, index) => (
-									<Cell key={`cell-${index}`} fill={entry.color} />
-								))}
-							</Bar>
-						</BarChart>
-					</ResponsiveContainer>
-				</Card>
-			</div>
+			<OverviewGlobalStatisticsSection rows={sectionOneRows} />
 
-			{/* Language Details Table */}
-			<Card className='p-6'>
-				<h3 className='text-lg font-semibold text-gray-900 mb-4'>Languages Breakdown</h3>
-				<div className='overflow-x-auto'>
-					<table className='w-full'>
-						<thead className='border-b'>
-							<tr className='text-left text-sm text-gray-600'>
-								<th className='pb-3 font-medium'>Language</th>
-								<th className='pb-3 font-medium text-right'>Files</th>
-								<th className='pb-3 font-medium text-right'>Code</th>
-								<th className='pb-3 font-medium text-right'>Comments</th>
-								<th className='pb-3 font-medium text-right'>Blank</th>
-								<th className='pb-3 font-medium text-right'>Total</th>
-							</tr>
-						</thead>
-						<tbody className='divide-y'>
-							{languageData.map(lang => {
-								const stats = scanResult.languages[lang.name]
-								return (
-									<tr key={lang.name} className='text-sm hover:bg-gray-50'>
-										<td className='py-3 font-medium'>
-											<div className='flex items-center gap-2'>
-												<div
-													className='w-3 h-3 rounded-full'
-													style={{
-														backgroundColor: resolveLanguageColor(
-															lang.name,
-															languageColors
-														)
-													}}
-												/>
-												{lang.name}
-											</div>
-										</td>
-										<td className='py-3 text-right text-gray-600'>
-											{formatNumber(stats.files)}
-										</td>
-										<td className='py-3 text-right text-gray-900 font-medium'>
-											{formatNumber(stats.code)}
-										</td>
-										<td className='py-3 text-right text-gray-600'>
-											{formatNumber(stats.comment)}
-										</td>
-										<td className='py-3 text-right text-gray-600'>
-											{formatNumber(stats.blank)}
-										</td>
-										<td className='py-3 text-right text-gray-900 font-semibold'>
-											{formatNumber(stats.total)}
-										</td>
-									</tr>
-								)
-							})}
-						</tbody>
-					</table>
-				</div>
-			</Card>
+			<OverviewLanguagesBreakdownSection
+				rows={languageBreakdownData}
+				languageColors={languageColors}
+			/>
 
-			{/* Project Info */}
-			<Card className='p-6 bg-gray-50 border-2 border-dashed'>
-				<div className='text-sm text-gray-600'>
-					<p className='font-medium mb-2'>Project Path</p>
-					<p className='font-mono text-xs text-gray-800 bg-white px-3 py-2 rounded border'>
-						{projectPath}
-					</p>
-				</div>
-			</Card>
-
-			<Card className='p-4'>
-				<div className='flex items-center gap-2 text-gray-600 mb-2'>
-					<Search className='h-4 w-4' />
-					<span className='text-sm font-medium'>File Search</span>
-				</div>
-				<div className='flex gap-2'>
-					<select
-						className='border rounded px-2 py-1 text-sm'
-						value={searchLang}
-						onChange={e => setSearchLang(e.target.value)}
-					>
-						<option value=''>All</option>
-						{scanResult &&
-							Object.keys(scanResult.languages).map(l => (
-								<option key={l} value={l}>
-									{l}
-								</option>
-							))}
-					</select>
-					<input
-						type='text'
-						className='border rounded px-2 py-1 text-sm flex-1'
-						placeholder='Search path...'
-						value={searchQuery}
-						onChange={e => setSearchQuery(e.target.value)}
-					/>
-				</div>
-			</Card>
-
-			{/* File search by language */}
-			{scanResult && (
-				<Card className='p-6'>
-					<h3 className='text-lg font-semibold text-gray-900 mb-4'>Files Explorer</h3>
-					<div className='overflow-x-auto'>
-						<table className='w-full'>
-							<thead className='border-b'>
-								<tr className='text-left text-sm text-gray-600'>
-									<th className='pb-3 font-medium'>Path</th>
-									<th className='pb-3 font-medium'>Language</th>
-									<th className='pb-3 font-medium text-right'>Code</th>
-									<th className='pb-3 font-medium text-right'>Comments</th>
-									<th className='pb-3 font-medium text-right'>Blank</th>
-									<th className='pb-3 font-medium text-right'>Total</th>
-								</tr>
-							</thead>
-							<tbody className='divide-y'>
-								{(scanResult.files || [])
-									.filter((f: any) => !searchLang || f.language === searchLang)
-									.filter(
-										(f: any) =>
-											!searchQuery ||
-											f.path.toLowerCase().includes(searchQuery.toLowerCase())
-									)
-									.sort((a: any, b: any) => b.code - a.code)
-									.slice(0, 100)
-									.map((f: any) => (
-										<tr key={f.path} className='text-sm hover:bg-gray-50'>
-											<td className='py-3 font-mono text-xs'>{f.path}</td>
-											<td className='py-3'>{f.language}</td>
-											<td className='py-3 text-right text-gray-900 font-medium'>
-												{f.code}
-											</td>
-											<td className='py-3 text-right text-gray-600'>
-												{f.comment}
-											</td>
-											<td className='py-3 text-right text-gray-600'>
-												{f.blank}
-											</td>
-											<td className='py-3 text-right text-gray-900 font-semibold'>
-												{f.total}
-											</td>
-										</tr>
-									))}
-							</tbody>
-						</table>
-					</div>
-				</Card>
-			)}
+			<OverviewFilesExplorerSection
+				projectPath={projectPath}
+				searchLang={searchLang}
+				searchQuery={searchQuery}
+				onSearchLangChange={setSearchLang}
+				onSearchQueryChange={setSearchQuery}
+				languageOptions={languageOptions}
+				rows={fileExplorerRows}
+				languageColors={languageColors}
+			/>
 		</div>
 	)
 }
