@@ -150,6 +150,20 @@ export async function getLocDiff(path: string): Promise<Record<string, [number, 
 	return invoke<Record<string, [number, number]>>('get_loc_diff', { path })
 }
 
+export type CommitActivity = {
+	commit_oid: string
+	timestamp: number
+	date: string
+	additions: number
+	deletions: number
+	total_loc: number
+	loc_by_language: Record<string, number>
+}
+
+export async function getCommitActivity(path: string): Promise<CommitActivity[]> {
+	return invoke<CommitActivity[]>('get_commit_activity', { path })
+}
+
 export async function getLanguageColors(): Promise<Record<string, string>> {
 	const definitions = await getLanguageDefinitions()
 	const map: Record<string, string> = {}

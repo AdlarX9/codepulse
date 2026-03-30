@@ -550,14 +550,6 @@ pub fn languages() -> &'static Languages {
 }
 
 impl Languages {
-	pub fn ext_to_language(&self, ext: &str) -> &str {
-		if let Some(lang) = LANGUAGE_MAP.get(ext) {
-			lang
-		} else {
-			"Other"
-		}
-	}
-
 	pub fn get_all_languages(&self) -> &'static [LanguageDef] {
 		LANGUAGE_DEFINITIONS
 	}
@@ -575,6 +567,10 @@ impl Languages {
 		}
 
 		"Unknown".to_string()
+	}
+
+	pub fn get_language_category(&self, language: &str) -> &str {
+		LANGUAGE_CATEGORIES.get(language).copied().unwrap_or("doc")
 	}
 
 	pub fn count_lines(&self, content: &str, language: &str) -> (u32, u32, u32, u32) {

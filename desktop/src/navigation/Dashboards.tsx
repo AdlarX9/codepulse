@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LayoutDashboard, TrendingUp, Download } from 'lucide-react'
 import ExportCenter from '@/export/ExportCenter'
 import ExportButton from '@/export/ExportButton'
@@ -11,6 +11,7 @@ interface DashboardTab {
 	label: string
 	icon: React.ReactNode
 	description: string
+	disabled?: boolean
 }
 
 const TABS: DashboardTab[] = [
@@ -36,9 +37,17 @@ const TABS: DashboardTab[] = [
 
 export default function Dashboards() {
 	const [activeTab, setActiveTab] = useState<DashboardTab['id']>('overview')
-	const { scanResult, projectName } = useMainContext()
+	const { scanResult, projectName, hasGit } = useMainContext()
 
-	const availableTabs = TABS
+	const availableTabs = TABS.map(tab =>
+		tab.id === 'evolution' ? { ...tab, disabled: !hasGit } : tab
+	)
+
+	useEffect(() => {
+		if (!hasGit && activeTab === 'evolution') {
+			setActiveTab('overview')
+		}
+	}, [activeTab, hasGit])
 
 	return (
 		<div className='h-full flex flex-col'>
@@ -64,14 +73,21 @@ export default function Dashboards() {
 						{availableTabs.map(tab => (
 							<button
 								key={tab.id}
-								onClick={() => setActiveTab(tab.id)}
+								onClick={() => {
+									if (!tab.disabled) {
+										setActiveTab(tab.id)
+									}
+								}}
+								disabled={tab.disabled}
 								className={`
 									flex items-center gap-2 px-4 py-3 text-sm font-medium
 									border-b-2 transition-colors whitespace-nowrap
 									${
-										activeTab === tab.id
-											? 'border-blue-500 text-blue-600'
-											: 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+										tab.disabled
+											? 'border-transparent text-gray-400 cursor-not-allowed'
+											: activeTab === tab.id
+												? 'border-blue-500 text-blue-600'
+												: 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
 									}
 								`}
 							>
@@ -95,7 +111,7 @@ export default function Dashboards() {
 				<div className='flex'>
 					<div className='flex-1 p-6'>
 						{activeTab === 'overview' && <OverviewDashboard />}
-						{activeTab === 'evolution' && <EvolutionDashboard />}
+						{activeTab === 'evolution' && hasGit && <EvolutionDashboard />}
 						{activeTab === 'exports' && <ExportCenter />}
 					</div>
 				</div>

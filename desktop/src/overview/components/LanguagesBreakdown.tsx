@@ -12,7 +12,7 @@ type LanguageBreakdownRow = {
 	}
 }
 
-type OverviewLanguagesBreakdownSectionProps = {
+type LanguagesBreakdownProps = {
 	rows: LanguageBreakdownRow[]
 	languageColors: Record<string, string>
 }
@@ -21,13 +21,18 @@ function formatNumber(num: number): string {
 	return new Intl.NumberFormat('en-US').format(num)
 }
 
-export function OverviewLanguagesBreakdownSection({
+export function LanguagesBreakdown({
 	rows,
 	languageColors
-}: OverviewLanguagesBreakdownSectionProps) {
+}: LanguagesBreakdownProps) {
 	return (
-		<Card className='p-6 border bg-white shadow-sm'>
-			<h3 className='text-lg font-semibold text-slate-900 mb-4'>Languages Breakdown</h3>
+		<Card className='p-6 border bg-white shadow-sm rounded-xl'>
+			<div className='mb-4 flex items-center justify-between gap-3'>
+				<h3 className='text-lg font-semibold text-slate-900'>Languages Breakdown</h3>
+				<span className='text-sm font-medium text-slate-600'>
+					{formatNumber(rows.length)} languages
+				</span>
+			</div>
 			<div className='overflow-x-auto'>
 				<table className='w-full'>
 					<thead className='border-b border-slate-200'>

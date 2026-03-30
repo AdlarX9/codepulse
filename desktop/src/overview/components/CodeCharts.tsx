@@ -27,7 +27,7 @@ type CodeDistributionDatum = {
 	color: string
 }
 
-type OverviewCodeChartsSectionProps = {
+type CodeChartsProps = {
 	codeLanguageData: CodeLanguageDatum[]
 	codeDistributionData: CodeDistributionDatum[]
 	languageColors: Record<string, string>
@@ -44,11 +44,11 @@ function formatDecimal(num: number): string {
 	}).format(num)
 }
 
-export function OverviewCodeChartsSection({
+export function CodeCharts({
 	codeLanguageData,
 	codeDistributionData,
 	languageColors
-}: OverviewCodeChartsSectionProps) {
+}: CodeChartsProps) {
 	const codeDistributionByName = useMemo(() => {
 		const map: Record<string, CodeDistributionDatum> = {}
 		for (const item of codeDistributionData) {
@@ -83,7 +83,7 @@ export function OverviewCodeChartsSection({
 
 	return (
 		<div className='grid md:grid-cols-2 gap-6'>
-			<Card className='p-6 border bg-white shadow-sm'>
+			<Card className='p-6 border bg-white shadow-sm rounded-xl'>
 				<h3 className='text-lg font-semibold text-slate-900 mb-1'>
 					Code Languages Distribution
 				</h3>
@@ -119,7 +119,7 @@ export function OverviewCodeChartsSection({
 				)}
 			</Card>
 
-			<Card className='p-6 border bg-white shadow-sm'>
+			<Card className='p-6 border bg-white shadow-sm rounded-xl'>
 				<h3 className='text-lg font-semibold text-slate-900 mb-1'>
 					Code Line Distribution
 				</h3>

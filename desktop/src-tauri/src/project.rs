@@ -1,12 +1,11 @@
-use git2::{ObjectType, Repository, Sort, Tree, Error};
+use git2::{Error, ObjectType, Repository, Sort, Tree};
 use std::collections::{BTreeSet, HashMap};
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use regex::Regex;
+use ignore::gitignore::GitignoreBuilder;
+use ignore::WalkBuilder;
 use serde::Serialize;
-use walkdir::WalkDir;
 
 use crate::languages::languages;
 use crate::user::{user, ScanSettings};
@@ -22,6 +21,17 @@ pub struct FileStats {
 	pub path: String,
 }
 
+#[derive(Serialize)]
+pub struct CommitActivity {
+	pub commit_oid: String,
+	pub timestamp: i64,
+	pub date: String,
+	pub additions: i64,
+	pub deletions: i64,
+	pub total_loc: u64,
+	pub loc_by_language: HashMap<String, u64>,
+}
+
 #[allow(dead_code)]
 pub struct Project {
 	name: String,
@@ -33,84 +43,35 @@ impl Project {
 		Self { name, path }
 	}
 
-	// Given compiled patterns in order (regex, is_negation), determine if path is excluded
-	fn is_path_excluded(&self, path: &str, compiled: &[(Regex, bool)]) -> bool {
-		let mut matched = false;
-		for (re, neg) in compiled {
-			if re.is_match(path) {
-				if *neg {
-					matched = false;
-				} else {
-					matched = true;
-				}
-			}
-		}
-		matched
-	}
-
 	// Collect commit oids and timestamps in chronological order (oldest -> newest)
-    fn collect_commit_oids(&self, repo: &Repository) -> Result<Vec<(Oid, i64)>, Error> {
-        let mut revwalk = repo.revwalk()?;
-        
-        // 1. Commencer l'itération à partir de HEAD (le bout de la branche principale)
-        revwalk.push_head()?;
-        
-        // 2. LA CORRECTION : Ignorer l'historique des branches fusionnées
-        // En activant ceci, on reste uniquement sur la ligne temporelle principale.
-        revwalk.simplify_first_parent()?;
-        
-        // 3. Trier topologiquement et inverser (REVERSE) 
-        // pour avoir l'évolution chronologique (du plus vieux commit au plus récent)
-        revwalk.set_sorting(Sort::TOPOLOGICAL | Sort::REVERSE)?;
-        
-        let mut commits = Vec::new();
-        
-        // Parcourir les OIDs trouvés
-        for id_result in revwalk {
-            let oid = id_result?;
-            
-            // Si vous avez besoin du timestamp, récupérez le commit
-            if let Ok(commit) = repo.find_commit(oid) {
-                let ts = commit.time().seconds();
-                commits.push((oid, ts));
-            }
-        }
-        
-        Ok(commits)
-    }
+	fn collect_commit_oids(&self, repo: &Repository) -> Result<Vec<(Oid, i64)>, Error> {
+		let mut revwalk = repo.revwalk()?;
 
-	fn pattern_to_regex(&self, pat: &str) -> Result<Regex, regex::Error> {
-		let p = pat.replace('\\', "/");
-		let is_dir = p.ends_with('/');
-		let core = if is_dir { p.trim_end_matches('/').to_string() } else { p };
+		// 1. Commencer l'itération à partir de HEAD (le bout de la branche principale)
+		revwalk.push_head()?;
 
-		let mut regex = String::new();
-		let mut chars = core.chars().peekable();
-		while let Some(c) = chars.next() {
-			if c == '*' {
-				if chars.peek() == Some(&'*') {
-					chars.next();
-					regex.push_str(".*");
-				} else {
-					regex.push_str("[^/]*");
-				}
-			} else if c == '?' {
-				regex.push('.');
-			} else if "^$.+()[]{}|\\".contains(c) {
-				regex.push('\\');
-				regex.push(c);
-			} else {
-				regex.push(c);
+		// 2. LA CORRECTION : Ignorer l'historique des branches fusionnées
+		// En activant ceci, on reste uniquement sur la ligne temporelle principale.
+		revwalk.simplify_first_parent()?;
+
+		// 3. Trier topologiquement et inverser (REVERSE)
+		// pour avoir l'évolution chronologique (du plus vieux commit au plus récent)
+		revwalk.set_sorting(Sort::TOPOLOGICAL | Sort::REVERSE)?;
+
+		let mut commits = Vec::new();
+
+		// Parcourir les OIDs trouvés
+		for id_result in revwalk {
+			let oid = id_result?;
+
+			// Si vous avez besoin du timestamp, récupérez le commit
+			if let Ok(commit) = repo.find_commit(oid) {
+				let ts = commit.time().seconds();
+				commits.push((oid, ts));
 			}
 		}
 
-		let final_re = if core.contains('/') {
-			format!("^{}{}$", regex, if is_dir { "(/.*)?" } else { "" })
-		} else {
-			format!("(^|.*/){}{}$", regex, if is_dir { "(/.*)?" } else { "" })
-		};
-
-		Regex::new(&final_re)
+		Ok(commits)
 	}
 
 	// Return list of files to scan, respecting .gitignore-like patterns,
@@ -129,66 +90,38 @@ impl Project {
 			Err(_) => ScanSettings::default(),
 		};
 
-		// collect patterns: .gitignore first (if present), then ScanSettings, then settingsOverride
-		let mut patterns: Vec<String> = Vec::new();
-		let gitignore_path = root.join(".gitignore");
-		if let Ok(content) = fs::read_to_string(&gitignore_path) {
-			for line in content.lines() {
-				let t = line.trim();
-				if t.is_empty() || t.starts_with('#') {
-					continue;
-				}
-				patterns.push(t.to_string());
+		// Build an additional root-scoped gitignore matcher from ScanSettings.
+		let mut settings_ignore_builder = GitignoreBuilder::new(root);
+		for pat in &settings.excluded_expressions {
+			let trimmed = pat.trim();
+			if trimmed.is_empty() || trimmed.starts_with('#') {
+				continue;
 			}
+			let _ = settings_ignore_builder.add_line(None, trimmed);
 		}
+		let settings_ignore = settings_ignore_builder.build().ok();
 
-		patterns.extend(settings.excluded_expressions.iter().cloned());
-
-		// compile patterns into regex + negation flag using the existing pattern_to_regex()
-		let compiled: Vec<(Regex, bool)> = patterns
-			.into_iter()
-			.filter_map(|pat| {
-				let pat = pat.trim().to_string();
-				if pat.is_empty() {
-					return None;
-				}
-				let neg = pat.starts_with('!');
-				let core = if neg { pat[1..].trim().to_string() } else { pat.clone() };
-				match (&self).pattern_to_regex(&core) {
-					Ok(re) => Some((re, neg)),
-					Err(_) => None,
-				}
-			})
-			.collect();
-
-		// Use WalkDir filter_entry to avoid descending into excluded directories
-		let walker = WalkDir::new(root)
+		// Use ignore::WalkBuilder so nested .gitignore files are respected with local scope.
+		let walker = WalkBuilder::new(root)
 			.follow_links(settings.follow_symlinks)
-			.into_iter()
-			.filter_entry(|e| {
-				// determine relative path for the entry
-				let rel = match e.path().strip_prefix(root) {
-					Ok(p) => p.to_string_lossy().to_string(),
-					Err(_) => return true,
-				};
-				// if the entry itself is excluded (dir), filter it out to prevent descent
-				!(&self).is_path_excluded(&rel, &compiled)
-			});
+			.hidden(false)
+			.git_ignore(true)
+			.git_global(false)
+			.git_exclude(true)
+			.parents(true)
+			.build();
 
 		for entry in walker.filter_map(|e| e.ok()) {
-			if !entry.file_type().is_file() {
+			if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
 				continue;
 			}
 
 			let path = entry.path();
-			let rel = match path.strip_prefix(root) {
-				Ok(p) => p.to_string_lossy().to_string(),
-				Err(_) => continue,
-			};
 
-			// final exclusion check for files
-			if (&self).is_path_excluded(&rel, &compiled) {
-				continue;
+			if let Some(ignore_matcher) = &settings_ignore {
+				if ignore_matcher.matched_path_or_any_parents(path, false).is_ignore() {
+					continue;
+				}
 			}
 
 			if let Some(s) = path.to_str() {
@@ -256,23 +189,11 @@ impl Project {
 					Some(ObjectType::Blob) => {
 						// Try to get file name
 						if let Some(name) = entry.name() {
-							// Determine language from extension
-							let lang = Path::new(name)
-								.extension()
-								.and_then(OsStr::to_str)
-								.map(|s| languages().ext_to_language(&s.to_lowercase()))
-								.unwrap_or("Other")
-								.to_string();
-
-							// Skip unsupported and documentation languages
-							let is_documentation = matches!(
-								lang.as_str(),
-								"Markdown"
-									| "MDX" | "LaTeX" | "reStructuredText"
-									| "HTML" | "XML" | "YAML" | "TOML"
-									| "JSON"
-							);
-							if lang == "Other" || is_documentation {
+							// Determine language from full filename (supports special files)
+							let lang = languages().detect_language(name);
+							if lang == "Unknown"
+								|| languages().get_language_category(&lang) != "code"
+							{
 								continue;
 							}
 
@@ -392,6 +313,64 @@ impl Project {
 		}
 
 		week_map
+	}
+
+	pub async fn get_commit_activity(&self) -> Vec<CommitActivity> {
+		let mut result: Vec<CommitActivity> = Vec::new();
+
+		let repo = match Repository::open(&self.path) {
+			Ok(r) => r,
+			Err(_) => return result,
+		};
+
+		let commits = match self.collect_commit_oids(&repo) {
+			Ok(c) => c,
+			Err(_) => return result,
+		};
+
+		for (oid, ts) in commits {
+			if let Ok(commit) = repo.find_commit(oid) {
+				let parent = if commit.parent_count() > 0 { commit.parent(0).ok() } else { None };
+
+				let tree = commit.tree().ok();
+				let parent_tree = parent.and_then(|p| p.tree().ok());
+
+				let mut additions: i64 = 0;
+				let mut deletions: i64 = 0;
+				let mut loc_by_language: HashMap<String, u64> = HashMap::new();
+
+				if let Some(t) = tree.as_ref() {
+					let diff = repo.diff_tree_to_tree(parent_tree.as_ref(), Some(t), None).ok();
+					if let Some(d) = diff {
+						if let Ok(stats) = d.stats() {
+							additions = stats.insertions() as i64;
+							deletions = stats.deletions() as i64;
+						}
+					}
+
+					loc_by_language = self.count_tree_loc(&repo, t);
+				}
+
+				let total_loc = loc_by_language.values().sum();
+
+				let date = match Utc.timestamp_opt(ts, 0).single() {
+					Some(d) => d.format("%Y-%m-%d").to_string(),
+					None => "1970-01-01".to_string(),
+				};
+
+				result.push(CommitActivity {
+					commit_oid: oid.to_string(),
+					timestamp: ts,
+					date,
+					additions,
+					deletions,
+					total_loc,
+					loc_by_language,
+				});
+			}
+		}
+
+		result
 	}
 }
 

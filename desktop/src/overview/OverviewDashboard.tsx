@@ -5,12 +5,12 @@ import { useMainContext } from '@/navigation/MainContext'
 import { getLanguageCategories, getLanguageColors } from '@/handles/scan'
 import { FileStats } from '@/types'
 import {
-	OverviewGlobalStatisticsSection,
+	GlobalStatistics,
 	SummaryRow
-} from '@/overview/sections/OverviewGlobalStatisticsSection'
-import { OverviewCodeChartsSection } from '@/overview/sections/OverviewCodeChartsSection'
-import { OverviewLanguagesBreakdownSection } from '@/overview/sections/OverviewLanguagesBreakdownSection'
-import { OverviewFilesExplorerSection } from '@/overview/sections/OverviewFilesExplorerSection'
+} from '@/overview/components/GlobalStatistics'
+import { CodeCharts } from '@/overview/components/CodeCharts'
+import { LanguagesBreakdown } from '@/overview/components/LanguagesBreakdown'
+import { FilesExplorer } from '@/overview/components/FilesExplorer'
 
 type CategoryKey = 'code' | 'config' | 'doc'
 
@@ -217,6 +217,10 @@ export default function OverviewDashboard() {
 			}
 		}
 
+		const codeTotalLines = categorizedFiles
+			.filter(file => file.category === 'code')
+			.reduce((acc, file) => acc + file.total, 0)
+
 		const mainLanguageEntry = Object.entries(scanResult.languages).sort(
 			(a, b) => b[1].code - a[1].code
 		)[0]
@@ -224,10 +228,10 @@ export default function OverviewDashboard() {
 		return {
 			totalFiles: scanResult.total_files,
 			totalLines: scanResult.total_lines,
-			totalCode: scanResult.total_code,
+			totalCode: codeTotalLines,
 			mainLanguage: mainLanguageEntry?.[0] ?? 'N/A'
 		}
-	}, [scanResult])
+	}, [scanResult, categorizedFiles])
 
 	if (!scanResult) {
 		return (
@@ -244,7 +248,7 @@ export default function OverviewDashboard() {
 	return (
 		<div className='space-y-6'>
 			<div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
-				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm'>
+				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm rounded-xl'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 							Total Files
@@ -256,7 +260,7 @@ export default function OverviewDashboard() {
 					</div>
 				</Card>
 
-				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm'>
+				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm rounded-xl'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 							Total Lines
@@ -268,7 +272,7 @@ export default function OverviewDashboard() {
 					</div>
 				</Card>
 
-				<Card className='p-5 border bg-gradient-to-br from-blue-50 to-white shadow-sm'>
+				<Card className='p-5 border bg-gradient-to-br from-blue-50 to-white shadow-sm rounded-xl'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-blue-700'>
 							Lines Of Code
@@ -280,7 +284,7 @@ export default function OverviewDashboard() {
 					</div>
 				</Card>
 
-				<Card className='p-5 border bg-gradient-to-br from-amber-50 to-white shadow-sm'>
+				<Card className='p-5 border bg-gradient-to-br from-amber-50 to-white shadow-sm rounded-xl'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-amber-700'>
 							Main Language
@@ -293,20 +297,20 @@ export default function OverviewDashboard() {
 				</Card>
 			</div>
 
-			<OverviewCodeChartsSection
+			<CodeCharts
 				codeLanguageData={codeLanguageData}
 				codeDistributionData={codeDistributionData}
 				languageColors={languageColors}
 			/>
 
-			<OverviewGlobalStatisticsSection rows={sectionOneRows} />
+			<GlobalStatistics rows={sectionOneRows} />
 
-			<OverviewLanguagesBreakdownSection
+			<LanguagesBreakdown
 				rows={languageBreakdownData}
 				languageColors={languageColors}
 			/>
 
-			<OverviewFilesExplorerSection
+			<FilesExplorer
 				projectPath={projectPath}
 				searchLang={searchLang}
 				searchQuery={searchQuery}

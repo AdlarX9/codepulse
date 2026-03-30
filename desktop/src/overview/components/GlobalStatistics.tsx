@@ -28,13 +28,13 @@ const summaryRowStyles: Record<SummaryRow['key'], string> = {
 	doc: 'bg-amber-50 border-amber-200'
 }
 
-type OverviewGlobalStatisticsSectionProps = {
+type GlobalStatisticsProps = {
 	rows: SummaryRow[]
 }
 
-export function OverviewGlobalStatisticsSection({ rows }: OverviewGlobalStatisticsSectionProps) {
+export function GlobalStatistics({ rows }: GlobalStatisticsProps) {
 	return (
-		<Card className='p-6 border bg-white shadow-sm'>
+		<Card className='p-6 border bg-white shadow-sm rounded-xl'>
 			<div className='flex items-center gap-2 mb-4'>
 				<h3 className='text-lg font-semibold text-slate-900'>Global Statistics</h3>
 			</div>

@@ -17,7 +17,7 @@ type FileExplorerRow = {
 	alert: FileAlert
 }
 
-type OverviewFilesExplorerSectionProps = {
+type FilesExplorerProps = {
 	projectPath: string
 	searchLang: string
 	searchQuery: string
@@ -39,7 +39,7 @@ function getRelativePath(absolutePath: string, basePath: string): string {
 	return absolutePath
 }
 
-export function OverviewFilesExplorerSection({
+export function FilesExplorer({
 	projectPath,
 	searchLang,
 	searchQuery,
@@ -48,9 +48,9 @@ export function OverviewFilesExplorerSection({
 	languageOptions,
 	rows,
 	languageColors
-}: OverviewFilesExplorerSectionProps) {
+}: FilesExplorerProps) {
 	return (
-		<Card className='p-6 border bg-white shadow-sm'>
+		<Card className='p-6 border bg-white shadow-sm rounded-xl'>
 			<div className='flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between'>
 				<h3 className='text-lg font-semibold text-slate-900'>Files Explorer</h3>
 				<div className='flex gap-2 w-full md:w-auto'>
@@ -89,7 +89,6 @@ export function OverviewFilesExplorerSection({
 						<tr className='text-left text-sm text-slate-600'>
 							<th className='pb-3 font-medium'>Path</th>
 							<th className='pb-3 font-medium'>Language</th>
-							<th className='pb-3 font-medium text-right'>Files</th>
 							<th className='pb-3 font-medium text-right'>Total</th>
 							<th className='pb-3 font-medium text-right'>True code</th>
 							<th className='pb-3 font-medium text-right'>Comments</th>
@@ -128,7 +127,6 @@ export function OverviewFilesExplorerSection({
 										<span>{file.language}</span>
 									</div>
 								</td>
-								<td className='py-3 text-right text-slate-600'>1</td>
 								<td className='py-3 text-right text-slate-900 font-semibold'>
 									{formatNumber(file.total)}
 								</td>

@@ -50,6 +50,7 @@ fn default_excluded_expressions() -> Vec<String> {
 		"vendor".to_string(),
 		"bin".to_string(),
 		"obj".to_string(),
+		"CMakeFiles".to_string(),
 		"*lock.*".to_string(),
 		"*lib*".to_string(),
 	]
