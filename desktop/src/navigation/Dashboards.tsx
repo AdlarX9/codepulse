@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, TrendingUp, Download } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, Download, Users2 } from 'lucide-react'
 import ExportCenter from '@/export/ExportCenter'
 import ExportButton from '@/export/ExportButton'
 import OverviewDashboard from '@/overview/OverviewDashboard'
 import EvolutionDashboard from '@/evolution/EvolutionDashboard'
+import ContributorsDashboard from '@/contributors/ContributorsDashboard'
+import { getContributorCount } from '@/handles/scan'
 import { useMainContext } from './MainContext'
 
 interface DashboardTab {
-	id: 'overview' | 'evolution' | 'exports'
+	id: 'overview' | 'evolution' | 'contributors' | 'exports'
 	label: string
 	icon: React.ReactNode
 	description: string
 	disabled?: boolean
+	disabledReason?: string
 }
 
 const TABS: DashboardTab[] = [
@@ -28,6 +31,12 @@ const TABS: DashboardTab[] = [
 		description: 'Growth over time, commits, trends'
 	},
 	{
+		id: 'contributors',
+		label: 'Contributors',
+		icon: <Users2 className='h-4 w-4' />,
+		description: 'Main contributor, ownership and productivity'
+	},
+	{
 		id: 'exports',
 		label: 'Exports',
 		icon: <Download className='h-4 w-4' />,
@@ -37,17 +46,54 @@ const TABS: DashboardTab[] = [
 
 export default function Dashboards() {
 	const [activeTab, setActiveTab] = useState<DashboardTab['id']>('overview')
-	const { scanResult, projectName, hasGit } = useMainContext()
+	const [contributorCount, setContributorCount] = useState<number>(0)
+	const { scanResult, projectName, hasGit, projectPath } = useMainContext()
 
-	const availableTabs = TABS.map(tab =>
-		tab.id === 'evolution' ? { ...tab, disabled: !hasGit } : tab
-	)
+	useEffect(() => {
+		if (!hasGit || !projectPath) {
+			setContributorCount(0)
+			return
+		}
+
+		void getContributorCount(projectPath)
+			.then(count => setContributorCount(count))
+			.catch(() => setContributorCount(0))
+	}, [hasGit, projectPath])
+
+	const contributorsDisabled = !hasGit || contributorCount <= 1
+
+	const availableTabs = TABS.map(tab => {
+		if (tab.id === 'evolution') {
+			return {
+				...tab,
+				disabled: !hasGit,
+				disabledReason: !hasGit ? 'Git repository required' : undefined
+			}
+		}
+
+		if (tab.id === 'contributors') {
+			return {
+				...tab,
+				disabled: contributorsDisabled,
+				disabledReason: !hasGit
+					? 'Git repository required'
+					: 'At least 2 contributors required'
+			}
+		}
+
+		return tab
+	})
 
 	useEffect(() => {
 		if (!hasGit && activeTab === 'evolution') {
 			setActiveTab('overview')
+			return
 		}
-	}, [activeTab, hasGit])
+
+		if (contributorsDisabled && activeTab === 'contributors') {
+			setActiveTab('overview')
+		}
+	}, [activeTab, hasGit, contributorsDisabled])
 
 	return (
 		<div className='h-full flex flex-col'>
@@ -73,6 +119,7 @@ export default function Dashboards() {
 						{availableTabs.map(tab => (
 							<button
 								key={tab.id}
+								title={tab.disabled ? tab.disabledReason : tab.description}
 								onClick={() => {
 									if (!tab.disabled) {
 										setActiveTab(tab.id)
@@ -112,6 +159,9 @@ export default function Dashboards() {
 					<div className='flex-1 p-6'>
 						{activeTab === 'overview' && <OverviewDashboard />}
 						{activeTab === 'evolution' && hasGit && <EvolutionDashboard />}
+						{activeTab === 'contributors' && !contributorsDisabled && (
+							<ContributorsDashboard />
+						)}
 						{activeTab === 'exports' && <ExportCenter />}
 					</div>
 				</div>

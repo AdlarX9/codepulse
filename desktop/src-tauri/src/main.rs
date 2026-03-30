@@ -7,7 +7,7 @@ mod storage;
 mod user;
 
 use crate::languages::{languages, LanguageDef};
-use crate::project::{CommitActivity, FileStats, Project};
+use crate::project::{CommitActivity, ContributorsDashboardData, FileStats, Project};
 use crate::user::{user, ScanSettings};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -47,6 +47,20 @@ async fn get_loc_diff(path: String) -> Result<HashMap<String, [i64; 2]>, String>
 async fn get_commit_activity(path: String) -> Result<Vec<CommitActivity>, String> {
 	let project = Project::new(String::new(), path);
 	Ok(project.get_commit_activity().await)
+}
+
+#[tauri::command]
+async fn get_contributor_count(path: String) -> Result<u64, String> {
+	let project = Project::new(String::new(), path);
+	Ok(project.get_contributor_count().await)
+}
+
+#[tauri::command]
+async fn get_contributors_dashboard_data(
+	path: String,
+) -> Result<ContributorsDashboardData, String> {
+	let project = Project::new(String::new(), path);
+	Ok(project.get_contributors_dashboard_data().await)
 }
 
 #[tauri::command]
@@ -94,6 +108,8 @@ fn main() {
 			get_loc_evolution,
 			get_loc_diff,
 			get_commit_activity,
+			get_contributor_count,
+			get_contributors_dashboard_data,
 			// Languages
 			// Facilitators
 			get_all_languages,

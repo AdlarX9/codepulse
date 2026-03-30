@@ -164,6 +164,36 @@ export async function getCommitActivity(path: string): Promise<CommitActivity[]>
 	return invoke<CommitActivity[]>('get_commit_activity', { path })
 }
 
+export type ContributorStats = {
+	key: string
+	pseudo: string
+	name: string
+	email: string
+	commits: number
+	commit_percentage: number
+	lines: number
+	line_percentage: number
+	lines_per_commit: number
+	first_commit_date: string
+	last_commit_date: string
+}
+
+export type ContributorsDashboardData = {
+	total_commits: number
+	total_lines: number
+	contributors: ContributorStats[]
+}
+
+export async function getContributorCount(path: string): Promise<number> {
+	return invoke<number>('get_contributor_count', { path })
+}
+
+export async function getContributorsDashboardData(
+	path: string
+): Promise<ContributorsDashboardData> {
+	return invoke<ContributorsDashboardData>('get_contributors_dashboard_data', { path })
+}
+
 export async function getLanguageColors(): Promise<Record<string, string>> {
 	const definitions = await getLanguageDefinitions()
 	const map: Record<string, string> = {}
