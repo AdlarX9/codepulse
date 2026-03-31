@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LayoutDashboard, TrendingUp, Download, Users2 } from 'lucide-react'
-import ExportCenter from '@/export/ExportCenter'
+import { LayoutDashboard, TrendingUp, Users2 } from 'lucide-react'
 import ExportButton from '@/export/ExportButton'
 import OverviewDashboard from '@/overview/OverviewDashboard'
 import EvolutionDashboard from '@/evolution/EvolutionDashboard'
@@ -35,12 +34,6 @@ const TABS: DashboardTab[] = [
 		label: 'Contributors',
 		icon: <Users2 className='h-4 w-4' />,
 		description: 'Main contributor, ownership and productivity'
-	},
-	{
-		id: 'exports',
-		label: 'Exports',
-		icon: <Download className='h-4 w-4' />,
-		description: 'Export data in multiple formats'
 	}
 ]
 
@@ -162,7 +155,6 @@ export default function Dashboards() {
 						{activeTab === 'contributors' && !contributorsDisabled && (
 							<ContributorsDashboard />
 						)}
-						{activeTab === 'exports' && <ExportCenter />}
 					</div>
 				</div>
 			</div>

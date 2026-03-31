@@ -38,7 +38,15 @@ export interface LocalProject {
 	path: string
 }
 
-export type ExportFormat = 'json' | 'csv' | 'markdown' | 'html'
+export type ExportFormat =
+	| 'raw-json'
+	| 'raw-csv'
+	| 'raw-sql'
+	| 'raw-xml'
+	| 'visual-html'
+	| 'visual-pdf'
+	| 'visual-markdown'
+	| 'visual-latex'
 
 export interface ScanSettings {
 	excluded_expressions: string[]

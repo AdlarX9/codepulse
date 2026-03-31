@@ -1,6 +1,15 @@
 import { useState } from 'react'
-import * as exportLib from '@/export/functions'
-import { Download, FileText, FileJson, FileSpreadsheet, Code } from 'lucide-react'
+import * as exportLib from './functions'
+import {
+	Braces,
+	Code,
+	Download,
+	FileJson,
+	FileSpreadsheet,
+	FileText,
+	FileType2,
+	FileType
+} from 'lucide-react'
 import { ExportFormat } from '@/types'
 import { Button } from '@/components/Button'
 import { useMainContext } from '@/navigation/MainContext'
@@ -13,7 +22,7 @@ interface ExportButtonProps {
 export default function ExportButton({ variant = 'outline', size = 'sm' }: ExportButtonProps) {
 	const [showMenu, setShowMenu] = useState(false)
 	const [exporting, setExporting] = useState(false)
-	const { scanResult, projectName } = useMainContext()
+	const { scanResult, projectName, projectPath, hasGit } = useMainContext()
 
 	if (!scanResult) {
 		return null
@@ -24,31 +33,17 @@ export default function ExportButton({ variant = 'outline', size = 'sm' }: Expor
 			return
 		}
 
-		const data = scanResult
-
 		try {
 			setExporting(true)
 			setShowMenu(false)
 
-			let content = ''
-			const fileName = projectName || 'code-analysis'
-
-			switch (format) {
-				case 'json':
-					content = exportLib.exportToJSON(data)
-					break
-				case 'csv':
-					content = exportLib.exportToCSV(data)
-					break
-				case 'markdown':
-					content = exportLib.exportToMarkdown(data, projectName)
-					break
-				case 'html':
-					content = exportLib.exportToHTML(data, projectName)
-					break
-			}
-
-			const success = await exportLib.saveToFile(content, fileName, format)
+			const success = await exportLib.runExport({
+				format,
+				scanResult,
+				projectName,
+				projectPath,
+				hasGit
+			})
 
 			if (success) {
 				// Could show a toast notification here
@@ -81,33 +76,69 @@ export default function ExportButton({ variant = 'outline', size = 'sm' }: Expor
 					{/* Menu */}
 					<div className='absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20 overflow-hidden'>
 						<div className='py-1'>
+							<div className='px-4 py-1 text-[11px] uppercase tracking-wide text-gray-500'>
+								Raw data
+							</div>
 							<button
-								onClick={() => handleExport('json')}
+								onClick={() => handleExport('raw-json')}
 								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
 							>
 								<FileJson className='h-4 w-4 text-blue-600' />
-								<span>JSON</span>
+								<span>JSON (Files/Commits/Contributors)</span>
 							</button>
 							<button
-								onClick={() => handleExport('csv')}
+								onClick={() => handleExport('raw-csv')}
 								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
 							>
 								<FileSpreadsheet className='h-4 w-4 text-green-600' />
-								<span>CSV</span>
+								<span>CSV (3 sheets)</span>
 							</button>
 							<button
-								onClick={() => handleExport('markdown')}
+								onClick={() => handleExport('raw-sql')}
 								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
 							>
-								<FileText className='h-4 w-4 text-purple-600' />
-								<span>Markdown</span>
+								<Braces className='h-4 w-4 text-slate-700' />
+								<span>SQL (3 tables)</span>
 							</button>
 							<button
-								onClick={() => handleExport('html')}
+								onClick={() => handleExport('raw-xml')}
 								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
 							>
 								<Code className='h-4 w-4 text-orange-600' />
-								<span>HTML</span>
+								<span>XML (3 sections)</span>
+							</button>
+
+							<div className='my-1 h-px bg-gray-200' />
+							<div className='px-4 py-1 text-[11px] uppercase tracking-wide text-gray-500'>
+								Visual report
+							</div>
+							<button
+								onClick={() => handleExport('visual-html')}
+								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
+							>
+								<Code className='h-4 w-4 text-indigo-600' />
+								<span>HTML report</span>
+							</button>
+							<button
+								onClick={() => handleExport('visual-pdf')}
+								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
+							>
+								<FileType className='h-4 w-4 text-red-600' />
+								<span>PDF report</span>
+							</button>
+							<button
+								onClick={() => handleExport('visual-markdown')}
+								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
+							>
+								<FileText className='h-4 w-4 text-purple-600' />
+								<span>Markdown report</span>
+							</button>
+							<button
+								onClick={() => handleExport('visual-latex')}
+								className='w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-3'
+							>
+								<FileType2 className='h-4 w-4 text-teal-600' />
+								<span>LaTeX report</span>
 							</button>
 						</div>
 					</div>
