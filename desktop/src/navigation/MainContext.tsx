@@ -16,6 +16,7 @@ interface ValueType {
 	isAutoScanning: boolean
 	changeView: (view: 'dashboard' | 'settings' | 'analysis') => void
 	selectAndScan: () => Promise<void>
+	scanProjectPath: (path: string) => Promise<boolean>
 	autoScanProjects: () => Promise<void>
 	openRecentProject: (project: LocalProject) => Promise<void>
 	rescan: () => Promise<void>
@@ -114,6 +115,44 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 		}
 	}
 
+	function getProjectNameFromPath(path: string): string {
+		const normalizedPath = path.replace(/\\/g, '/').replace(/\/+$/, '')
+		const parts = normalizedPath.split('/').filter(Boolean)
+		return parts[parts.length - 1] || 'Project'
+	}
+
+	async function runScanPipeline(
+		path: string,
+		preferredName?: string,
+		persistProject = true
+	): Promise<boolean> {
+		const normalizedPath = path.trim()
+		if (!normalizedPath) {
+			return false
+		}
+
+		const resolvedName = (
+			preferredName?.trim() || getProjectNameFromPath(normalizedPath)
+		).trim()
+
+		try {
+			const result = await scanDirectory(normalizedPath)
+			setProjectPath(normalizedPath)
+			setProjectName(resolvedName || 'Project')
+			setScanResult(result)
+			changeView('analysis')
+
+			if (persistProject) {
+				await saveRecentProject(normalizedPath, resolvedName || 'Project')
+			}
+
+			return true
+		} catch (e) {
+			console.error('Failed to scan project path:', e)
+			return false
+		}
+	}
+
 	async function reorderRecentProjects(draggedId: string, targetId: string) {
 		if (!draggedId || !targetId || draggedId === targetId) {
 			return
@@ -205,32 +244,19 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 			multiple: false
 		})) as string | null
 
-		if (!selected) return
+		if (!selected) {
+			return
+		}
 
-		const newProjectName = selected.split('/').pop() || 'Project'
-		setProjectPath(selected)
-		setProjectName(newProjectName)
+		await runScanPipeline(selected)
+	}
 
-		const result = await scanDirectory(selected)
-
-		setScanResult(result)
-		changeView('analysis')
-
-		await saveRecentProject(selected, newProjectName)
+	async function scanProjectPath(path: string): Promise<boolean> {
+		return runScanPipeline(path)
 	}
 
 	async function openRecentProject(project: LocalProject) {
-		setProjectPath(project.path)
-		setProjectName(project.name || 'Project')
-
-		try {
-			const result = await scanDirectory(project.path)
-
-			setScanResult(result)
-			changeView('analysis')
-		} catch (e) {
-			console.error('Failed to scan project:', e)
-		}
+		await runScanPipeline(project.path, project.name || 'Project', false)
 	}
 
 	async function rescan() {
@@ -260,6 +286,7 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 				isAutoScanning,
 				changeView,
 				selectAndScan,
+				scanProjectPath,
 				autoScanProjects,
 				openRecentProject,
 				rescan,
