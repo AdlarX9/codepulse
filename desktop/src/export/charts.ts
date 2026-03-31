@@ -38,7 +38,9 @@ export function makeLineChartSvg(
 		y: padding + ((max - s.value) / span) * (height - padding * 2)
 	}))
 
-	const circles = points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${stroke}" />`).join('')
+	const circles = points
+		.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${stroke}" />`)
+		.join('')
 
 	return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" style="border:1px solid #e2e8f0;border-radius:4px">
 <rect width="${width}" height="${height}" fill="#ffffff" />
@@ -112,28 +114,39 @@ export function makeDonutChartSvg(
 	const cx = 80
 	const cy = 110
 	const r = 60
+	const palette = ['#2563EB', '#10B981', '#F59E0B', '#EF4444']
+	const positiveSeries = series.filter(s => s.value > 0)
+	const total = Math.max(
+		1,
+		positiveSeries.reduce((acc, s) => acc + Math.max(0, s.value), 0)
+	)
 
-	const total = Math.max(1, series.reduce((acc, s) => acc + Math.max(0, s.value), 0))
-	let angle = 0
+	let slices = ''
+	if (positiveSeries.length === 0) {
+		slices = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#E2E8F0" />`
+	} else if (positiveSeries.length === 1) {
+		const color = positiveSeries[0].color ?? palette[0]
+		slices = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" />`
+	} else {
+		let angle = 0
+		slices = positiveSeries
+			.map((s, index) => {
+				const part = (Math.max(0, s.value) / total) * 360
+				const start = angle
+				const isLastSlice = index === positiveSeries.length - 1
+				const end = isLastSlice ? 360 : angle + part
+				angle = end
+				const color = s.color ?? palette[index % palette.length]
+				return `<path d="${arcPath(cx, cy, r, start, end)}" fill="${color}" />`
+			})
+			.join('')
+	}
 
-	const slices = series
-		.filter(s => s.value > 0)
-		.map((s, index) => {
-			const part = (Math.max(0, s.value) / total) * 360
-			const start = angle
-			const end = angle + part
-			angle = end
-			const color = s.color ?? ['#2563EB', '#10B981', '#F59E0B', '#EF4444'][index % 4]
-			return `<path d="${arcPath(cx, cy, r, start, end)}" fill="${color}" />`
-		})
-		.join('')
-
-	const legend = series
-		.filter(s => s.value > 0)
+	const legend = positiveSeries
 		.slice(0, 6)
 		.map((s, i) => {
 			const y = 24 + i * 18
-			const color = s.color ?? ['#2563EB', '#10B981', '#F59E0B', '#EF4444'][i % 4]
+			const color = s.color ?? palette[i % palette.length]
 			return `<rect x="200" y="${y}" width="8" height="8" fill="${color}" rx="1"/><text x="214" y="${y + 7}" font-size="10" fill="#334155">${escapeXml(
 				s.label.substring(0, 20)
 			)}</text>`
