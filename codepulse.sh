@@ -25,8 +25,7 @@ print_help() {
 	echo -e "${YELLOW}Développement:${NC}"
 	echo "  setup				Configuration initiale du projet"
 	echo "  icons				Générer les icônes de développement"
-	echo "  build				Build toutes les applications"
-	echo "  build-desktop		Build l'application desktop seulement"
+	echo "  build				Build Codepulse"
 	echo "  test				 Lancer tous les tests"
 	echo ""
 	echo -e "${YELLOW}Utilitaires:${NC}"
@@ -134,12 +133,6 @@ launch_web() {
 	php -S 127.0.0.1:8080 -t web
 }
 
-build_all() {
-	echo -e "${BLUE}📦 Build de toutes les applications...${NC}"
-	pnpm -w build
-	echo -e "${GREEN}✅ Build terminé !${NC}"
-}
-
 build_desktop() {
 	echo -e "${BLUE}🔨 Build de l'application desktop...${NC}"
 	bash scripts/build-tauri.sh
@@ -179,12 +172,8 @@ case "$1" in
 	"icons")
 		generate_icons
 		;;
-		
+
 	"build")
-		build_all
-		;;
-		
-	"build-desktop")
 		build_desktop
 		;;
 		

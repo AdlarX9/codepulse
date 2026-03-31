@@ -1,15 +1,17 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod auto_scan;
 mod languages;
 mod project;
 mod storage;
 mod user;
 
+use crate::auto_scan::scan_contributed_repositories;
 use crate::languages::{languages, LanguageDef};
 use crate::project::{CommitActivity, ContributorsDashboardData, FileStats, Project};
 use crate::user::{user, ScanSettings};
-use serde_json::Value as JsonValue;
+use serde_json::{json, Value as JsonValue};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -98,6 +100,23 @@ async fn set_projects_order(projects: Vec<JsonValue>) -> Result<(), String> {
 	user().set_projects_order(projects)
 }
 
+#[tauri::command]
+async fn auto_scan_projects() -> Result<Vec<JsonValue>, String> {
+	let discovered = scan_contributed_repositories()?;
+	let projects: Vec<JsonValue> = discovered
+		.into_iter()
+		.map(|repository| {
+			json!({
+				"id": repository.path,
+				"name": repository.name,
+				"path": repository.path
+			})
+		})
+		.collect();
+
+	user().merge_auto_scan_projects(projects)
+}
+
 fn main() {
 	tauri::Builder::default()
 		.manage(AppState { cancel_flag: Arc::new(AtomicBool::new(false)) })
@@ -120,6 +139,7 @@ fn main() {
 			upsert_project,
 			delete_project,
 			set_projects_order,
+			auto_scan_projects,
 			// CRUD Scan Settings
 			update_scan_settings,
 			get_scan_settings,

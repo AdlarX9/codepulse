@@ -1,9 +1,10 @@
-import { Code2, FolderOpen } from 'lucide-react'
+import { Code2, FolderOpen, GitBranch } from 'lucide-react'
 import { useMainContext } from './MainContext'
 import { LocalProject } from '@/types'
 
 export default function Home() {
-	const { selectAndScan, recentProjects, openRecentProject } = useMainContext()
+	const { selectAndScan, autoScanProjects, isAutoScanning, recentProjects, openRecentProject } =
+		useMainContext()
 
 	return (
 		<div className='max-w-4xl mx-auto'>
@@ -19,6 +20,21 @@ export default function Home() {
 					<FolderOpen className='w-5 h-5' />
 					Select a Project to Scan
 				</button>
+
+				<button
+					onClick={() => {
+						void autoScanProjects()
+					}}
+					disabled={isAutoScanning}
+					className='mt-4 px-6 py-2.5 border border-blue-200 text-blue-700 rounded-lg bg-blue-50/60 hover:bg-blue-100/70 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2 mx-auto'
+				>
+					<GitBranch className='w-4 h-4' />
+					{isAutoScanning ? 'Auto Scan in progress...' : 'Auto Scan My Git Repositories'}
+				</button>
+				<p className='mt-2 text-xs text-gray-500'>
+					Find repositories in your home directory where your configured Git identity
+					already contributed.
+				</p>
 			</div>
 
 			{recentProjects.length > 0 && (

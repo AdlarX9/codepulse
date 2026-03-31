@@ -13,11 +13,15 @@ interface ValueType {
 	hasGit: boolean
 	projectName: string
 	recentProjects: LocalProject[]
+	isAutoScanning: boolean
 	changeView: (view: 'dashboard' | 'settings' | 'analysis') => void
 	selectAndScan: () => Promise<void>
+	autoScanProjects: () => Promise<void>
 	openRecentProject: (project: LocalProject) => Promise<void>
 	rescan: () => Promise<void>
 	reorderRecentProjects: (draggedId: string, targetId: string) => Promise<void>
+	renameRecentProject: (projectId: string, newName: string) => Promise<void>
+	deleteRecentProject: (projectId: string) => Promise<void>
 	cn: (...inputs: ClassValue[]) => string
 }
 
@@ -32,6 +36,7 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 	const [hasGit, setHasGit] = useState<boolean>(false)
 	const [projectName, setProjectName] = useState<string>('Project')
 	const [recentProjects, setRecentProjects] = useState<LocalProject[]>([])
+	const [isAutoScanning, setIsAutoScanning] = useState(false)
 
 	useEffect(() => {
 		void loadRecentProjects()
@@ -72,6 +77,29 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 		}
 	}
 
+	async function autoScanProjects() {
+		if (isAutoScanning) {
+			return
+		}
+
+		setIsAutoScanning(true)
+		try {
+			const scanned = await invoke<Array<Record<string, unknown>>>('auto_scan_projects')
+			const projects: LocalProject[] = (scanned || [])
+				.map(item => ({
+					id: String(item.id ?? ''),
+					name: String(item.name ?? 'Project'),
+					path: String(item.path ?? '')
+				}))
+				.filter(p => p.id && p.path)
+			setRecentProjects(projects)
+		} catch (e) {
+			console.error('Failed to auto scan projects:', e)
+		} finally {
+			setIsAutoScanning(false)
+		}
+	}
+
 	async function saveRecentProject(path: string, name: string) {
 		try {
 			const project: LocalProject = {
@@ -106,6 +134,62 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 			await invoke('set_projects_order', { projects: next })
 		} catch (e) {
 			console.error('Failed to persist projects order:', e)
+			await loadRecentProjects()
+		}
+	}
+
+	async function renameRecentProject(projectId: string, newName: string) {
+		const trimmedName = newName.trim()
+		if (!projectId || !trimmedName) {
+			return
+		}
+
+		const current = recentProjects.find(project => project.id === projectId)
+		if (!current) {
+			return
+		}
+
+		const nextProject: LocalProject = {
+			...current,
+			name: trimmedName
+		}
+
+		setRecentProjects(prev =>
+			prev.map(project => (project.id === projectId ? nextProject : project))
+		)
+
+		if (projectPath === current.path) {
+			setProjectName(trimmedName)
+		}
+
+		try {
+			await invoke('upsert_project', { project: nextProject })
+		} catch (e) {
+			console.error('Failed to rename project:', e)
+			await loadRecentProjects()
+		}
+	}
+
+	async function deleteRecentProject(projectId: string) {
+		if (!projectId) {
+			return
+		}
+
+		const current = recentProjects.find(project => project.id === projectId)
+		setRecentProjects(prev => prev.filter(project => project.id !== projectId))
+
+		if (current && projectPath === current.path) {
+			setProjectPath('')
+			setProjectName('Project')
+			setScanResult(null)
+			setHasGit(false)
+			setCurrentView('dashboard')
+		}
+
+		try {
+			await invoke('delete_project', { id: projectId })
+		} catch (e) {
+			console.error('Failed to delete project:', e)
 			await loadRecentProjects()
 		}
 	}
@@ -173,11 +257,15 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 				hasGit,
 				projectName,
 				recentProjects,
+				isAutoScanning,
 				changeView,
 				selectAndScan,
+				autoScanProjects,
 				openRecentProject,
 				rescan,
 				reorderRecentProjects,
+				renameRecentProject,
+				deleteRecentProject,
 				cn
 			}}
 		>

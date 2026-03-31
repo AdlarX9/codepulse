@@ -49,9 +49,23 @@ BUILD_CMD_TAURI=""
 
 detect_pkg_manager() {
 	if [[ -f "pnpm-lock.yaml" ]]; then
-		PKG_MANAGER="pnpm"
-		INSTALL_CMD="pnpm install"
-		BUILD_CMD_TAURI="pnpm tauri build"
+		if command -v pnpm >/dev/null 2>&1 && pnpm --version >/dev/null 2>&1; then
+			PKG_MANAGER="pnpm"
+			INSTALL_CMD="pnpm install"
+			BUILD_CMD_TAURI="pnpm --filter desktop tauri build"
+		elif command -v pnpm >/dev/null 2>&1 && COREPACK_INTEGRITY_KEYS=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0 pnpm --version >/dev/null 2>&1; then
+			warn "pnpm via Corepack nécessite un contournement de signature. Activation automatique."
+			export COREPACK_INTEGRITY_KEYS=0
+			export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+			PKG_MANAGER="pnpm"
+			INSTALL_CMD="pnpm install"
+			BUILD_CMD_TAURI="pnpm --filter desktop tauri build"
+		else
+			warn "pnpm détecté mais non fonctionnel (Corepack/signature). Fallback sur npm."
+			PKG_MANAGER="npm"
+			INSTALL_CMD="cd desktop && npm install"
+			BUILD_CMD_TAURI="cd desktop && npm run tauri:build --"
+		fi
 	elif [[ -f "yarn.lock" ]]; then
 		PKG_MANAGER="yarn"
 		INSTALL_CMD="yarn install"
@@ -59,7 +73,7 @@ detect_pkg_manager() {
 	else
 		PKG_MANAGER="npm"
 		INSTALL_CMD="npm ci || npm install"
-		BUILD_CMD_TAURI="npx tauri build"
+		BUILD_CMD_TAURI="cd desktop && npm run tauri:build --"
 	fi
 }
 
@@ -73,10 +87,12 @@ while [[ $# -gt 0 ]]; do
 			PLATFORM="${2:-all}"; shift 2;;
 		--no-install)
 			DO_INSTALL="no"; shift;;
+		--install)
+			DO_INSTALL="yes"; shift;;
 		--linux-bundles)
 			LINUX_BUNDLES="${2:-appimage}"; shift 2;;
 		-h|--help)
-			sed -n '1,120p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+			sed -n '1,140p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 		*)
 			err "Option inconnue: $1"; exit 1;;
 	esac
@@ -122,11 +138,11 @@ build_macos_arm64() {
 	if [[ "${ARCH}" == "arm64" ]]; then
 		# Build natif arm64
 		eval "${BUILD_CMD_TAURI} --bundles dmg"
-		OUT_DIR="src-tauri/target/release/bundle/dmg"
+		OUT_DIR="desktop/src-tauri/target/release/bundle/dmg"
 	else
 		# Tentative cross-target arm64
 		eval "${BUILD_CMD_TAURI} --bundles dmg --target aarch64-apple-darwin"
-		OUT_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
+		OUT_DIR="desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
 	fi
 
 	mkdir -p dist/macos
@@ -148,7 +164,7 @@ build_linux_native() {
 	fi
 	eval "${BUILD_CMD_TAURI} ${bundles_arg}"
 	# Collecte des artefacts
-	local base="src-tauri/target/release/bundle"
+	local base="desktop/src-tauri/target/release/bundle"
 	mkdir -p dist/linux
 	if [[ -d "${base}" ]]; then
 		find "${base}" -maxdepth 2 -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec cp -f {} dist/linux/ \;
@@ -186,7 +202,7 @@ build_linux_docker() {
 		"
 
 	mkdir -p dist/linux
-	local base="src-tauri/target/release/bundle"
+	local base="desktop/src-tauri/target/release/bundle"
 	if [[ -d "${base}" ]]; then
 		find "${base}" -maxdepth 2 -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) -exec cp -f {} dist/linux/ \;
 		msg "Artefacts Linux copiés dans dist/linux/"
@@ -213,7 +229,7 @@ build_windows_note_or_native() {
 		# Bundles: nsis et/ou msi selon votre config. Exemple avec nsis:
 		eval "${BUILD_CMD_TAURI} --bundles nsis"
 		mkdir -p dist/windows
-		local base="src-tauri/target/release/bundle"
+		local base="desktop/src-tauri/target/release/bundle"
 		if [[ -d "${base}" ]]; then
 			find "${base}" -maxdepth 2 -type f \( -name "*.exe" -o -name "*.msi" \) -exec cp -f {} dist/windows/ \;
 			msg "Artefacts Windows copiés dans dist/windows/"

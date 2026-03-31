@@ -3,6 +3,7 @@ use crate::storage::storage;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 pub const SCAN_SETTINGS_STORAGE_KEY: &str = "scan_settings";
@@ -171,5 +172,61 @@ impl User {
 		storage().write_json(LOCAL_PROJECTS_STORAGE_KEY, &projects)?;
 		self.sync_projects_from_json(&projects);
 		Ok(())
+	}
+
+	pub fn merge_auto_scan_projects(
+		&self,
+		projects: Vec<JsonValue>,
+	) -> Result<Vec<JsonValue>, String> {
+		let current = self.list_projects()?;
+		let mut current_by_id: HashMap<String, &JsonValue> = HashMap::new();
+		for project in &current {
+			let id = project.get("id").and_then(|value| value.as_str()).unwrap_or("");
+			if !id.is_empty() {
+				current_by_id.insert(id.to_string(), project);
+			}
+		}
+
+		let mut seen_ids: HashSet<String> = HashSet::new();
+		let mut ordered: Vec<JsonValue> = Vec::with_capacity(projects.len());
+
+		for candidate in projects {
+			let id = candidate.get("id").and_then(|value| value.as_str()).unwrap_or("").to_string();
+			if id.is_empty() || !seen_ids.insert(id.clone()) {
+				continue;
+			}
+
+			if let Some(existing) = current_by_id.get(&id) {
+				let existing_name = existing
+					.get("name")
+					.and_then(|value| value.as_str())
+					.unwrap_or("")
+					.trim()
+					.to_string();
+				let candidate_name = candidate
+					.get("name")
+					.and_then(|value| value.as_str())
+					.unwrap_or("")
+					.trim()
+					.to_string();
+				let path = candidate
+					.get("path")
+					.and_then(|value| value.as_str())
+					.unwrap_or("")
+					.to_string();
+
+				ordered.push(serde_json::json!({
+					"id": id,
+					"name": if existing_name.is_empty() { candidate_name } else { existing_name },
+					"path": path
+				}));
+			} else {
+				ordered.push(candidate);
+			}
+		}
+
+		storage().write_json(LOCAL_PROJECTS_STORAGE_KEY, &ordered)?;
+		self.sync_projects_from_json(&ordered);
+		Ok(ordered)
 	}
 }
