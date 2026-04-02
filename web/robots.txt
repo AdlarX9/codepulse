@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://codepulse.alexis-larose.com/sitemap.xml
+Host: https://codepulse.alexis-larose.com

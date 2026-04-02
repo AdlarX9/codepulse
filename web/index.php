@@ -20,6 +20,13 @@ $canonical = $scheme . '://' . $host . ($_SERVER['REQUEST_URI'] ?? '/');
 		<meta name="theme-color" content="#eaf6ff">
 		<link rel="canonical" href="<?= htmlspecialchars($canonical, ENT_QUOTES, 'UTF-8') ?>">
 
+		<link rel="icon" type="image/png" href="/favicon-96x96.png?v=20260402" sizes="96x96" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260402" />
+		<link rel="shortcut icon" href="/favicon.ico?v=20260402" />
+		<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260402" />
+		<meta name="apple-mobile-web-app-title" content="Codepulse" />
+		<link rel="manifest" href="/site.webmanifest?v=20260402" />
+
 		<meta property="og:type" content="website">
 		<meta property="og:site_name" content="CodePulse">
 		<meta property="og:title" content="CodePulse | Beautiful Code Analytics for Fast-Moving Teams">

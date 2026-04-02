@@ -1,30 +1,25 @@
 # CodePulse
 
-CodePulse is a cross-platform desktop application that analyzes your codebase and provides detailed statistics, visualizations, and insights — all while keeping your code completely private and offline.
+CodePulse is a cross-platform desktop application that analyzes your codebase and provides detailed statistics, visualizations, and insights. It helps developers and teams understand their project's health, track code quality, and monitor contributor activity over time.
 
-# ✨ Features
-
-- 🚀 **Lightning Fast**: Rust-powered backend scans thousands of files in seconds
-- 🔒 **Privacy First**: All analysis happens locally—your code never leaves your machine
-- 📊 **Rich Insights**: Detailed stats, interactive charts, and breakdowns by language
-- 💾 **Export**: Save results as CSV, JSON, HTML or even Markdown!
-- 🌍 **Cross-Platform**: Works on macOS, Windows, and Linux
-
-# 🚀 Quick Start
+## 🚀 Quick Start
 
 You can run the following commands to easily run the application on your computer :
 
+Clone and setup
 ```bash
-# Clone and setup
 git clone https://github.com/AdlarX9/codepulse.git
+```
+```bash
 cd code-pulse
+```
+```bash
 ./codepulse.sh setup
+```
 
-# Launch desktop app
+Launch desktop app
+```bash
 ./codepulse.sh desktop
-
-# Or launch web app
-./codepulse.sh web
 ```
 
 # Examples
