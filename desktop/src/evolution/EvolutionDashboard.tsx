@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, GitCommit } from 'lucide-react'
 import { getCommitActivity, getLanguageColors } from '@/handles/scan'
+import {
+	buildProjectCacheKey,
+	formatResourceError,
+	getResourceSnapshot,
+	loadResource,
+	subscribeResource
+} from '@/cache/resourceCache'
 import { useMainContext } from '@/navigation/MainContext'
 import {
 	buildAllTimeStats,
@@ -19,35 +26,72 @@ import { CommitActivity } from './types'
 
 export default function EvolutionDashboard() {
 	const { projectPath, hasGit } = useMainContext()
-	const [commits, setCommits] = useState<CommitActivity[]>([])
+	const cacheKey =
+		projectPath && hasGit ? buildProjectCacheKey('commit-activity', projectPath) : null
+	const initialSnapshot = cacheKey ? getResourceSnapshot<CommitActivity[]>(cacheKey) : null
+	const [commits, setCommits] = useState<CommitActivity[]>(() => initialSnapshot?.data ?? [])
 	const [languageColors, setLanguageColors] = useState<Record<string, string>>({})
 	const [scaleMode, setScaleMode] = useState<LocScaleMode>('snapshots')
-	const [loading, setLoading] = useState(false)
-	const [error, setError] = useState<string | null>(null)
+	const [loading, setLoading] = useState<boolean>(() =>
+		Boolean(cacheKey) ? !(initialSnapshot?.data ?? false) : false
+	)
+	const [error, setError] = useState<string | null>(() =>
+		initialSnapshot?.data ? null : (initialSnapshot?.error ?? null)
+	)
 
 	useEffect(() => {
 		void getLanguageColors().then(setLanguageColors)
 	}, [])
 
 	useEffect(() => {
-		if (!projectPath || !hasGit) {
+		if (!cacheKey || !projectPath || !hasGit) {
 			setCommits([])
+			setLoading(false)
+			setError(null)
 			return
 		}
 
-		void (async () => {
+		let cancelled = false
+
+		const syncSnapshot = () => {
+			if (cancelled) {
+				return
+			}
+
+			const snapshot = getResourceSnapshot<CommitActivity[]>(cacheKey)
+			setCommits(snapshot.data ?? [])
+			setLoading(snapshot.loading)
+			setError(snapshot.data ? null : snapshot.error)
+		}
+
+		const unsubscribe = subscribeResource(cacheKey, syncSnapshot)
+
+		if (initialSnapshot?.data) {
+			syncSnapshot()
+		} else {
+			setCommits([])
 			setLoading(true)
 			setError(null)
+		}
+
+		void (async () => {
 			try {
-				const activity = await getCommitActivity(projectPath)
-				setCommits(activity)
+				await loadResource(cacheKey, () => getCommitActivity(projectPath))
 			} catch (e) {
-				setError(e instanceof Error ? e.message : 'Failed to load evolution data')
-			} finally {
-				setLoading(false)
+				if (!cancelled) {
+					const snapshot = getResourceSnapshot<CommitActivity[]>(cacheKey)
+					if (!snapshot.data) {
+						setError(formatResourceError(e) || 'Failed to load evolution data')
+					}
+				}
 			}
 		})()
-	}, [projectPath, hasGit])
+
+		return () => {
+			cancelled = true
+			unsubscribe()
+		}
+	}, [cacheKey, projectPath, hasGit])
 
 	const locPoints = useMemo(() => buildLocEvolutionPoints(commits), [commits])
 	const languageOrder = useMemo(() => buildLanguageOrder(locPoints), [locPoints])

@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, GitCommit, Users2 } from 'lucide-react'
 import { getContributorsDashboardData, ContributorsDashboardData } from '@/handles/scan'
+import {
+	buildProjectCacheKey,
+	formatResourceError,
+	getResourceSnapshot,
+	loadResource,
+	subscribeResource
+} from '@/cache/resourceCache'
 import { useMainContext } from '@/navigation/MainContext'
 import { buildContributorsViewModel } from './analytics'
 import { MainContributorBanner } from './components/MainContributorBanner'
@@ -9,59 +16,85 @@ import { ContributorsTableCard } from './components/ContributorsTableCard'
 
 export default function ContributorsDashboard() {
 	const { projectPath, hasGit } = useMainContext()
-	const [data, setData] = useState<ContributorsDashboardData | null>(null)
-	const [loading, setLoading] = useState(false)
-	const [error, setError] = useState<string | null>(null)
+	const cacheKey =
+		projectPath && hasGit ? buildProjectCacheKey('contributors-dashboard', projectPath) : null
+	const initialSnapshot = cacheKey
+		? getResourceSnapshot<ContributorsDashboardData>(cacheKey)
+		: null
+	const [data, setData] = useState<ContributorsDashboardData | null>(
+		() => initialSnapshot?.data ?? null
+	)
+	const [loading, setLoading] = useState<boolean>(() =>
+		Boolean(cacheKey) ? !(initialSnapshot?.data ?? false) : false
+	)
+	const [error, setError] = useState<string | null>(() =>
+		initialSnapshot?.data ? null : (initialSnapshot?.error ?? null)
+	)
 
 	useEffect(() => {
-		let isActive = true
-
-		if (!projectPath || !hasGit) {
+		if (!cacheKey || !projectPath || !hasGit) {
 			setData(null)
 			setLoading(false)
 			setError(null)
 			return
 		}
 
-		void (async () => {
+		const resourceKey = cacheKey
+
+		let isActive = true
+
+		const syncSnapshot = () => {
 			if (!isActive) {
 				return
 			}
 
+			const snapshot = getResourceSnapshot<ContributorsDashboardData>(resourceKey)
+			setData(snapshot.data)
+			setLoading(snapshot.loading)
+			setError(snapshot.data ? null : snapshot.error)
+		}
+
+		const unsubscribe = subscribeResource(resourceKey, syncSnapshot)
+
+		if (initialSnapshot?.data) {
+			syncSnapshot()
+		} else {
+			setData(null)
 			setLoading(true)
 			setError(null)
-			try {
-				const payload = (await Promise.race([
-					getContributorsDashboardData(projectPath),
-					new Promise<ContributorsDashboardData>((_, reject) => {
-						setTimeout(() => {
-							reject(
-								new Error('Contributors analysis took too long. Please try again.')
-							)
-						}, 20000)
-					})
-				])) as ContributorsDashboardData
+		}
 
-				if (!isActive) {
-					return
-				}
-				setData(payload)
+		void (async () => {
+			try {
+				await loadResource(resourceKey, async () => {
+					return (await Promise.race([
+						getContributorsDashboardData(projectPath),
+						new Promise<ContributorsDashboardData>((_, reject) => {
+							setTimeout(() => {
+								reject(
+									new Error(
+										'Contributors analysis took too long. Please try again.'
+									)
+								)
+							}, 20000)
+						})
+					])) as ContributorsDashboardData
+				})
 			} catch (e) {
-				if (!isActive) {
-					return
-				}
-				setError(e instanceof Error ? e.message : 'Failed to load contributors data')
-			} finally {
 				if (isActive) {
-					setLoading(false)
+					const snapshot = getResourceSnapshot<ContributorsDashboardData>(resourceKey)
+					if (!snapshot.data) {
+						setError(formatResourceError(e) || 'Failed to load contributors data')
+					}
 				}
 			}
 		})()
 
 		return () => {
 			isActive = false
+			unsubscribe()
 		}
-	}, [projectPath, hasGit])
+	}, [cacheKey, projectPath, hasGit])
 
 	const view = useMemo(() => buildContributorsViewModel(data), [data])
 

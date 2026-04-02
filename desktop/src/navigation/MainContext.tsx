@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { open as openDialog } from '@tauri-apps/api/dialog'
 import { invoke } from '@tauri-apps/api'
 import { scanDirectory } from '@/handles/scan'
+import { buildProjectCacheKey, getResourceSnapshot, loadResource } from '@/cache/resourceCache'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 
@@ -34,6 +35,7 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 	)
 	const [scanResult, setScanResult] = useState<ScanResult | null>(null)
 	const [projectPath, setProjectPath] = useState<string>('')
+	const projectPathRef = React.useRef('')
 	const [hasGit, setHasGit] = useState<boolean>(false)
 	const [projectName, setProjectName] = useState<string>('Project')
 	const [recentProjects, setRecentProjects] = useState<LocalProject[]>([])
@@ -42,6 +44,10 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 	useEffect(() => {
 		void loadRecentProjects()
 	}, [])
+
+	useEffect(() => {
+		projectPathRef.current = projectPath
+	}, [projectPath])
 
 	useEffect(() => {
 		if (!projectPath) {
@@ -134,13 +140,36 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 		const resolvedName = (
 			preferredName?.trim() || getProjectNameFromPath(normalizedPath)
 		).trim()
+		const cacheKey = buildProjectCacheKey('scan-directory', normalizedPath)
+		const cachedSnapshot = getResourceSnapshot<ScanResult>(cacheKey)
+		const loadScanResult = () => scanDirectory(normalizedPath)
 
 		try {
-			const result = await scanDirectory(normalizedPath)
-			setProjectPath(normalizedPath)
-			setProjectName(resolvedName || 'Project')
-			setScanResult(result)
-			changeView('analysis')
+			if (cachedSnapshot.data) {
+				setProjectPath(normalizedPath)
+				projectPathRef.current = normalizedPath
+				setProjectName(resolvedName || 'Project')
+				changeView('analysis')
+				setScanResult(cachedSnapshot.data)
+				void loadResource(cacheKey, loadScanResult, { force: true })
+					.then(result => {
+						if (projectPathRef.current === normalizedPath) {
+							setScanResult(result)
+						}
+					})
+					.catch(() => {
+						// Keep the cached result visible if the refresh fails.
+					})
+			} else {
+				const result = await loadResource(cacheKey, loadScanResult)
+				setProjectPath(normalizedPath)
+				projectPathRef.current = normalizedPath
+				setProjectName(resolvedName || 'Project')
+				changeView('analysis')
+				if (projectPathRef.current === normalizedPath) {
+					setScanResult(result)
+				}
+			}
 
 			if (persistProject) {
 				await saveRecentProject(normalizedPath, resolvedName || 'Project')
@@ -219,6 +248,7 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 
 		if (current && projectPath === current.path) {
 			setProjectPath('')
+			projectPathRef.current = ''
 			setProjectName('Project')
 			setScanResult(null)
 			setHasGit(false)
@@ -263,8 +293,13 @@ export const MainContextProvider = ({ children }: React.PropsWithChildren<{}>) =
 		if (!projectPath) return
 
 		try {
-			const result = await scanDirectory(projectPath)
-			setScanResult(result)
+			const cacheKey = buildProjectCacheKey('scan-directory', projectPath)
+			const result = await loadResource(cacheKey, () => scanDirectory(projectPath), {
+				force: true
+			})
+			if (projectPathRef.current === projectPath) {
+				setScanResult(result)
+			}
 		} catch (e) {
 			console.error('Failed to rescan:', e)
 		}

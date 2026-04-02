@@ -8,6 +8,14 @@ import { LocalProject } from '@/types'
 import { useEffect, useMemo, useState } from 'react'
 import { buildHomeHeadquartersData, splitTopLevelProjects } from '../analytics'
 import { HomeHeadquartersData, HomeProjectDataset } from '../types'
+import {
+	buildProjectCacheKey,
+	buildProjectSetCacheKey,
+	formatResourceError,
+	getResourceSnapshot,
+	loadResource,
+	subscribeResource
+} from '@/cache/resourceCache'
 
 type HeadquartersState = {
 	loading: boolean
@@ -58,11 +66,21 @@ export function useHomeHeadquarters(recentProjects: LocalProject[]) {
 		() => splitTopLevelProjects(recentProjects),
 		[recentProjects]
 	)
-	const [state, setState] = useState<HeadquartersState>({
-		loading: false,
-		error: null,
-		data: null
-	})
+	const cacheKey = useMemo(
+		() =>
+			[
+				buildProjectSetCacheKey('home-hq-considered', consideredProjects),
+				buildProjectSetCacheKey('home-hq-ignored', ignoredNestedProjects)
+			].join('|'),
+		[consideredProjects, ignoredNestedProjects]
+	)
+	const initialSnapshot =
+		consideredProjects.length > 0 ? getResourceSnapshot<HomeHeadquartersData>(cacheKey) : null
+	const [state, setState] = useState<HeadquartersState>(() => ({
+		loading: consideredProjects.length > 0 ? (initialSnapshot?.loading ?? true) : false,
+		error: initialSnapshot?.data ? null : (initialSnapshot?.error ?? null),
+		data: initialSnapshot?.data ?? null
+	}))
 
 	useEffect(() => {
 		if (consideredProjects.length === 0) {
@@ -72,72 +90,107 @@ export function useHomeHeadquarters(recentProjects: LocalProject[]) {
 
 		let cancelled = false
 
+		const syncSnapshot = () => {
+			if (cancelled) {
+				return
+			}
+
+			const snapshot = getResourceSnapshot<HomeHeadquartersData>(cacheKey)
+			setState({
+				loading: snapshot.loading,
+				error: snapshot.data ? null : snapshot.error,
+				data: snapshot.data
+			})
+		}
+
+		const unsubscribe = subscribeResource(cacheKey, syncSnapshot)
+
+		if (initialSnapshot?.data) {
+			syncSnapshot()
+		} else {
+			setState({ loading: true, error: null, data: null })
+		}
+
 		void (async () => {
-			setState(previous => ({ ...previous, loading: true, error: null }))
-
 			try {
-				const [languageColors, languageCategories] = await Promise.all([
-					getLanguageColors(),
-					getLanguageCategories()
-				])
+				const data = await loadResource(cacheKey, async () => {
+					const [languageColors, languageCategories] = await Promise.all([
+						getLanguageColors(),
+						getLanguageCategories()
+					])
 
-				const datasets = await mapWithConcurrency(
-					consideredProjects,
-					getScanConcurrency(),
-					async project => {
-						try {
-							const [scanResult, commits] = await Promise.all([
-								scanDirectory(project.path),
-								getCommitActivity(project.path).catch(() => [])
-							])
+					const datasets = await mapWithConcurrency(
+						consideredProjects,
+						getScanConcurrency(),
+						async project => {
+							try {
+								const [scanResult, commits] = await Promise.all([
+									loadResource(
+										buildProjectCacheKey('scan-directory', project.path),
+										() => scanDirectory(project.path)
+									),
+									loadResource(
+										buildProjectCacheKey('commit-activity', project.path),
+										() => getCommitActivity(project.path).catch(() => [])
+									)
+								])
 
-							const dataset: HomeProjectDataset = {
-								project,
-								scanResult,
-								commits
+								const dataset: HomeProjectDataset = {
+									project,
+									scanResult,
+									commits
+								}
+								return dataset
+							} catch {
+								return null
 							}
-							return dataset
-						} catch {
-							return null
 						}
+					)
+
+					const validDatasets = datasets.filter(
+						(dataset): dataset is HomeProjectDataset => dataset !== null
+					)
+
+					if (validDatasets.length === 0) {
+						throw new Error(
+							'Unable to compute aggregated Home insights from your projects. Try Auto Scan or re-scan your projects.'
+						)
 					}
-				)
+
+					return buildHomeHeadquartersData(
+						validDatasets,
+						ignoredNestedProjects,
+						languageColors,
+						languageCategories
+					)
+				})
 
 				if (cancelled) {
 					return
 				}
 
-				const validDatasets = datasets.filter(
-					(dataset): dataset is HomeProjectDataset => dataset !== null
-				)
-
-				if (validDatasets.length === 0) {
-					setState({
-						loading: false,
-						error: 'Unable to compute aggregated Home insights from your projects. Try Auto Scan or re-scan your projects.',
-						data: null
-					})
-					return
-				}
-
-				const data = buildHomeHeadquartersData(
-					validDatasets,
-					ignoredNestedProjects,
-					languageColors,
-					languageCategories
-				)
 				setState({ loading: false, error: null, data })
 			} catch (error) {
 				if (cancelled) {
 					return
 				}
 
+				const snapshot = getResourceSnapshot<HomeHeadquartersData>(cacheKey)
+				if (snapshot.data) {
+					setState(previous => ({
+						...previous,
+						loading: false,
+						error: null,
+						data: snapshot.data
+					}))
+					return
+				}
+
 				setState({
 					loading: false,
 					error:
-						error instanceof Error
-							? error.message
-							: 'Unexpected error while preparing Home insights.',
+						formatResourceError(error) ||
+						'Unexpected error while preparing Home insights.',
 					data: null
 				})
 			}
@@ -145,8 +198,9 @@ export function useHomeHeadquarters(recentProjects: LocalProject[]) {
 
 		return () => {
 			cancelled = true
+			unsubscribe()
 		}
-	}, [consideredProjects, ignoredNestedProjects])
+	}, [cacheKey, consideredProjects, ignoredNestedProjects])
 
 	return {
 		consideredProjects,
