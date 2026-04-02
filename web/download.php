@@ -1,33 +1,31 @@
 <?php
-require_once __DIR__ . '/lib/db.php';
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/lib/env.php';
+require_once __DIR__ . '/lib/tracker.php';
 
-initDownloadTables();
+env_load(__DIR__);
 
-$platform = $_GET['platform'] ?? '';
-$platform = strtolower($platform);
-if (!in_array($platform, ['mac', 'win', 'linux'], true)) {
-	http_response_code(400);
-	echo 'Invalid platform';
-	exit;
+$platform = strtolower(trim((string) ($_GET['platform'] ?? 'unknown')));
+$allowed = ['macos', 'windows', 'debian', 'ubuntu'];
+if (!in_array($platform, $allowed, true)) {
+	$platform = 'unknown';
 }
 
-$ip = $_SERVER['REMOTE_ADDR'] ?? null;
-$ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
-$pdo = db();
-
-$ins = $pdo->prepare('INSERT INTO download_events (platform, ip, user_agent) VALUES (?, ?, ?)');
-$ins->execute([$platform, $ip, $ua]);
-
-$upd = $pdo->prepare('UPDATE download_counts SET count = count + 1 WHERE platform = ?');
-$upd->execute([$platform]);
-
-$base = env('DOWNLOAD_BASE_URL', 'https://downloads.example.com/');
-$targets = [
-	'mac' => $base . 'codepulse-macos.dmg',
-	'win' => $base . 'codepulse-windows.exe',
-	'linux' => $base . 'codepulse-linux.tar.gz',
+$defaultTarget = env_get('DOWNLOAD_BASE_URL', 'https://github.com/AdlarX9/codepulse/releases/latest');
+$targetMap = [
+	'macos' => env_get('DOWNLOAD_URL_MACOS', $defaultTarget),
+	'windows' => env_get('DOWNLOAD_URL_WINDOWS', $defaultTarget),
+	'debian' => env_get('DOWNLOAD_URL_DEBIAN', $defaultTarget),
+	'ubuntu' => env_get('DOWNLOAD_URL_UBUNTU', $defaultTarget),
+	'unknown' => $defaultTarget,
 ];
 
-header('Location: ' . $targets[$platform]);
+$targetUrl = $targetMap[$platform] ?? $defaultTarget;
+track_download($platform, $targetUrl);
+
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Location: ' . $targetUrl, true, 302);
 exit;

@@ -1,49 +1,70 @@
 <?php
+
+declare(strict_types=1);
+
 require_once __DIR__ . '/env.php';
-require_once __DIR__ . '/db.php';
 
-function startSession(): void {
-	if (session_status() === PHP_SESSION_NONE) {
-		$secret = env('SESSION_SECRET', 'change-me');
-		session_name('codepulse_sess');
-		session_set_cookie_params([
-			'lifetime' => 0,
-			'path' => '/',
-			'secure' => false,
-			'httponly' => true,
-			'samesite' => 'Lax',
-		]);
-		session_start();
-		if (!isset($_SESSION['csrf'])) {
-			$_SESSION['csrf'] = bin2hex(random_bytes(16));
-		}
+function auth_start_session(): void
+{
+	if (session_status() === PHP_SESSION_ACTIVE) {
+		return;
 	}
+
+	$secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+	session_name('CODEPULSE_STATS');
+	session_set_cookie_params([
+		'lifetime' => 0,
+		'path' => '/',
+		'domain' => '',
+		'secure' => $secure,
+		'httponly' => true,
+		'samesite' => 'Lax',
+	]);
+	session_start();
 }
 
-function isAuthenticated(): bool {
-	startSession();
-	return !empty($_SESSION['user']);
+function auth_is_authenticated(): bool
+{
+	auth_start_session();
+	return ($_SESSION['stats_auth'] ?? false) === true;
 }
 
-function login(string $username, string $password): bool {
-	startSession();
-	$pdo = db();
-	$stmt = $pdo->prepare('SELECT * FROM users WHERE username = ?');
-	$stmt->execute([$username]);
-	$user = $stmt->fetch();
-	if ($user && password_verify($password, $user['password_hash'])) {
-		$_SESSION['user'] = [ 'id' => $user['id'], 'username' => $user['username'] ];
-		return true;
+function auth_validate_password(string $input): bool
+{
+	env_load(dirname(__DIR__));
+
+	$hash = env_get('STATS_PASSWORD_HASH');
+	if ($hash !== null && $hash !== '') {
+		return password_verify($input, $hash);
 	}
-	return false;
+
+	$plain = env_get('STATS_PASSWORD');
+	if ($plain === null || $plain === '') {
+		return false;
+	}
+
+	return hash_equals($plain, $input);
 }
 
-function logout(): void {
-	startSession();
+function auth_login(string $password): bool
+{
+	if (!auth_validate_password($password)) {
+		return false;
+	}
+
+	auth_start_session();
+	$_SESSION['stats_auth'] = true;
+	$_SESSION['stats_auth_at'] = time();
+	return true;
+}
+
+function auth_logout(): void
+{
+	auth_start_session();
 	$_SESSION = [];
 	if (ini_get('session.use_cookies')) {
 		$params = session_get_cookie_params();
-		setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+		setcookie(session_name(), '', time() - 3600, $params['path'], $params['domain'], (bool) $params['secure'], (bool) $params['httponly']);
 	}
 	session_destroy();
 }
