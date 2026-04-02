@@ -142,7 +142,7 @@ impl User {
 		}
 
 		if !replaced {
-			list.push(project);
+			list.insert(0, project);
 		}
 
 		storage().write_json(LOCAL_PROJECTS_STORAGE_KEY, &list)?;

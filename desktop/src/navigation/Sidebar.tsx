@@ -391,19 +391,32 @@ export default function Sidebar() {
 			}}
 		>
 			<div className='p-4 border-b border-gray-200'>
-				<button
-					onClick={() => changeView('dashboard')}
-					className='mb-4 flex w-full items-center gap-3 rounded-lg px-1 py-1 text-left transition-colors hover:bg-gray-100/80'
-					aria-label='Go to Home'
-				>
-					<div className='w-12 h-12 rounded-lg flex items-center justify-center'>
-						<img src={logo} alt='Logo' className='text-white font-bold text-sm' />
-					</div>
-					<div>
-						<div className='font-semibold text-sm'>CodePulse</div>
-						<div className='text-xs text-gray-400'>Code Analytics</div>
-					</div>
-				</button>
+				{(() => {
+					const isHomeActive = currentView === 'dashboard'
+					return (
+						<button
+							onClick={() => changeView('dashboard')}
+							className={`mb-4 flex w-full items-center gap-3 rounded-lg border px-1 py-1 text-left transition-colors ${
+								isHomeActive
+									? 'border-blue-200 bg-blue-50 text-gray-900'
+									: 'border-transparent hover:border-gray-200 hover:bg-gray-100/80'
+							}`}
+							aria-label='Go to Home'
+						>
+							<div className='w-12 h-12 rounded-lg flex items-center justify-center'>
+								<img
+									src={logo}
+									alt='Logo'
+									className='text-white font-bold text-sm'
+								/>
+							</div>
+							<div>
+								<div className='font-semibold text-sm'>CodePulse</div>
+								<div className='text-xs text-gray-400'>Code Analytics</div>
+							</div>
+						</button>
+					)
+				})()}
 				<SidebarItem
 					icon={<Settings className='w-5 h-5' />}
 					label='Settings'
@@ -417,9 +430,7 @@ export default function Sidebar() {
 					<h3 className='text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3'>
 						Projects
 					</h3>
-					<p className='px-3 pb-2 text-xs text-gray-400'>
-						Drag and drop to customize order.
-					</p>
+					<p className='px-3 pb-2 text-xs text-gray-400'>Your biggest coding projects.</p>
 					{recentProjects.length === 0 ? (
 						<div className='px-3 py-2 text-sm text-gray-500'>No recent projects</div>
 					) : (

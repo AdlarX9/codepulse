@@ -56,8 +56,7 @@ export default function HeadquartersHome({
 							Your Global Project Command Center
 						</h1>
 						<p className='mt-3 max-w-2xl text-sm text-slate-600'>
-							A unified view of your saved repositories. Nested projects are folded
-							into their parent to keep this overview clean and meaningful.
+							A unified view of your saved repositories, displaying code analytics that tells a lot about you.
 						</p>
 						<p className='mt-2 text-xs text-blue-700'>
 							Projects counted: {data.consideredProjects.length}
