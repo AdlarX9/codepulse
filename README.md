@@ -2,6 +2,8 @@
 
 CodePulse is a cross-platform desktop application that analyzes your codebase and provides detailed statistics, visualizations, and insights. It helps developers and teams understand their project's health, track code quality, and monitor contributor activity over time.
 
+You can download CodePulse by following [https://codepulse.alexis-larose.com](https://codepulse.alexis-larose.com)!
+
 ## 🚀 Quick Start
 
 You can run the following commands to easily run the application on your computer :
