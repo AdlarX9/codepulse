@@ -45,18 +45,19 @@ export default function HeadquartersHome({
 	]
 
 	return (
-		<div className='mx-auto max-w-7xl space-y-8'>
-			<section className='rounded-3xl border border-blue-100 bg-gradient-to-b from-blue-100 via-indigo-50 to-violet-100 p-6 text-slate-900 shadow-[0_24px_52px_-40px_rgba(59,130,246,0.45)] sm:p-8'>
+		<div className='mx-auto max-w-7xl space-y-8 pb-10'>
+			<section className='rounded-3xl border border-blue-100 bg-gradient-to-b from-blue-100 via-indigo-50 to-violet-100 p-4 text-slate-900 shadow-[0_24px_52px_-40px_rgba(59,130,246,0.45)] sm:p-8'>
 				<div className='flex flex-col gap-5 md:flex-row md:items-end md:justify-between'>
 					<div>
 						<p className='text-xs font-semibold uppercase tracking-[0.18em] text-blue-700'>
 							CodePulse HQ
 						</p>
-						<h1 className='mt-2 text-3xl font-bold tracking-tight sm:text-4xl'>
+						<h1 className='mt-2 text-2xl font-bold tracking-tight sm:text-4xl'>
 							Your Global Project Command Center
 						</h1>
 						<p className='mt-3 max-w-2xl text-sm text-slate-600'>
-							A unified view of your saved repositories, displaying code analytics that tells a lot about you.
+							A unified view of your saved repositories, displaying code analytics
+							that tells a lot about you.
 						</p>
 						<p className='mt-2 text-xs text-blue-700'>
 							Projects counted: {data.consideredProjects.length}
@@ -68,7 +69,7 @@ export default function HeadquartersHome({
 					<button
 						onClick={onAutoScan}
 						disabled={isAutoScanning}
-						className='inline-flex items-center justify-center gap-2 rounded-xl border border-blue-300 bg-gradient-to-b from-blue-600 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(37,99,235,0.95)] transition-colors hover:from-blue-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60'
+						className='inline-flex items-center justify-center gap-2 rounded-xl border border-blue-300 bg-gradient-to-b from-blue-600 to-violet-600 px-3.5 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-16px_rgba(37,99,235,0.95)] transition-colors hover:from-blue-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60'
 					>
 						<GitBranch className='h-4 w-4' />
 						{isAutoScanning ? 'Auto Scan in progress...' : 'Auto Scan'}
@@ -76,12 +77,12 @@ export default function HeadquartersHome({
 				</div>
 			</section>
 
-			<section className='grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.3fr]'>
-				<div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+			<section className='grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.3fr]'>
+				<div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 					<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 						Main Language
 					</p>
-					<div className='mt-3 text-3xl font-bold text-slate-900'>
+					<div className='mt-3 text-2xl font-bold text-slate-900 sm:text-3xl'>
 						{data.mainLanguage}
 					</div>
 					<p className='mt-3 text-sm text-slate-600'>
@@ -110,7 +111,7 @@ export default function HeadquartersHome({
 					</div>
 				</div>
 
-				<div className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+				<div className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 					<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 						Key Figures
 					</p>
@@ -123,7 +124,7 @@ export default function HeadquartersHome({
 								<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 									{figure.label}
 								</p>
-								<p className='mt-2 text-2xl font-bold text-slate-900'>
+								<p className='mt-2 text-xl font-bold text-slate-900 sm:text-2xl'>
 									{figure.value}
 								</p>
 							</div>
@@ -132,14 +133,14 @@ export default function HeadquartersHome({
 				</div>
 			</section>
 
-			<section className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+			<section className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 				<div className='mb-4 flex items-center gap-2'>
 					<PieChartIcon className='h-5 w-5 text-blue-600' />
 					<h2 className='text-lg font-semibold text-slate-900'>
 						Top 10 Languages by Total Lines
 					</h2>
 				</div>
-				<div className='h-[360px]'>
+				<div className='h-[280px] sm:h-[360px]'>
 					{data.languagePieRows.length > 0 ? (
 						<ResponsiveContainer width='100%' height='100%'>
 							<PieChart>
@@ -169,14 +170,14 @@ export default function HeadquartersHome({
 				</div>
 			</section>
 
-			<section className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+			<section className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 				<div className='mb-4 flex items-center gap-2'>
 					<Layers3 className='h-5 w-5 text-blue-600' />
 					<h2 className='text-lg font-semibold text-slate-900'>
 						Projects by Total Lines
 					</h2>
 				</div>
-				<div className='h-[340px]'>
+				<div className='h-[280px] sm:h-[340px]'>
 					{data.projectBarRows.length > 0 ? (
 						<ResponsiveContainer width='100%' height='100%'>
 							<BarChart
@@ -216,7 +217,7 @@ export default function HeadquartersHome({
 				</div>
 			</section>
 
-			<section className='rounded-3xl border border-slate-200 bg-white p-6 shadow-sm'>
+			<section className='rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 				<div className='mb-4 flex items-center gap-2'>
 					<Activity className='h-5 w-5 text-blue-600' />
 					<h2 className='text-lg font-semibold text-slate-900'>Languages Breakdown</h2>

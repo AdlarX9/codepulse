@@ -8,7 +8,7 @@ type ContributorsTableCardProps = {
 
 export function ContributorsTableCard({ rows }: ContributorsTableCardProps) {
 	return (
-		<Card className='rounded-xl border border-gray-200 bg-white p-6 shadow-sm'>
+		<Card className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6'>
 			<h4 className='mb-4 text-base font-semibold text-gray-900'>
 				Contributors Productivity
 			</h4>
@@ -19,7 +19,9 @@ export function ContributorsTableCard({ rows }: ContributorsTableCardProps) {
 							<th className='pb-3 font-medium'>Contributor</th>
 							<th className='pb-3 text-right font-medium'>Commits</th>
 							<th className='pb-3 text-right font-medium'>Lines</th>
-							<th className='pb-3 text-right font-medium'>Lines / commit</th>
+							<th className='hidden pb-3 text-right font-medium sm:table-cell'>
+								Lines / commit
+							</th>
 						</tr>
 					</thead>
 					<tbody className='divide-y divide-gray-100'>
@@ -39,7 +41,7 @@ export function ContributorsTableCard({ rows }: ContributorsTableCardProps) {
 								<td className='py-3 text-right text-gray-700'>
 									{formatInt(contributor.lines)}
 								</td>
-								<td className='py-3 text-right font-medium text-gray-900'>
+								<td className='hidden py-3 text-right font-medium text-gray-900 sm:table-cell'>
 									{formatDecimal(contributor.lines_per_commit)}
 								</td>
 							</tr>

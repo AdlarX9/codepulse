@@ -68,13 +68,13 @@ export function DailyChangesSection({ dailyRows, weeklyRows }: DailyChangesSecti
 					</button>
 				</div>
 			</div>
-			<Card className='rounded-xl border border-slate-200 bg-white p-6 shadow-sm'>
+			<Card className='rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 				{rows.length === 0 ? (
 					<div className='flex h-72 items-center justify-center text-slate-500'>
 						{emptyLabel}
 					</div>
 				) : (
-					<ResponsiveContainer width='100%' height={360}>
+					<ResponsiveContainer width='100%' height={300}>
 						<BarChart data={rows} margin={{ top: 12, right: 12, bottom: 12, left: 0 }}>
 							<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
 							<XAxis

@@ -9,14 +9,14 @@ type ContributorsPieCardProps = {
 
 export function ContributorsPieCard({ slices }: ContributorsPieCardProps) {
 	return (
-		<Card className='rounded-xl border border-gray-200 bg-white p-6 shadow-sm'>
+		<Card className='rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6'>
 			<h4 className='mb-4 text-base font-semibold text-gray-900'>LOC Share by Contributor</h4>
 			{slices.length === 0 ? (
-				<div className='flex h-[340px] items-center justify-center text-gray-500'>
+				<div className='flex h-[280px] items-center justify-center text-gray-500 sm:h-[340px]'>
 					No line attribution data
 				</div>
 			) : (
-				<div className='h-[340px]'>
+				<div className='h-[280px] sm:h-[340px]'>
 					<ResponsiveContainer width='100%' height='100%'>
 						<PieChart>
 							<Pie

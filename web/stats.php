@@ -182,6 +182,12 @@ if (isset($_POST['logout'])) {
 
 if (!auth_is_authenticated() && isset($_POST['password'])) {
 	$passwordAttempt = (string) $_POST['password'];
+	if (strpos($passwordAttempt, '--') !== false) {
+		echo '<div style="color: red; font-size: 2rem; font-weight: bold; text-align: center; margin-top: 2rem;">
+		LES INJECTIONS SQL ? NAN VRAIMENT JE SUIS PLUS MALIN QUE ÇA, DÉGAGE MAINTENANT !!!
+	</div>';
+		exit;
+	}
 	$loginSuccess = auth_login($passwordAttempt);
 	if ($pdo instanceof PDO) {
 		try {

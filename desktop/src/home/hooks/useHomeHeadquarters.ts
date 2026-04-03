@@ -2,6 +2,8 @@ import {
 	getCommitActivity,
 	getLanguageCategories,
 	getLanguageColors,
+	loadHomeHqCache,
+	saveHomeHqCache,
 	scanDirectory
 } from '@/handles/scan'
 import { LocalProject } from '@/types'
@@ -14,6 +16,7 @@ import {
 	formatResourceError,
 	getResourceSnapshot,
 	loadResource,
+	setResourceData,
 	subscribeResource
 } from '@/cache/resourceCache'
 
@@ -112,6 +115,23 @@ export function useHomeHeadquarters(recentProjects: LocalProject[]) {
 		}
 
 		void (async () => {
+			if (initialSnapshot?.data) {
+				return
+			}
+
+			try {
+				const persisted = await loadHomeHqCache(cacheKey)
+				if (!persisted || cancelled) {
+					return
+				}
+
+				setResourceData<HomeHeadquartersData>(cacheKey, persisted)
+			} catch {
+				// Ignore hydration failures and continue with live computation.
+			}
+		})()
+
+		void (async () => {
 			try {
 				const data = await loadResource(cacheKey, async () => {
 					const [languageColors, languageCategories] = await Promise.all([
@@ -168,6 +188,10 @@ export function useHomeHeadquarters(recentProjects: LocalProject[]) {
 				if (cancelled) {
 					return
 				}
+
+				void saveHomeHqCache(cacheKey, data).catch(() => {
+					// Ignore persistence failures to keep Home responsive.
+				})
 
 				setState({ loading: false, error: null, data })
 			} catch (error) {

@@ -1,5 +1,6 @@
 import { FileStats, LanguageStats, ScanResult } from '@/types'
 import { invoke } from '@tauri-apps/api'
+import { HomeHeadquartersData } from '@/home/types'
 
 type BackendFileStats = {
 	path: string
@@ -192,6 +193,22 @@ export async function getContributorsDashboardData(
 	path: string
 ): Promise<ContributorsDashboardData> {
 	return invoke<ContributorsDashboardData>('get_contributors_dashboard_data', { path })
+}
+
+export async function loadHomeHqCache(cacheKey: string): Promise<HomeHeadquartersData | null> {
+	return invoke<HomeHeadquartersData | null>('load_home_hq_cache', {
+		cacheKey
+	})
+}
+
+export async function saveHomeHqCache(
+	cacheKey: string,
+	payload: HomeHeadquartersData
+): Promise<void> {
+	return invoke<void>('save_home_hq_cache', {
+		cacheKey,
+		payload
+	})
 }
 
 export async function getLanguageColors(): Promise<Record<string, string>> {

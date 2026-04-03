@@ -4,10 +4,7 @@ import { Card } from '@/components/Card'
 import { useMainContext } from '@/navigation/MainContext'
 import { getLanguageCategories, getLanguageColors } from '@/handles/scan'
 import { FileStats } from '@/types'
-import {
-	GlobalStatistics,
-	SummaryRow
-} from '@/overview/components/GlobalStatistics'
+import { GlobalStatistics, SummaryRow } from '@/overview/components/GlobalStatistics'
 import { CodeCharts } from '@/overview/components/CodeCharts'
 import { LanguagesBreakdown } from '@/overview/components/LanguagesBreakdown'
 import { FilesExplorer } from '@/overview/components/FilesExplorer'
@@ -248,50 +245,50 @@ export default function OverviewDashboard() {
 	return (
 		<div className='space-y-6'>
 			<div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
-				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm rounded-xl'>
+				<Card className='rounded-xl border bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm sm:p-5'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 							Total Files
 						</p>
 						<FileCode className='h-4 w-4 text-slate-500' />
 					</div>
-					<div className='text-3xl font-bold text-slate-900'>
+					<div className='text-2xl font-bold text-slate-900 sm:text-3xl'>
 						{formatNumber(topMetrics.totalFiles)}
 					</div>
 				</Card>
 
-				<Card className='p-5 border bg-gradient-to-br from-white to-slate-50 shadow-sm rounded-xl'>
+				<Card className='rounded-xl border bg-gradient-to-br from-white to-slate-50 p-4 shadow-sm sm:p-5'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-slate-500'>
 							Total Lines
 						</p>
 						<FileText className='h-4 w-4 text-slate-500' />
 					</div>
-					<div className='text-3xl font-bold text-slate-900'>
+					<div className='text-2xl font-bold text-slate-900 sm:text-3xl'>
 						{formatNumber(topMetrics.totalLines)}
 					</div>
 				</Card>
 
-				<Card className='p-5 border bg-gradient-to-br from-blue-50 to-white shadow-sm rounded-xl'>
+				<Card className='rounded-xl border bg-gradient-to-br from-blue-50 to-white p-4 shadow-sm sm:p-5'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-blue-700'>
 							Lines Of Code
 						</p>
 						<Code2 className='h-4 w-4 text-blue-600' />
 					</div>
-					<div className='text-3xl font-bold text-blue-700'>
+					<div className='text-2xl font-bold text-blue-700 sm:text-3xl'>
 						{formatNumber(topMetrics.totalCode)}
 					</div>
 				</Card>
 
-				<Card className='p-5 border bg-gradient-to-br from-amber-50 to-white shadow-sm rounded-xl'>
+				<Card className='rounded-xl border bg-gradient-to-br from-amber-50 to-white p-4 shadow-sm sm:p-5'>
 					<div className='flex items-start justify-between mb-3'>
 						<p className='text-xs font-semibold uppercase tracking-wide text-amber-700'>
 							Main Language
 						</p>
 						<Trophy className='h-4 w-4 text-amber-600' />
 					</div>
-					<div className='text-2xl font-bold text-amber-700 truncate'>
+					<div className='truncate text-xl font-bold text-amber-700 sm:text-2xl'>
 						{topMetrics.mainLanguage}
 					</div>
 				</Card>
@@ -305,10 +302,7 @@ export default function OverviewDashboard() {
 
 			<GlobalStatistics rows={sectionOneRows} />
 
-			<LanguagesBreakdown
-				rows={languageBreakdownData}
-				languageColors={languageColors}
-			/>
+			<LanguagesBreakdown rows={languageBreakdownData} languageColors={languageColors} />
 
 			<FilesExplorer
 				projectPath={projectPath}

@@ -15,7 +15,7 @@ use serde_json::{json, Value as JsonValue};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size, State};
 
 struct AppState {
 	cancel_flag: Arc<AtomicBool>,
@@ -117,8 +117,48 @@ async fn auto_scan_projects() -> Result<Vec<JsonValue>, String> {
 	user().merge_auto_scan_projects(projects)
 }
 
+#[tauri::command]
+async fn load_home_hq_cache(cache_key: String) -> Result<Option<JsonValue>, String> {
+	user().load_home_hq_cache(&cache_key)
+}
+
+#[tauri::command]
+async fn save_home_hq_cache(cache_key: String, payload: JsonValue) -> Result<(), String> {
+	user().save_home_hq_cache(&cache_key, payload)
+}
+
 fn main() {
 	tauri::Builder::default()
+		.setup(|app| {
+			if let Some(window) = app.get_window("main") {
+				let monitor = match window.current_monitor() {
+					Ok(current) => current,
+					Err(_) => None,
+				};
+
+				if let Some(monitor) = monitor {
+					let monitor_size = monitor.size();
+					let scale_factor = monitor.scale_factor();
+
+					let screen_width = monitor_size.width as f64 / scale_factor;
+					let screen_height = monitor_size.height as f64 / scale_factor;
+
+					let target_width = (screen_width * 0.84).clamp(900.0, 1800.0);
+					let target_height = (screen_height * 0.84).clamp(650.0, 1300.0);
+
+					let _ = window
+						.set_size(Size::Logical(LogicalSize::new(target_width, target_height)));
+
+					let pos_x = ((screen_width - target_width) / 2.0).max(0.0);
+					let pos_y = ((screen_height - target_height) / 2.0).max(0.0);
+
+					let _ =
+						window.set_position(Position::Logical(LogicalPosition::new(pos_x, pos_y)));
+				}
+			}
+
+			Ok(())
+		})
 		.manage(AppState { cancel_flag: Arc::new(AtomicBool::new(false)) })
 		.invoke_handler(tauri::generate_handler![
 			// Project
@@ -140,6 +180,8 @@ fn main() {
 			delete_project,
 			set_projects_order,
 			auto_scan_projects,
+			load_home_hq_cache,
+			save_home_hq_cache,
 			// CRUD Scan Settings
 			update_scan_settings,
 			get_scan_settings,

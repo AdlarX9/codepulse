@@ -17,7 +17,7 @@ export function GeneralStatsSection({ stats }: GeneralStatsSectionProps) {
 			<div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
 				<StatCard title='Snapshots'>
 					<div className='flex items-end justify-between'>
-						<p className='text-3xl font-bold text-slate-900'>
+						<p className='text-2xl font-bold text-slate-900 sm:text-3xl'>
 							{formatInt(stats.snapshots)}
 						</p>
 						<GitCommit className='h-5 w-5 text-slate-400' />
@@ -35,7 +35,7 @@ export function GeneralStatsSection({ stats }: GeneralStatsSectionProps) {
 
 				<StatCard title='Age'>
 					<div className='flex items-end justify-between'>
-						<p className='text-3xl font-bold text-slate-900'>
+						<p className='text-2xl font-bold text-slate-900 sm:text-3xl'>
 							{formatInt(stats.ageDays)}
 						</p>
 						<CalendarRange className='h-5 w-5 text-slate-400' />

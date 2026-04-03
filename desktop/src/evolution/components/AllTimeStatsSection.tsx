@@ -17,7 +17,7 @@ export function AllTimeStatsSection({ stats }: AllTimeStatsSectionProps) {
 			<div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
 				<StatCard title='Peak LOC'>
 					<div className='flex items-end justify-between'>
-						<p className='text-3xl font-bold text-slate-900'>
+						<p className='text-2xl font-bold text-slate-900 sm:text-3xl'>
 							{formatInt(stats.peakLoc)}
 						</p>
 						<Mountain className='h-5 w-5 text-slate-400' />
@@ -26,7 +26,7 @@ export function AllTimeStatsSection({ stats }: AllTimeStatsSectionProps) {
 
 				<StatCard title='Biggest Bump'>
 					<div className='flex items-end justify-between'>
-						<p className='text-3xl font-bold text-emerald-600'>
+						<p className='text-2xl font-bold text-emerald-600 sm:text-3xl'>
 							+{formatInt(stats.biggestBump)}
 						</p>
 						<ArrowBigUpDash className='h-5 w-5 text-slate-400' />
@@ -35,7 +35,7 @@ export function AllTimeStatsSection({ stats }: AllTimeStatsSectionProps) {
 
 				<StatCard title='Longest Streak'>
 					<div className='flex items-end justify-between'>
-						<p className='text-3xl font-bold text-blue-700'>
+						<p className='text-2xl font-bold text-blue-700 sm:text-3xl'>
 							{formatInt(stats.longestStreakDays)}
 						</p>
 						<Flame className='h-5 w-5 text-slate-400' />
@@ -45,7 +45,7 @@ export function AllTimeStatsSection({ stats }: AllTimeStatsSectionProps) {
 
 				<StatCard title='Longest Inactivity Period'>
 					<div className='flex items-end justify-between'>
-						<p className='text-3xl font-bold text-amber-700'>
+						<p className='text-2xl font-bold text-amber-700 sm:text-3xl'>
 							{formatInt(stats.longestInactivityDays)}
 						</p>
 						<PauseCircle className='h-5 w-5 text-slate-400' />

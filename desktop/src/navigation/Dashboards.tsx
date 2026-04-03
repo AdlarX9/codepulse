@@ -89,16 +89,18 @@ export default function Dashboards() {
 	}, [activeTab, hasGit, contributorsDisabled])
 
 	return (
-		<div className='h-full flex flex-col'>
+		<div className='flex h-full min-w-0 flex-col'>
 			{/* Header */}
-			<div className='border-b bg-white px-6 py-4'>
-				<div className='flex items-center justify-between gap-4'>
-					<div>
-						<h1 className='text-2xl font-bold text-gray-900'>{projectName}</h1>
+			<div className='border-b bg-white px-3 py-3 sm:px-4 sm:py-4 lg:px-6'>
+				<div className='flex flex-wrap items-center justify-between gap-3'>
+					<div className='min-w-0'>
+						<h1 className='truncate text-xl font-bold text-gray-900 sm:text-2xl'>
+							{projectName}
+						</h1>
 						<p className='text-sm text-gray-500 mt-1'>Project insights and analytics</p>
 					</div>
 					{scanResult ? (
-						<div className='flex items-center gap-2'>
+						<div className='flex items-center gap-2 sm:ml-auto'>
 							<ExportButton />
 						</div>
 					) : null}
@@ -107,7 +109,7 @@ export default function Dashboards() {
 
 			{/* Tab Navigation - Notion Style */}
 			<div className='border-b bg-white'>
-				<div className='px-6'>
+				<div className='px-2 sm:px-4 lg:px-6'>
 					<div className='flex gap-1 overflow-x-auto'>
 						{availableTabs.map(tab => (
 							<button
@@ -120,7 +122,7 @@ export default function Dashboards() {
 								}}
 								disabled={tab.disabled}
 								className={`
-									flex items-center gap-2 px-4 py-3 text-sm font-medium
+									flex items-center gap-2 px-3 py-2.5 text-sm font-medium
 									border-b-2 transition-colors whitespace-nowrap
 									${
 										tab.disabled
@@ -140,7 +142,7 @@ export default function Dashboards() {
 			</div>
 
 			{/* Tab Description */}
-			<div className='bg-gray-50 border-b px-6 py-3'>
+			<div className='bg-gray-50 border-b px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6'>
 				<p className='text-sm text-gray-600'>
 					{availableTabs.find(t => t.id === activeTab)?.description}
 				</p>
@@ -148,14 +150,12 @@ export default function Dashboards() {
 
 			{/* Content Area */}
 			<div className='flex-1 overflow-auto bg-gray-50'>
-				<div className='flex'>
-					<div className='flex-1 p-6'>
-						{activeTab === 'overview' && <OverviewDashboard />}
-						{activeTab === 'evolution' && hasGit && <EvolutionDashboard />}
-						{activeTab === 'contributors' && !contributorsDisabled && (
-							<ContributorsDashboard />
-						)}
-					</div>
+				<div className='min-w-0 p-3 sm:p-4 lg:p-6'>
+					{activeTab === 'overview' && <OverviewDashboard />}
+					{activeTab === 'evolution' && hasGit && <EvolutionDashboard />}
+					{activeTab === 'contributors' && !contributorsDisabled && (
+						<ContributorsDashboard />
+					)}
 				</div>
 			</div>
 		</div>

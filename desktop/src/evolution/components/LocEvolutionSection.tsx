@@ -107,13 +107,13 @@ export function LocEvolutionSection({
 				</div>
 			</div>
 
-			<Card className='rounded-xl border border-slate-200 bg-white p-6 shadow-sm'>
+			<Card className='rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6'>
 				{points.length === 0 ? (
 					<div className='flex h-72 items-center justify-center text-slate-500'>
 						No evolution data
 					</div>
 				) : scaleMode === 'snapshots' ? (
-					<ResponsiveContainer width='100%' height={340}>
+					<ResponsiveContainer width='100%' height={300}>
 						<AreaChart data={snapshotData}>
 							<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
 							<XAxis dataKey='x' tick={{ fontSize: 12 }} minTickGap={24} />
@@ -145,7 +145,7 @@ export function LocEvolutionSection({
 						</AreaChart>
 					</ResponsiveContainer>
 				) : (
-					<ResponsiveContainer width='100%' height={340}>
+					<ResponsiveContainer width='100%' height={300}>
 						<AreaChart data={timeData}>
 							<CartesianGrid strokeDasharray='3 3' stroke='#e5e7eb' />
 							<XAxis

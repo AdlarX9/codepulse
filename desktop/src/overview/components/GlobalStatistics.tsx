@@ -34,24 +34,26 @@ type GlobalStatisticsProps = {
 
 export function GlobalStatistics({ rows }: GlobalStatisticsProps) {
 	return (
-		<Card className='p-6 border bg-white shadow-sm rounded-xl'>
+		<Card className='rounded-xl border bg-white p-4 shadow-sm sm:p-6'>
 			<div className='flex items-center gap-2 mb-4'>
 				<h3 className='text-lg font-semibold text-slate-900'>Global Statistics</h3>
 			</div>
 			<div className='overflow-x-auto'>
-				<table className='w-full min-w-[900px]'>
+				<table className='w-full'>
 					<thead>
 						<tr className='text-left text-xs uppercase tracking-wide text-slate-500'>
 							<th className='pb-3 pr-3 font-semibold'>Scope</th>
 							<th className='pb-3 px-3 font-semibold text-right'>Total Files</th>
 							<th className='pb-3 px-3 font-semibold text-right'>Total Lines</th>
-							<th className='pb-3 px-3 font-semibold text-right'>
+							<th className='hidden pb-3 px-3 text-right font-semibold md:table-cell'>
 								Mean (lines/file)
 							</th>
-							<th className='pb-3 px-3 font-semibold text-right'>
+							<th className='hidden pb-3 px-3 text-right font-semibold lg:table-cell'>
 								Median (lines/file)
 							</th>
-							<th className='pb-3 pl-3 font-semibold text-right'>Std deviation</th>
+							<th className='hidden pb-3 pl-3 text-right font-semibold xl:table-cell'>
+								Std deviation
+							</th>
 						</tr>
 					</thead>
 					<tbody className='text-sm text-slate-700'>
@@ -70,11 +72,13 @@ export function GlobalStatistics({ rows }: GlobalStatisticsProps) {
 								<td className='py-3 px-3 text-right font-semibold text-slate-900'>
 									{formatNumber(row.totalLines)}
 								</td>
-								<td className='py-3 px-3 text-right'>{formatDecimal(row.mean)}</td>
-								<td className='py-3 px-3 text-right'>
+								<td className='hidden py-3 px-3 text-right md:table-cell'>
+									{formatDecimal(row.mean)}
+								</td>
+								<td className='hidden py-3 px-3 text-right lg:table-cell'>
 									{formatDecimal(row.median)}
 								</td>
-								<td className='py-3 pl-3 text-right'>
+								<td className='hidden py-3 pl-3 text-right xl:table-cell'>
 									{formatDecimal(row.stdDeviation)}
 								</td>
 							</tr>

@@ -8,6 +8,7 @@ use std::sync::Mutex;
 
 pub const SCAN_SETTINGS_STORAGE_KEY: &str = "scan_settings";
 pub const LOCAL_PROJECTS_STORAGE_KEY: &str = "local_projects";
+pub const HOME_HQ_CACHE_STORAGE_KEY: &str = "home_hq_cache";
 
 pub struct User {
 	pub projects: Mutex<Vec<Project>>,
@@ -228,5 +229,31 @@ impl User {
 		storage().write_json(LOCAL_PROJECTS_STORAGE_KEY, &ordered)?;
 		self.sync_projects_from_json(&ordered);
 		Ok(ordered)
+	}
+
+	pub fn load_home_hq_cache(&self, cache_key: &str) -> Result<Option<JsonValue>, String> {
+		if cache_key.trim().is_empty() {
+			return Ok(None);
+		}
+
+		let cache =
+			match storage().read_json::<HashMap<String, JsonValue>>(HOME_HQ_CACHE_STORAGE_KEY) {
+				Ok(found) => found,
+				Err(_) => return Ok(None),
+			};
+
+		Ok(cache.get(cache_key).cloned())
+	}
+
+	pub fn save_home_hq_cache(&self, cache_key: &str, payload: JsonValue) -> Result<(), String> {
+		if cache_key.trim().is_empty() {
+			return Err("cache_key required".into());
+		}
+
+		let mut cache = storage()
+			.read_json::<HashMap<String, JsonValue>>(HOME_HQ_CACHE_STORAGE_KEY)
+			.unwrap_or_default();
+		cache.insert(cache_key.to_string(), payload);
+		storage().write_json(HOME_HQ_CACHE_STORAGE_KEY, &cache)
 	}
 }

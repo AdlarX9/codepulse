@@ -34,7 +34,7 @@ function formatNumber(num: number): string {
 
 function getRelativePath(absolutePath: string, basePath: string): string {
 	if (absolutePath.startsWith(basePath)) {
-		return absolutePath.slice(basePath.length).replace(/^[\\/]/, './')
+		return absolutePath.slice(basePath.length).replace(/^[\\/]/, '')
 	}
 	return absolutePath
 }
@@ -50,10 +50,10 @@ export function FilesExplorer({
 	languageColors
 }: FilesExplorerProps) {
 	return (
-		<Card className='p-6 border bg-white shadow-sm rounded-xl'>
+		<Card className='rounded-xl border bg-white p-4 shadow-sm sm:p-6'>
 			<div className='flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between'>
 				<h3 className='text-lg font-semibold text-slate-900'>Files Explorer</h3>
-				<div className='flex gap-2 w-full md:w-auto'>
+				<div className='flex w-full flex-col gap-2 sm:flex-row md:w-auto'>
 					<div className='relative w-full md:w-52'>
 						<select
 							className='w-full border border-slate-300 rounded-md px-3 py-2 text-sm text-slate-700 bg-white'
@@ -81,18 +81,24 @@ export function FilesExplorer({
 				</div>
 			</div>
 			<div className='text-xs text-slate-500 mb-4'>
-				Project root: <span className='font-mono'>{projectPath}</span>
+				Project root: <span className='font-mono break-all'>{projectPath}</span>
 			</div>
 			<div className='overflow-x-auto'>
-				<table className='w-full min-w-[980px]'>
+				<table className='w-full'>
 					<thead className='border-b border-slate-200'>
 						<tr className='text-left text-sm text-slate-600'>
 							<th className='pb-3 font-medium'>Path</th>
 							<th className='pb-3 font-medium'>Language</th>
 							<th className='pb-3 font-medium text-right'>Total</th>
-							<th className='pb-3 font-medium text-right'>True code</th>
-							<th className='pb-3 font-medium text-right'>Comments</th>
-							<th className='pb-3 font-medium text-right'>Blank</th>
+							<th className='hidden pb-3 text-right font-medium sm:table-cell'>
+								True code
+							</th>
+							<th className='hidden pb-3 text-right font-medium md:table-cell'>
+								Comments
+							</th>
+							<th className='hidden pb-3 text-right font-medium lg:table-cell'>
+								Blank
+							</th>
 						</tr>
 					</thead>
 					<tbody className='divide-y divide-slate-100'>
@@ -110,7 +116,9 @@ export function FilesExplorer({
 												<Info className='h-4 w-4 text-sky-600 shrink-0' />
 											</span>
 										)}
-										<span>{getRelativePath(file.path, projectPath)}</span>
+										<span className='break-all'>
+											{getRelativePath(file.path, projectPath)}
+										</span>
 									</div>
 								</td>
 								<td className='py-3'>
@@ -130,13 +138,13 @@ export function FilesExplorer({
 								<td className='py-3 text-right text-slate-900 font-semibold'>
 									{formatNumber(file.total)}
 								</td>
-								<td className='py-3 text-right text-slate-900 font-medium'>
+								<td className='hidden py-3 text-right font-medium text-slate-900 sm:table-cell'>
 									{formatNumber(file.code)}
 								</td>
-								<td className='py-3 text-right text-slate-600'>
+								<td className='hidden py-3 text-right text-slate-600 md:table-cell'>
 									{formatNumber(file.comment)}
 								</td>
-								<td className='py-3 text-right text-slate-600'>
+								<td className='hidden py-3 text-right text-slate-600 lg:table-cell'>
 									{formatNumber(file.blank)}
 								</td>
 							</tr>

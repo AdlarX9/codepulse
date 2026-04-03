@@ -6,7 +6,7 @@ import {
 	useRef,
 	useState
 } from 'react'
-import { Code2, FolderOpen, GripVertical, Settings } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Code2, FolderOpen, GripVertical, Settings } from 'lucide-react'
 
 import logo from '../assets/icon.png'
 import { useMainContext } from './MainContext'
@@ -88,7 +88,9 @@ function ProjectSidebarItem({
 	onDrop
 }: ProjectSidebarItemProps) {
 	return (
-		<div
+		<button
+			onClick={onOpen}
+			disabled={isRenaming}
 			draggable={!isRenaming}
 			onContextMenu={onContextMenu}
 			onDragStart={e => {
@@ -116,8 +118,8 @@ function ProjectSidebarItem({
 			}}
 			className={
 				active
-					? 'mb-1 rounded-lg border border-blue-200 bg-blue-50'
-					: 'mb-1 rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-100/80'
+					? 'mb-1 rounded-lg border border-blue-200 bg-blue-50 w-full'
+					: 'mb-1 rounded-lg border border-transparent hover:border-gray-200 hover:bg-gray-100/80 w-full'
 			}
 			style={{
 				opacity: isDragging ? 0.45 : 1,
@@ -139,19 +141,26 @@ function ProjectSidebarItem({
 							className='w-full rounded-md border border-blue-300 bg-white px-2 py-1 text-sm font-medium text-gray-900 outline-none ring-0 focus:border-blue-400 focus:ring-2 focus:ring-blue-100'
 						/>
 					) : (
-						<button onClick={onOpen} className='min-w-0 flex-1 text-left'>
+						<div className='min-w-0 flex-1 text-left'>
 							<span className='block w-full truncate text-sm font-medium text-gray-900'>
 								{project.name}
 							</span>
-						</button>
+						</div>
 					)}
 				</div>
 			</div>
-		</div>
+		</button>
 	)
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+	isOpen: boolean
+	onToggle: () => void
+	onClose: () => void
+	isCompactScreen: boolean
+}
+
+export default function Sidebar({ isOpen, onToggle, onClose, isCompactScreen }: SidebarProps) {
 	const {
 		selectAndScan,
 		recentProjects,
@@ -301,6 +310,9 @@ export default function Sidebar() {
 	}, [isResizing])
 
 	function startSidebarResize(event: ReactMouseEvent<HTMLDivElement>) {
+		if (isCompactScreen) {
+			return
+		}
 		event.preventDefault()
 		event.stopPropagation()
 		setIsResizing(true)
@@ -384,19 +396,46 @@ export default function Sidebar() {
 	return (
 		<aside
 			ref={sidebarRef}
-			className='relative bg-gray-50 border-r text-gray-900 flex-shrink-0 flex flex-col'
-			style={{ width: `${sidebarWidth}px` }}
+			className={`flex flex-col border-r bg-gray-50 text-gray-900 ${
+				isCompactScreen
+					? `fixed inset-y-0 left-0 z-40 transition-transform duration-200 ${
+							isOpen ? 'translate-x-0' : '-translate-x-full'
+						}`
+					: isOpen
+						? 'relative'
+						: 'hidden'
+			}`}
+			style={{ width: `${sidebarWidth}px`, maxWidth: '85vw' }}
 			onContextMenu={event => {
 				event.preventDefault()
 			}}
 		>
 			<div className='p-4 border-b border-gray-200'>
+				<div className='mb-3 flex items-center justify-end absolute top-2 right-2'>
+					<button
+						type='button'
+						onClick={onToggle}
+						className='inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 transition hover:bg-gray-100'
+						aria-label={isOpen ? 'Close sidebar' : 'Open sidebar'}
+					>
+						{isOpen ? (
+							<ChevronLeft className='h-4 w-4' />
+						) : (
+							<ChevronRight className='h-4 w-4' />
+						)}
+					</button>
+				</div>
 				{(() => {
 					const isHomeActive = currentView === 'dashboard'
 					return (
 						<button
-							onClick={() => changeView('dashboard')}
-							className={`mb-4 flex w-full items-center gap-3 rounded-lg border px-1 py-1 text-left transition-colors ${
+							onClick={() => {
+								changeView('dashboard')
+								if (isCompactScreen) {
+									onClose()
+								}
+							}}
+							className={`my-4 flex w-full items-center gap-3 rounded-lg border px-1 py-1 text-left transition-colors ${
 								isHomeActive
 									? 'border-blue-200 bg-blue-50 text-gray-900'
 									: 'border-transparent hover:border-gray-200 hover:bg-gray-100/80'
@@ -421,7 +460,12 @@ export default function Sidebar() {
 					icon={<Settings className='w-5 h-5' />}
 					label='Settings'
 					active={currentView === 'settings'}
-					onClick={() => changeView('settings')}
+					onClick={() => {
+						changeView('settings')
+						if (isCompactScreen) {
+							onClose()
+						}
+					}}
 				/>
 			</div>
 
@@ -450,6 +494,9 @@ export default function Sidebar() {
 								onOpen={() => {
 									if (renamingProjectId !== project.id) {
 										void openRecentProject(project)
+										if (isCompactScreen) {
+											onClose()
+										}
 									}
 								}}
 								onContextMenu={event => openProjectContextMenu(event, project)}
@@ -525,7 +572,9 @@ export default function Sidebar() {
 				aria-orientation='vertical'
 				aria-label='Resize sidebar'
 				onMouseDown={startSidebarResize}
-				className='absolute right-0 top-0 h-full w-2 cursor-col-resize group'
+				className={`absolute right-0 top-0 h-full w-2 cursor-col-resize group ${
+					isCompactScreen ? 'hidden' : ''
+				}`}
 			>
 				<div
 					className={`pointer-events-none absolute right-0 top-0 h-full w-[2px] transition-colors ${

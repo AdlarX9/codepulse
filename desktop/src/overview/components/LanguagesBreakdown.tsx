@@ -21,12 +21,9 @@ function formatNumber(num: number): string {
 	return new Intl.NumberFormat('en-US').format(num)
 }
 
-export function LanguagesBreakdown({
-	rows,
-	languageColors
-}: LanguagesBreakdownProps) {
+export function LanguagesBreakdown({ rows, languageColors }: LanguagesBreakdownProps) {
 	return (
-		<Card className='p-6 border bg-white shadow-sm rounded-xl'>
+		<Card className='rounded-xl border bg-white p-4 shadow-sm sm:p-6'>
 			<div className='mb-4 flex items-center justify-between gap-3'>
 				<h3 className='text-lg font-semibold text-slate-900'>Languages Breakdown</h3>
 				<span className='text-sm font-medium text-slate-600'>
@@ -40,9 +37,15 @@ export function LanguagesBreakdown({
 							<th className='pb-3 font-medium'>Language</th>
 							<th className='pb-3 font-medium text-right'>Files</th>
 							<th className='pb-3 font-medium text-right'>Total</th>
-							<th className='pb-3 font-medium text-right'>True code</th>
-							<th className='pb-3 font-medium text-right'>Comments</th>
-							<th className='pb-3 font-medium text-right'>Blank</th>
+							<th className='hidden pb-3 text-right font-medium sm:table-cell'>
+								True code
+							</th>
+							<th className='hidden pb-3 text-right font-medium md:table-cell'>
+								Comments
+							</th>
+							<th className='hidden pb-3 text-right font-medium lg:table-cell'>
+								Blank
+							</th>
 						</tr>
 					</thead>
 					<tbody className='divide-y divide-slate-100'>
@@ -68,13 +71,13 @@ export function LanguagesBreakdown({
 								<td className='py-3 text-right text-slate-900 font-semibold'>
 									{formatNumber(stats.total)}
 								</td>
-								<td className='py-3 text-right text-slate-900 font-medium'>
+								<td className='hidden py-3 text-right font-medium text-slate-900 sm:table-cell'>
 									{formatNumber(stats.code)}
 								</td>
-								<td className='py-3 text-right text-slate-600'>
+								<td className='hidden py-3 text-right text-slate-600 md:table-cell'>
 									{formatNumber(stats.comment)}
 								</td>
-								<td className='py-3 text-right text-slate-600'>
+								<td className='hidden py-3 text-right text-slate-600 lg:table-cell'>
 									{formatNumber(stats.blank)}
 								</td>
 							</tr>
